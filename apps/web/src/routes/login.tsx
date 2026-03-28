@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AuthPanel } from "@/components/authPanel";
-import { redirectIfAuthenticated } from "@/lib/requireAuth";
+import { AuthPanel } from "@/components/auth-panel";
+import { redirectIfAuthenticated } from "@/lib/require-auth";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: redirectIfAuthenticated,

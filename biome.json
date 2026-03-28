@@ -27,9 +27,6 @@
     "rules": {
       "performance": {
         "noBarrelFile": "off"
-      },
-      "style": {
-        "useFilenamingConvention": "off"
       }
     }
   },
@@ -43,7 +40,18 @@
             "noExcessiveCognitiveComplexity": "off"
           },
           "style": {
-            "useConsistentTypeDefinitions": "off"
+            "useConsistentTypeDefinitions": "off",
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["AGENTS.md", "README.md"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
           }
         }
       }

@@ -10,7 +10,7 @@ import {
 import type { PropsWithChildren } from "react";
 
 import { Button } from "@/components/ui/button";
-import { useLiveUpdates } from "@/hooks/useLiveUpdates";
+import { useLiveUpdates } from "@/hooks/use-live-updates";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 

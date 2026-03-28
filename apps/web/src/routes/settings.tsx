@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { AppShell } from "@/components/appShell";
+import { AppShell } from "@/components/app-shell";
 import Loader from "@/components/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCreateDestination } from "@/hooks/useCreateDestination";
-import { useSettingsBootstrap } from "@/hooks/useSettingsBootstrap";
-import { useUpdateNotificationPreferences } from "@/hooks/useUpdateNotificationPreferences";
-import { requireAuth } from "@/lib/requireAuth";
+import { useCreateDestination } from "@/hooks/use-create-destination";
+import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
+import { useUpdateNotificationPreferences } from "@/hooks/use-update-notification-preferences";
+import { requireAuth } from "@/lib/require-auth";
 
 const destinationFieldIds = {
   absolutePath: "destination-absolute-path",

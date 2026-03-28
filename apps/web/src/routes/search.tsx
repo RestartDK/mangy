@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { AppShell } from "@/components/appShell";
+import { AppShell } from "@/components/app-shell";
 import Loader from "@/components/loader";
-import { PlaceholderPanel } from "@/components/placeholderPanel";
-import { SeriesCard } from "@/components/seriesCard";
+import { PlaceholderPanel } from "@/components/placeholder-panel";
+import { SeriesCard } from "@/components/series-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSourceFilters } from "@/hooks/useSourceFilters";
-import { useSourceSearch } from "@/hooks/useSourceSearch";
-import { useSources } from "@/hooks/useSources";
-import { requireAuth } from "@/lib/requireAuth";
+import { useSourceFilters } from "@/hooks/use-source-filters";
+import { useSourceSearch } from "@/hooks/use-source-search";
+import { useSources } from "@/hooks/use-sources";
+import { requireAuth } from "@/lib/require-auth";
 
 export const Route = createFileRoute("/search")({
   beforeLoad: requireAuth,

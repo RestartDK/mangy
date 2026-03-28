@@ -1,2 +1,2 @@
-export * from "./adapters/mangaDex";
+export * from "./adapters/manga-dex";
 export * from "./types";

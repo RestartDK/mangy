@@ -1,4 +1,4 @@
-import { createMangaDexSourceAdapter } from "./adapters/mangaDex";
+import { createMangaDexSourceAdapter } from "./adapters/manga-dex";
 import type { SourceAdapter } from "./types";
 
 export interface SourceRegistry {

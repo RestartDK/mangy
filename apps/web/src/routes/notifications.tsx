@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AppShell } from "@/components/appShell";
-import { PlaceholderPanel } from "@/components/placeholderPanel";
+import { AppShell } from "@/components/app-shell";
+import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { Button } from "@/components/ui/button";
-import { useMarkAllNotificationsRead } from "@/hooks/useMarkAllNotificationsRead";
-import { useMarkNotificationRead } from "@/hooks/useMarkNotificationRead";
-import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
-import { useNotifications } from "@/hooks/useNotifications";
-import { requireAuth } from "@/lib/requireAuth";
+import { useMarkAllNotificationsRead } from "@/hooks/use-mark-all-notifications-read";
+import { useMarkNotificationRead } from "@/hooks/use-mark-notification-read";
+import { useNotificationPreferences } from "@/hooks/use-notification-preferences";
+import { useNotifications } from "@/hooks/use-notifications";
+import { requireAuth } from "@/lib/require-auth";
 
 export const Route = createFileRoute("/notifications")({
   beforeLoad: requireAuth,

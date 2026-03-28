@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-import type { DiscoverSection } from "@/hooks/useSourceDiscover";
+import type { DiscoverSection } from "@/hooks/use-source-discover";
 
 type SeriesCardItem = DiscoverSection["items"][number];
 

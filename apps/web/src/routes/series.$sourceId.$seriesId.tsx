@@ -1,17 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { AppShell } from "@/components/appShell";
+import { AppShell } from "@/components/app-shell";
 import Loader from "@/components/loader";
-import { PlaceholderPanel } from "@/components/placeholderPanel";
+import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { useEnqueueDownload } from "@/hooks/useEnqueueDownload";
-import { useLibrarySeriesState } from "@/hooks/useLibrarySeriesState";
-import { useRefreshTracking } from "@/hooks/useRefreshTracking";
-import { useSeriesDetail } from "@/hooks/useSeriesDetail";
-import { useSettingsBootstrap } from "@/hooks/useSettingsBootstrap";
-import { useUpdateLibrarySeriesState } from "@/hooks/useUpdateLibrarySeriesState";
-import { requireAuth } from "@/lib/requireAuth";
+import { useEnqueueDownload } from "@/hooks/use-enqueue-download";
+import { useLibrarySeriesState } from "@/hooks/use-library-series-state";
+import { useRefreshTracking } from "@/hooks/use-refresh-tracking";
+import { useSeriesDetail } from "@/hooks/use-series-detail";
+import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
+import { useUpdateLibrarySeriesState } from "@/hooks/use-update-library-series-state";
+import { requireAuth } from "@/lib/require-auth";
 import { cn } from "@/lib/utils";
 
 const getQueueReadinessLabel = (

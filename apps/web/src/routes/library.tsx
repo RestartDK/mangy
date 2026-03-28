@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AppShell } from "@/components/appShell";
-import { PlaceholderPanel } from "@/components/placeholderPanel";
-import { useLibrary } from "@/hooks/useLibrary";
-import { useTracking } from "@/hooks/useTracking";
-import { requireAuth } from "@/lib/requireAuth";
+import { AppShell } from "@/components/app-shell";
+import { PlaceholderPanel } from "@/components/placeholder-panel";
+import { useLibrary } from "@/hooks/use-library";
+import { useTracking } from "@/hooks/use-tracking";
+import { requireAuth } from "@/lib/require-auth";
 
 export const Route = createFileRoute("/library")({
   beforeLoad: requireAuth,

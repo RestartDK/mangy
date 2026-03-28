@@ -1,6 +1,6 @@
-import type { DiscoverSection } from "@/hooks/useSourceDiscover";
+import type { DiscoverSection } from "@/hooks/use-source-discover";
 
-import { SeriesCard } from "./seriesCard";
+import { SeriesCard } from "./series-card";
 
 interface SectionShelfProps {
   section: DiscoverSection;

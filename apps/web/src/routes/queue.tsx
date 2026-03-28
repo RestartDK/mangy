@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AppShell } from "@/components/appShell";
+import { AppShell } from "@/components/app-shell";
 import Loader from "@/components/loader";
-import { PlaceholderPanel } from "@/components/placeholderPanel";
+import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { Button } from "@/components/ui/button";
-import { useCancelDownload } from "@/hooks/useCancelDownload";
-import { useDownloads } from "@/hooks/useDownloads";
-import { usePrioritizeDownload } from "@/hooks/usePrioritizeDownload";
-import { useRetryDownload } from "@/hooks/useRetryDownload";
-import { requireAuth } from "@/lib/requireAuth";
+import { useCancelDownload } from "@/hooks/use-cancel-download";
+import { useDownloads } from "@/hooks/use-downloads";
+import { usePrioritizeDownload } from "@/hooks/use-prioritize-download";
+import { useRetryDownload } from "@/hooks/use-retry-download";
+import { requireAuth } from "@/lib/require-auth";
 
 const sortQueuedJobs = <T extends { createdAt: string }>(items: T[]): T[] =>
   [...items].sort(
