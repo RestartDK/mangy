@@ -1,0 +1,20 @@
+{
+  "name": "worker",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile worker",
+    "check-types": "tsc -b",
+    "dev": "bun --env-file=../../.env --env-file=../../.env.local run --hot src/index.ts",
+    "start": "./worker"
+  },
+  "dependencies": {
+    "@mangy/db": "workspace:*",
+    "@mangy/env": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "@mangy/config": "workspace:*"
+  }
+}

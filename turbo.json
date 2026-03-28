@@ -1,0 +1,131 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**", "server"]
+    },
+    "//#lint": {},
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "HOST",
+        "PORT",
+        "VITE_SERVER_URL",
+        "WORKER_POLL_INTERVAL_MS"
+      ]
+    },
+    "db:push": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:studio": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:migrate": {
+      "cache": false,
+      "env": ["DATABASE_URL"]
+    },
+    "start": {
+      "cache": false,
+      "persistent": true
+    },
+    "server#start": {
+      "dependsOn": ["@mangy/db#db:migrate"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "HOST",
+        "PORT"
+      ]
+    },
+    "server#dev": {
+      "dependsOn": ["@mangy/db#db:migrate"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "HOST",
+        "PORT"
+      ]
+    },
+    "worker#start": {
+      "dependsOn": ["@mangy/db#db:migrate"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "HOST",
+        "PORT",
+        "WORKER_POLL_INTERVAL_MS"
+      ]
+    },
+    "worker#dev": {
+      "dependsOn": ["@mangy/db#db:migrate"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "HOST",
+        "PORT",
+        "WORKER_POLL_INTERVAL_MS"
+      ]
+    },
+    "web#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"],
+      "env": ["VITE_SERVER_URL"]
+    },
+    "web#dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["VITE_SERVER_URL"]
+    },
+    "db:generate": {
+      "cache": false,
+      "persistent": true
+    },
+
+    "db:start": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:stop": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:down": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="mangyBg" x1="26" y1="20" x2="174" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f18a4f"/>
+      <stop offset="1" stop-color="#d4573c"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="180" height="180" rx="44" fill="url(#mangyBg)"/>
+  <rect x="44" y="40" width="94" height="122" rx="18" fill="#fff4e7" stroke="#5c2e1f" stroke-width="10"/>
+  <path d="M138 52h18c10.493 0 19 8.507 19 19v72c0 10.493-8.507 19-19 19h-18z" fill="#f3c06c" stroke="#5c2e1f" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M65 76h52" stroke="#d96444" stroke-width="10" stroke-linecap="round"/>
+  <path d="M65 102h52" stroke="#d96444" stroke-width="10" stroke-linecap="round"/>
+  <path d="M65 128h33" stroke="#d96444" stroke-width="10" stroke-linecap="round"/>
+  <path d="M103 120l18 18 24-36" fill="none" stroke="#5c2e1f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M145 54v106" stroke="#5c2e1f" stroke-width="10" stroke-linecap="round"/>
+</svg>

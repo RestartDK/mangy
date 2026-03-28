@@ -1,0 +1,16 @@
+{
+  "name": "@mangy/env",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "default": "./src/client.ts"
+    }
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@mangy/config": "workspace:*"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@mangy/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@mangy/config": "workspace:*"
+  },
+  "dependencies": {
+    "better-auth": "catalog:",
+    "zod": "catalog:",
+    "@mangy/db": "workspace:*",
+    "@mangy/env": "workspace:*"
+  }
+}
