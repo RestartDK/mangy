@@ -16,6 +16,12 @@ export const useSettingsBootstrap = () =>
         throw error;
       }
 
-      return data ?? { profile: { name: "", email: "" }, destinations: [] };
+      return (
+        data ?? {
+          destinations: [],
+          notifications: { inAppEnabled: true, unreadCount: 0 },
+          profile: { name: "", email: "" },
+        }
+      );
     },
   });

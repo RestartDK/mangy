@@ -17,12 +17,12 @@ function LibraryRouteComponent() {
 
   return (
     <AppShell
-      subtitle="The database structure for saved titles and tracked series is already in place, even though creation flows arrive in later phases."
-      title="Library foundations"
+      subtitle="Queued chapters seed the library automatically, and tracked series now carry real polling state for the worker to process in the background."
+      title="Library and tracking"
     >
       <div className="grid gap-6 xl:grid-cols-2">
         <PlaceholderPanel
-          description="Saved series will appear here once the add-to-library flow lands. The table and API are already ready for it."
+          description="Series land here as soon as you queue a chapter, carrying their destination and tracking preferences forward."
           eyebrow="Library"
           title={`Saved titles: ${libraryQuery.data?.length ?? 0}`}
         >
@@ -37,13 +37,16 @@ function LibraryRouteComponent() {
                   Tracked: {String(item.isTracked)} | Auto-download:{" "}
                   {String(item.autoDownload)}
                 </div>
+                <div className="mt-1 text-muted-foreground text-sm">
+                  Destination: {item.destinationName ?? "Not assigned"}
+                </div>
               </div>
             ))}
           </div>
         </PlaceholderPanel>
 
         <PlaceholderPanel
-          description="Tracked-series state is persisted separately so the worker can later poll and queue newly released chapters without the website being open."
+          description="The worker now polls these entries in the background and can queue new chapters automatically when auto-download is enabled."
           eyebrow="Tracking"
           title={`Tracked series: ${trackingQuery.data?.length ?? 0}`}
         >
@@ -56,6 +59,9 @@ function LibraryRouteComponent() {
                 <div className="font-medium">{item.title}</div>
                 <div className="mt-1 text-muted-foreground text-sm">
                   Last checked: {item.lastCheckedAt ?? "Not checked yet"}
+                </div>
+                <div className="mt-1 text-muted-foreground text-sm">
+                  Next check: {item.nextCheckAt ?? "Not scheduled yet"}
                 </div>
               </div>
             ))}

@@ -1,0 +1,16 @@
+{
+  "name": "@mangy/downloader",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@mangy/config": "workspace:*"
+  }
+}

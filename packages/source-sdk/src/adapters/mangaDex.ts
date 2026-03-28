@@ -406,24 +406,24 @@ export const createMangaDexSourceAdapter = (): SourceAdapter => ({
       supportsPageFetch: true,
     },
   },
-  async getFilters() {
+  getFilters() {
     return getCachedTagFilters();
   },
-  async getPopular(page, pageSize) {
+  getPopular(page, pageSize) {
     const resolvedPage = normalizePage(page);
     const resolvedPageSize = normalizePageSize(pageSize);
     const searchParams = createBaseMangaParams(resolvedPage, resolvedPageSize);
     searchParams.append("order[followedCount]", "desc");
     return fetchMangaList(searchParams, resolvedPage, resolvedPageSize);
   },
-  async getLatest(page, pageSize) {
+  getLatest(page, pageSize) {
     const resolvedPage = normalizePage(page);
     const resolvedPageSize = normalizePageSize(pageSize);
     const searchParams = createBaseMangaParams(resolvedPage, resolvedPageSize);
     searchParams.append("order[latestUploadedChapter]", "desc");
     return fetchMangaList(searchParams, resolvedPage, resolvedPageSize);
   },
-  async getTrending(page, pageSize) {
+  getTrending(page, pageSize) {
     const resolvedPage = normalizePage(page);
     const resolvedPageSize = normalizePageSize(pageSize);
     const searchParams = createBaseMangaParams(resolvedPage, resolvedPageSize);
@@ -431,7 +431,7 @@ export const createMangaDexSourceAdapter = (): SourceAdapter => ({
     searchParams.append("order[latestUploadedChapter]", "desc");
     return fetchMangaList(searchParams, resolvedPage, resolvedPageSize);
   },
-  async searchSeries(input) {
+  searchSeries(input) {
     const resolvedPage = normalizePage(input.page);
     const resolvedPageSize = normalizePageSize(input.pageSize);
     const searchParams = createBaseMangaParams(resolvedPage, resolvedPageSize);

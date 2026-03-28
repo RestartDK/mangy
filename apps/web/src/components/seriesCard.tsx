@@ -19,7 +19,9 @@ export const SeriesCard = ({ item }: SeriesCardProps) => (
         <img
           alt={item.title}
           className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          height={960}
           src={item.coverImageUrl}
+          width={720}
         />
       ) : (
         <div className="flex size-full items-center justify-center px-6 text-center font-display text-2xl text-muted-foreground">

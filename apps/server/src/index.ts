@@ -4,6 +4,7 @@ import { env } from "@mangy/env";
 import { Elysia } from "elysia";
 import { downloads } from "./modules/downloads";
 import { library } from "./modules/library";
+import { live } from "./modules/live";
 import { notifications } from "./modules/notifications";
 import { series } from "./modules/series";
 import { settings } from "./modules/settings";
@@ -28,32 +29,39 @@ const corsOrigins =
     ? configuredOrigins
     : [...configuredOrigins, ...trustedDevOrigins];
 
-const app = new Elysia()
-  .use(
-    cors({
-      origin: corsOrigins,
-      methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
-      credentials: true,
-    })
-  )
-  .mount(auth.handler)
-  .get("/", () => ({
-    appName: "Mangy",
-    status: "ok",
-    timestamp: Date.now(),
-    version: "0.1.0",
-  }))
-  .use(sources)
-  .use(series)
-  .use(library)
-  .use(downloads)
-  .use(tracking)
-  .use(notifications)
-  .use(settings)
-  .listen({
+export const createApp = () =>
+  new Elysia()
+    .use(
+      cors({
+        origin: corsOrigins,
+        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: true,
+      })
+    )
+    .mount(auth.handler)
+    .get("/", () => ({
+      appName: "Mangy",
+      status: "ok",
+      timestamp: Date.now(),
+      version: "0.1.0",
+    }))
+    .use(sources)
+    .use(series)
+    .use(library)
+    .use(downloads)
+    .use(tracking)
+    .use(notifications)
+    .use(settings)
+    .use(live);
+
+export const app = createApp();
+
+if (import.meta.main) {
+  app.listen({
     hostname: env.HOST,
     port: Number(env.PORT),
   });
+}
 
 export type App = typeof app;

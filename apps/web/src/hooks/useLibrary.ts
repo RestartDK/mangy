@@ -16,4 +16,5 @@ export const useLibrary = () =>
 
       return data ?? [];
     },
+    refetchInterval: 5000,
   });

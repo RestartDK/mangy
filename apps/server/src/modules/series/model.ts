@@ -1,10 +1,5 @@
 import { z } from "zod";
 
-import {
-  sourceSeriesSchema,
-  unauthorizedResponseSchema,
-} from "../sources/model";
-
 export const seriesParamsSchema = z.object({
   seriesId: z.string(),
 });
@@ -26,4 +21,7 @@ export const chapterSchema = z.object({
   isUnavailable: z.boolean(),
 });
 
-export { sourceSeriesSchema, unauthorizedResponseSchema };
+export {
+  sourceSeriesSchema,
+  unauthorizedResponseSchema,
+} from "../sources/model";

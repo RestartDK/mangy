@@ -18,4 +18,5 @@ export const useDownloads = () =>
 
       return data ?? [];
     },
+    refetchInterval: 2000,
   });

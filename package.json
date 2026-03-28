@@ -24,6 +24,7 @@
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
+    "test:integration": "turbo -F server test:integration",
     "db:push": "turbo -F @mangy/db db:push",
     "db:studio": "turbo -F @mangy/db db:studio",
     "db:generate": "turbo -F @mangy/db db:generate",

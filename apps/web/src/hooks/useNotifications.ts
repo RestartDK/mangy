@@ -18,4 +18,5 @@ export const useNotifications = () =>
 
       return data ?? [];
     },
+    refetchInterval: 5000,
   });

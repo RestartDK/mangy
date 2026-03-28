@@ -1,50 +1,54 @@
 # Mangy
 
-<div align="center">
-  <img src="docs/demo.png" alt="Mangy application demo" />
-</div>
+Mangy is a pure TypeScript manga discovery, download, and tracking app for homelab setups.
 
-Mangy is a manga discovery and download app built to replace a Suwayomi-based homelab workflow with a pure TypeScript stack.
+It replaces a Suwayomi-based workflow with a typed monorepo that includes:
 
-## The Problem
+- a React web app for discovery, queue management, library state, and notifications
+- an Elysia API with typed Treaty clients
+- a background worker that processes downloads and tracked-series checks even when the browser is closed
+- direct filesystem output to Komga-watched folders
 
-Traditional calendar applications suffer from two fundamental limitations:
+Slack planning is intentionally separated into `slack-integration.md`.
 
-1. **Reactive, Not Adaptive** -> When unexpected changes happen—you're running late, a meeting goes long, or plans shift—conventional calendars can't absorb these disruptions and intelligently ripple them through the rest of your schedule. You're left manually rearranging everything yourself.
-2. **Passive, Not Proactive** -> Standard calendars are merely display tools. They can't help you think through what an ideal arrangement looks like, whether you're planning your own week or coordinating with others. They wait for you to figure it out.
+## Current Product Slice
 
-## The Solution
+The current implementation covers the core vertical slice:
 
-- **Conversational calendar management** -> Tell the assistant what you want in plain language and it turns intent into proposed calendar updates.
-- **Human-in-the-loop approval** -> Review an explicit diff of changes and approve/decline so you stay in control.
-- **Intelligent scheduling** -> Finds availability, detects conflicts, and suggests times that fit your existing calendar.
+- email/password authentication with Better Auth
+- discover and search APIs with a native TypeScript source adapter
+- series detail pages with chapter queueing
+- durable Postgres-backed download queue
+- worker-driven chapter downloads to configured destinations
+- tracked series with manual refresh and auto-download of new chapters
+- in-app notifications for download and tracking events
+- SSE-based live invalidation for queue, tracking, and notification UIs
+- queue controls for cancel, retry, and move-to-front
 
-## Features
+## Monorepo Layout
 
-- **Calendar Views**: Day, week, month, and year views with smooth navigation
-- **Drag & Drop**: Reschedule events by dragging, resize by pulling edges
-- **AI Chat Panel**: Collapsible sidebar with streaming responses
-- **Proposal Cards**: Visual diff of proposed changes with accept/decline actions
-- **Google OAuth**: Sign in with Google for secure authentication
-- **Real-time Updates**: Changes reflect immediately across the interface
+```text
+mangy/
+├── apps/
+│   ├── web/         # React + TanStack Router frontend
+│   ├── server/      # Elysia API server
+│   └── worker/      # Background queue and tracking worker
+├── packages/
+│   ├── auth/        # Better Auth configuration
+│   ├── db/          # Drizzle schema and migrations
+│   ├── downloader/  # Filesystem download helpers
+│   ├── env/         # Typed environment access
+│   ├── source-sdk/  # Source adapter contracts and adapters
+│   └── config/      # Shared TypeScript config
+└── plan.md          # Rebuild plan and phase tracking
+```
+
+## Prerequisites
+
+- Bun `1.3.4` or newer
+- Docker, for the local PostgreSQL service
 
 ## Getting Started
-
-### Prerequisites
-
-- [Bun](https://bun.sh/) v1.3.4 or later
-- PostgreSQL database
-- Google Cloud project with OAuth credentials
-- Google AI (Gemini) API key
-
-### Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/your-username/mangy.git
-cd mangy
-```
 
 Install dependencies:
 
@@ -52,113 +56,106 @@ Install dependencies:
 bun install
 ```
 
-Set up environment variables in the repo root:
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Required environment values:
 
 ```env
 DATABASE_URL=postgresql://postgres:password@localhost:5432/mangy
 BETTER_AUTH_SECRET=replace-with-a-32-character-secret
 BETTER_AUTH_URL=http://localhost:3000
 CORS_ORIGIN=http://localhost:3001
+HOST=0.0.0.0
 PORT=3000
 VITE_SERVER_URL=http://localhost:3000
 WORKER_POLL_INTERVAL_MS=15000
+TRACKING_POLL_INTERVAL_MS=900000
 ```
 
-Copy `.env.example` to `.env` and adjust values as needed.
-
-Start the database (if using Docker):
+Start the database and apply migrations:
 
 ```bash
 bun db:start
-```
-
-Run database migrations:
-
-```bash
 bun db:migrate
 ```
 
-Start the development servers:
+Run the whole stack:
 
 ```bash
 bun dev
 ```
 
-The web application will be available at [http://localhost:3001](http://localhost:3001) and the API at [http://localhost:3000](http://localhost:3000).
+Useful focused commands:
 
-### Available Scripts
-
-| Command | Description |
-| ------- | ----------- |
-| `bun dev` | Start all applications in development mode |
-| `bun dev:web` | Start only the web application |
-| `bun dev:server` | Start only the server |
-| `bun build` | Build all applications |
-| `bun check-types` | Run TypeScript type checking |
-| `bun check` | Run Biome linting and formatting |
-| `bun db:start` | Start the PostgreSQL container |
-| `bun db:migrate` | Run database migrations |
-| `bun db:studio` | Open Drizzle Studio for database management |
-
-## Project Structure
-
-```text
-mangy/
-├── apps/
-│   ├── web/              # React frontend (TanStack Router, shadcn/ui)
-│   └── server/           # Elysia backend with AI agent
-│       └── modules/
-│           ├── chat/     # AI chat with calendar tools
-│           └── events/   # Calendar event CRUD
-├── packages/
-│   ├── auth/             # Better-Auth configuration
-│   ├── db/               # Drizzle ORM schema & migrations
-│   ├── env/              # Type-safe environment variables
-│   └── config/           # Shared TypeScript configuration
+```bash
+bun dev:web
+bun dev:server
+bun dev:worker
 ```
 
-## Deployment
+Default local URLs:
 
-Mangy is deployed using **Dokploy**, a self-hosted platform for managing containerized applications.
+- web: `http://localhost:3001`
+- server: `http://localhost:3000`
 
-### Architecture
+## Commands
 
-The application is split into two separate Dokploy applications:
+| Command | Purpose |
+| --- | --- |
+| `bun dev` | Run web, server, and worker together |
+| `bun build` | Build all workspaces |
+| `bun check-types` | Run workspace TypeScript checks |
+| `bun check` | Run Biome formatting and checks |
+| `bun db:start` | Start PostgreSQL via Docker |
+| `bun db:migrate` | Apply Drizzle migrations |
+| `bun db:studio` | Open Drizzle Studio |
+| `bun test:integration` | Run the server/worker integration test suite |
 
-1. **Web Application** - The React frontend, built and served as static files
-2. **Server Application** - The Elysia backend API with the AI agent
+## Testing
 
-### Build Process
+Integration coverage currently exercises the real app flow through the server and worker:
 
-Both applications use **Railpack** for builds, which automatically detects the project structure and creates optimized Docker images.
+- destination creation
+- chapter enqueueing
+- queue actions
+- worker download processing
+- tracked-series auto-download flow
+- notification APIs
+- SSE event delivery
 
-### Database
+Run it with:
 
-PostgreSQL is hosted as a separate service on Dokploy, providing persistent storage for user data, authentication, and calendar events.
+```bash
+bun test:integration
+```
 
-### Environment Configuration
+This test expects the local database to be running and migrated.
 
-Environment variables are configured directly in Dokploy for each application:
+## Architecture Notes
 
-- **Server**: Database connection, Google OAuth credentials, Gemini API key, CORS settings
-- **Web**: Server URL for API communication
+- `apps/server` exposes feature modules for sources, series, library, downloads, tracking, notifications, settings, and live events
+- `apps/worker` claims jobs from Postgres, downloads chapter pages, updates queue state, and checks tracked series on a schedule
+- source adapters normalize external payloads at the adapter boundary so app code stays camelCase
+- completed downloads are written directly into configured filesystem destinations for Komga import
 
-### Deployment Steps
+## Deployment Notes
 
-1. Connect your Git repository to Dokploy
-1. Create two applications: one for `apps/web`, one for `apps/server`
-1. Configure environment variables for each application
-1. Set up a PostgreSQL database service
-1. Deploy—Railpack handles the build process automatically
+Mangy is intended to run as separate web, server, and worker services.
 
-The server runs migrations on startup via the `server#start` task, ensuring the database schema is always up to date.
+- web and server are built with Railpack-compatible workspace builds
+- PostgreSQL is an external persistent dependency
+- the worker must run anywhere the configured download destinations are reachable
+- Komga can watch those destination folders directly
 
-## Tech Stack
+## Status
 
-- **Frontend**: React, TanStack Router, TailwindCSS, shadcn/ui
-- **Backend**: Elysia, Bun
-- **Database**: PostgreSQL, Drizzle ORM
-- **AI**: Google Gemini 2.5 Pro via Vercel AI SDK
-- **Auth**: Better-Auth with Google OAuth
-- **Build**: Turborepo, Railpack
-- **Deployment**: Dokploy
+The project has moved well beyond the old calendar template, but some polish work is still ongoing:
+
+- queue and tracking core flows are live
+- notification preferences and SSE invalidation are live
+- Slack delivery remains a separate follow-on from `slack-integration.md`
+- broader hardening and cleanup continue in the remaining implementation work

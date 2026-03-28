@@ -10,6 +10,7 @@ import {
 import type { PropsWithChildren } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useLiveUpdates } from "@/hooks/useLiveUpdates";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,8 @@ interface AppShellProps extends PropsWithChildren {
 export const AppShell = ({ children, title, subtitle }: AppShellProps) => {
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
+
+  useLiveUpdates(Boolean(session?.user.id));
 
   return (
     <div className="min-h-svh bg-background text-foreground">

@@ -17,6 +17,10 @@ export const Route = createFileRoute("/search")({
   component: SearchRouteComponent,
 });
 
+const searchFieldIds = {
+  query: "search-query",
+} as const;
+
 function SearchRouteComponent() {
   const { data: sources, isLoading: isSourcesLoading } = useSources();
   const [sourceId, setSourceId] = useState<string | undefined>(undefined);
@@ -59,9 +63,13 @@ function SearchRouteComponent() {
               </select>
             </label>
 
-            <label className="grid gap-2 text-sm">
+            <label
+              className="grid gap-2 text-sm"
+              htmlFor={searchFieldIds.query}
+            >
               <span className="font-medium">Title or keyword</span>
               <Input
+                id={searchFieldIds.query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="One Piece, dungeon, horror..."
                 value={query}

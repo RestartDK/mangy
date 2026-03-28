@@ -1,0 +1,670 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { db } from "@mangy/db";
+import { notification, source, user } from "@mangy/db/schema";
+import type {
+  SourceAdapter,
+  SourceChapter,
+  SourceSeries,
+} from "@mangy/source-sdk";
+import { sourceRegistry } from "@mangy/source-sdk/registry";
+import { and, eq } from "drizzle-orm";
+
+import { claimNextDownloadJob } from "../../worker/src/jobs";
+import { runDownloadJob } from "../../worker/src/runner";
+import {
+  claimDueTrackedSeries,
+  processTrackedSeries,
+} from "../../worker/src/tracking";
+import { app } from "../src/index";
+import { SourcesStorage } from "../src/modules/sources/storage";
+
+const pngDataUrl =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9s8lJawAAAAASUVORK5CYII=";
+const sessionCookieRegex = /better-auth\.session_token=([^;]+)/;
+
+const decoder = new TextDecoder();
+
+const extractSessionCookie = (header: string | null): string | null => {
+  if (!header) {
+    return null;
+  }
+
+  const match = sessionCookieRegex.exec(header);
+  return match?.[1] ?? null;
+};
+
+const createFakeAdapter = (config: {
+  adapterId: string;
+  chapters: SourceChapter[];
+  series: SourceSeries;
+}) => {
+  const state = {
+    chapters: [...config.chapters],
+    series: config.series,
+  };
+
+  const adapter: SourceAdapter = {
+    metadata: {
+      capabilities: {
+        supportsChapterFeed: true,
+        supportsFilters: false,
+        supportsLatest: true,
+        supportsPageFetch: true,
+        supportsPopular: true,
+        supportsSearch: true,
+        supportsSeriesDetails: true,
+        supportsTrending: true,
+      },
+      description: "Deterministic test adapter",
+      id: config.adapterId,
+      languageCode: "en",
+      name: "Test Source",
+      supportedLanguages: ["en"],
+      websiteUrl: "https://example.test",
+    },
+    async getChapters(seriesId) {
+      if (seriesId !== state.series.externalId) {
+        throw new Error("Unexpected series requested in fake adapter.");
+      }
+
+      return [...state.chapters];
+    },
+    async getFilters() {
+      return [];
+    },
+    async getLatest() {
+      return {
+        hasNextPage: false,
+        items: [state.series],
+        page: 1,
+        pageSize: 1,
+        total: 1,
+      };
+    },
+    async getPages(chapterId) {
+      const chapter = state.chapters.find(
+        (item) => item.externalId === chapterId
+      );
+      if (!chapter) {
+        throw new Error("Unexpected chapter requested in fake adapter.");
+      }
+
+      return {
+        pages: Array.from({ length: chapter.pageCount ?? 1 }, (_, index) => ({
+          imageUrl: pngDataUrl,
+          index,
+        })),
+      };
+    },
+    async getPopular() {
+      return {
+        hasNextPage: false,
+        items: [state.series],
+        page: 1,
+        pageSize: 1,
+        total: 1,
+      };
+    },
+    async getSeries(seriesId) {
+      if (seriesId !== state.series.externalId) {
+        throw new Error("Unexpected series requested in fake adapter.");
+      }
+
+      return state.series;
+    },
+    async getTrending() {
+      return {
+        hasNextPage: false,
+        items: [state.series],
+        page: 1,
+        pageSize: 1,
+        total: 1,
+      };
+    },
+    async searchSeries() {
+      return {
+        hasNextPage: false,
+        items: [state.series],
+        page: 1,
+        pageSize: 1,
+        total: 1,
+      };
+    },
+  };
+
+  return {
+    adapter,
+    setChapters(chapters: SourceChapter[]) {
+      state.chapters = [...chapters];
+    },
+  };
+};
+
+const createApiClient = async (
+  email: string,
+  password: string,
+  name: string
+) => {
+  const headers = new Headers();
+
+  const authRequest = async (path: string, body: unknown) => {
+    return app.handle(
+      new Request(`http://localhost${path}`, {
+        body: JSON.stringify(body),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      })
+    );
+  };
+
+  const setSessionCookie = (response: Response) => {
+    const cookie = extractSessionCookie(response.headers.get("set-cookie"));
+    if (cookie) {
+      headers.set("cookie", `better-auth.session_token=${cookie}`);
+    }
+  };
+
+  const signUpResponse = await authRequest("/api/auth/sign-up/email", {
+    email,
+    name,
+    password,
+  });
+  setSessionCookie(signUpResponse);
+
+  if (!headers.get("cookie")) {
+    const signInResponse = await authRequest("/api/auth/sign-in/email", {
+      email,
+      password,
+    });
+    setSessionCookie(signInResponse);
+  }
+
+  const apiFetch = async (path: string, init?: RequestInit) => {
+    const requestHeaders = new Headers(init?.headers);
+    const cookie = headers.get("cookie");
+    if (cookie) {
+      requestHeaders.set("cookie", cookie);
+    }
+
+    return app.handle(
+      new Request(`http://localhost${path}`, {
+        ...init,
+        headers: requestHeaders,
+      })
+    );
+  };
+
+  const [createdUser] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, email))
+    .limit(1);
+
+  return {
+    apiFetch,
+    userId: createdUser?.id ?? null,
+  };
+};
+
+const jsonRequest = (body: unknown, init?: RequestInit): RequestInit => ({
+  ...init,
+  body: JSON.stringify(body),
+  headers: {
+    "content-type": "application/json",
+    ...Object.fromEntries(new Headers(init?.headers).entries()),
+  },
+});
+
+const readJson = async <T>(response: Response): Promise<T> => {
+  return (await response.json()) as T;
+};
+
+const readUntilChunk = async (
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  matcher: string,
+  timeoutMs = 5000
+) => {
+  let output = "";
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    output += decoder.decode(value, { stream: true });
+    if (output.includes(matcher)) {
+      return output;
+    }
+  }
+
+  throw new Error(`Timed out waiting for chunk containing: ${matcher}`);
+};
+
+const cleanupState = {
+  sourceIds: new Set<string>(),
+  tempPaths: new Set<string>(),
+  userIds: new Set<string>(),
+};
+
+afterEach(async () => {
+  for (const sourceId of cleanupState.sourceIds) {
+    await db.delete(source).where(eq(source.id, sourceId));
+  }
+
+  for (const userId of cleanupState.userIds) {
+    await db.delete(user).where(eq(user.id, userId));
+  }
+
+  for (const tempPath of cleanupState.tempPaths) {
+    await rm(tempPath, { force: true, recursive: true });
+  }
+
+  cleanupState.sourceIds.clear();
+  cleanupState.tempPaths.clear();
+  cleanupState.userIds.clear();
+  sourceRegistry.reset();
+});
+
+describe("server and worker integration", () => {
+  test("queue controls, worker processing, tracking automation, and notification APIs work together", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-test-"));
+
+    cleanupState.sourceIds.add(adapterId);
+    cleanupState.tempPaths.add(tempDirectory);
+
+    const series: SourceSeries = {
+      artistNames: ["Artist"],
+      authorNames: ["Author"],
+      availableTranslatedLanguages: ["en"],
+      canonicalUrl: `https://example.test/${seriesExternalId}`,
+      contentRating: null,
+      coverImageUrl: "https://example.test/cover.png",
+      description: "Integration test series",
+      externalId: seriesExternalId,
+      latestChapter: "1",
+      originalLanguage: "en",
+      publicationDemographic: null,
+      status: "ongoing",
+      tags: ["test"],
+      title: "Integration Test Series",
+    };
+
+    const chapterOne: SourceChapter = {
+      chapterNumber: "1",
+      externalId: `chapter-${crypto.randomUUID()}`,
+      externalUrl: `https://example.test/${seriesExternalId}/1`,
+      isUnavailable: false,
+      pageCount: 2,
+      publishedAt: new Date("2025-01-01T00:00:00.000Z"),
+      sourceOrder: "1",
+      title: "Arrival",
+      translatedLanguage: "en",
+      volumeNumber: "1",
+    };
+
+    const fakeAdapter = createFakeAdapter({
+      adapterId,
+      chapters: [chapterOne],
+      series,
+    });
+
+    sourceRegistry.register(fakeAdapter.adapter);
+    await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+    const email = `reader-${crypto.randomUUID()}@example.com`;
+    const password = "reader-password-123";
+    const { apiFetch, userId } = await createApiClient(
+      email,
+      password,
+      "Integration Reader"
+    );
+
+    expect(userId).toBeString();
+    cleanupState.userIds.add(userId as string);
+
+    const destinationResponse = await apiFetch(
+      "/api/settings/destinations",
+      jsonRequest(
+        {
+          absolutePath: tempDirectory,
+          isDefault: true,
+          name: "Integration Library",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(destinationResponse.status).toBe(200);
+    const destination = await readJson<{
+      id: string;
+      name: string;
+    }>(destinationResponse);
+
+    const queueResponse = await apiFetch(
+      "/api/downloads",
+      jsonRequest(
+        {
+          chapterId: chapterOne.externalId,
+          downloadDestinationId: destination.id,
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+        },
+        { method: "POST" }
+      )
+    );
+    expect(queueResponse.status).toBe(200);
+    const queuedJob = await readJson<{ id: string; status: string }>(
+      queueResponse
+    );
+    expect(queuedJob.status).toBe("queued");
+
+    const prioritizeResponse = await apiFetch(
+      `/api/downloads/${queuedJob.id}/prioritize`,
+      { method: "POST" }
+    );
+    expect(prioritizeResponse.status).toBe(200);
+
+    const cancelResponse = await apiFetch(
+      `/api/downloads/${queuedJob.id}/cancel`,
+      {
+        method: "POST",
+      }
+    );
+    expect(cancelResponse.status).toBe(200);
+    expect((await readJson<{ status: string }>(cancelResponse)).status).toBe(
+      "cancelled"
+    );
+
+    const retryResponse = await apiFetch(
+      `/api/downloads/${queuedJob.id}/retry`,
+      {
+        method: "POST",
+      }
+    );
+    expect(retryResponse.status).toBe(200);
+    expect((await readJson<{ status: string }>(retryResponse)).status).toBe(
+      "queued"
+    );
+
+    const claimedJob = await claimNextDownloadJob("test-worker");
+    expect(claimedJob?.id).toBe(queuedJob.id);
+    await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+
+    const downloadsResponse = await apiFetch("/api/downloads", {
+      method: "GET",
+    });
+    expect(downloadsResponse.status).toBe(200);
+    const downloads =
+      await readJson<Array<{ id: string; status: string }>>(downloadsResponse);
+    expect(
+      downloads.some(
+        (job) => job.id === queuedJob.id && job.status === "completed"
+      )
+    ).toBe(true);
+
+    const libraryStateResponse = await apiFetch(
+      `/api/library/series-state?sourceId=${adapterId}&seriesId=${seriesExternalId}`,
+      { method: "GET" }
+    );
+    expect(libraryStateResponse.status).toBe(200);
+    expect(
+      (
+        await readJson<{ downloadDestinationId: string | null }>(
+          libraryStateResponse
+        )
+      ).downloadDestinationId
+    ).toBe(destination.id);
+
+    const saveTrackingResponse = await apiFetch(
+      "/api/library/series-state",
+      jsonRequest(
+        {
+          autoDownload: true,
+          downloadDestinationId: destination.id,
+          isTracked: true,
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+        },
+        { method: "PATCH" }
+      )
+    );
+    expect(saveTrackingResponse.status).toBe(200);
+    const trackedState = await readJson<{
+      autoDownload: boolean;
+      isTracked: boolean;
+      trackingState: { lastSeenChapterExternalId: string | null } | null;
+    }>(saveTrackingResponse);
+    expect(trackedState.autoDownload).toBe(true);
+    expect(trackedState.isTracked).toBe(true);
+    expect(trackedState.trackingState?.lastSeenChapterExternalId).toBe(
+      chapterOne.externalId
+    );
+
+    const chapterTwo: SourceChapter = {
+      ...chapterOne,
+      chapterNumber: "2",
+      externalId: `chapter-${crypto.randomUUID()}`,
+      externalUrl: `https://example.test/${seriesExternalId}/2`,
+      publishedAt: new Date("2025-01-02T00:00:00.000Z"),
+      sourceOrder: "2",
+      title: "Follow Up",
+    };
+
+    fakeAdapter.setChapters([chapterTwo, chapterOne]);
+
+    const refreshResponse = await apiFetch(
+      "/api/tracking/refresh",
+      jsonRequest(
+        {
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+        },
+        { method: "POST" }
+      )
+    );
+    expect(refreshResponse.status).toBe(200);
+
+    const claimedTrackedSeries = await claimDueTrackedSeries();
+    expect(claimedTrackedSeries?.seriesExternalId).toBe(seriesExternalId);
+    await processTrackedSeries(
+      claimedTrackedSeries as NonNullable<typeof claimedTrackedSeries>
+    );
+
+    const trackingResponse = await apiFetch("/api/tracking", { method: "GET" });
+    expect(trackingResponse.status).toBe(200);
+    const trackedSeries =
+      await readJson<
+        Array<{ lastSeenChapterExternalId: string | null; seriesId: string }>
+      >(trackingResponse);
+    expect(
+      trackedSeries.some(
+        (item) =>
+          item.seriesId === seriesExternalId &&
+          item.lastSeenChapterExternalId === chapterTwo.externalId
+      )
+    ).toBe(true);
+
+    const notificationsResponse = await apiFetch("/api/notifications", {
+      method: "GET",
+    });
+    expect(notificationsResponse.status).toBe(200);
+    const notifications = await readJson<
+      Array<{ id: string; isRead: boolean; type: string }>
+    >(notificationsResponse);
+    expect(
+      notifications.some((item) => item.type === "downloadCompleted")
+    ).toBe(true);
+    expect(
+      notifications.some((item) => item.type === "trackedSeriesUpdated")
+    ).toBe(true);
+
+    const firstNotification = notifications[0];
+    expect(firstNotification).toBeDefined();
+
+    const markReadResponse = await apiFetch(
+      `/api/notifications/${firstNotification?.id}/read`,
+      { method: "PATCH" }
+    );
+    expect(markReadResponse.status).toBe(200);
+    expect((await readJson<{ isRead: boolean }>(markReadResponse)).isRead).toBe(
+      true
+    );
+
+    const preferencesResponse = await apiFetch(
+      "/api/notifications/preferences",
+      {
+        method: "GET",
+      }
+    );
+    expect(preferencesResponse.status).toBe(200);
+    expect(
+      (await readJson<{ inAppEnabled: boolean }>(preferencesResponse))
+        .inAppEnabled
+    ).toBe(true);
+
+    const updatePreferencesResponse = await apiFetch(
+      "/api/notifications/preferences",
+      jsonRequest({ inAppEnabled: false }, { method: "PATCH" })
+    );
+    expect(updatePreferencesResponse.status).toBe(200);
+    expect(
+      (await readJson<{ inAppEnabled: boolean }>(updatePreferencesResponse))
+        .inAppEnabled
+    ).toBe(false);
+
+    const markAllReadResponse = await apiFetch(
+      "/api/notifications/mark-all-read",
+      {
+        method: "POST",
+      }
+    );
+    expect(markAllReadResponse.status).toBe(200);
+    expect(
+      (await readJson<{ updatedCount: number }>(markAllReadResponse))
+        .updatedCount
+    ).toBeGreaterThanOrEqual(1);
+
+    const settingsBootstrapResponse = await apiFetch(
+      "/api/settings/bootstrap",
+      {
+        method: "GET",
+      }
+    );
+    expect(settingsBootstrapResponse.status).toBe(200);
+    const settingsBootstrap = await readJson<{
+      notifications: { inAppEnabled: boolean; unreadCount: number };
+    }>(settingsBootstrapResponse);
+    expect(settingsBootstrap.notifications.inAppEnabled).toBe(false);
+    expect(settingsBootstrap.notifications.unreadCount).toBe(0);
+
+    const queuedAutoDownloadResponse = await apiFetch("/api/downloads", {
+      method: "GET",
+    });
+    const queuedAutoDownloads = await readJson<
+      Array<{ chapterId: string | null; status: string }>
+    >(queuedAutoDownloadResponse);
+    expect(
+      queuedAutoDownloads.some(
+        (job) =>
+          job.chapterId === chapterTwo.externalId && job.status === "queued"
+      )
+    ).toBe(true);
+  });
+
+  test("live SSE endpoint emits update events when notification state changes", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+
+    cleanupState.sourceIds.add(adapterId);
+
+    const fakeAdapter = createFakeAdapter({
+      adapterId,
+      chapters: [],
+      series: {
+        artistNames: [],
+        authorNames: [],
+        availableTranslatedLanguages: ["en"],
+        canonicalUrl: `https://example.test/${seriesExternalId}`,
+        contentRating: null,
+        coverImageUrl: null,
+        description: "SSE test series",
+        externalId: seriesExternalId,
+        latestChapter: null,
+        originalLanguage: "en",
+        publicationDemographic: null,
+        status: "ongoing",
+        tags: [],
+        title: "SSE Test Series",
+      },
+    });
+
+    sourceRegistry.register(fakeAdapter.adapter);
+    await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+    const email = `reader-${crypto.randomUUID()}@example.com`;
+    const { apiFetch, userId } = await createApiClient(
+      email,
+      "reader-password-123",
+      "SSE Reader"
+    );
+
+    expect(userId).toBeString();
+    cleanupState.userIds.add(userId as string);
+
+    const abortController = new AbortController();
+    const liveResponse = await apiFetch("/api/live/events", {
+      method: "GET",
+      signal: abortController.signal,
+    });
+
+    expect(liveResponse.status).toBe(200);
+    expect(liveResponse.headers.get("content-type")).toContain(
+      "text/event-stream"
+    );
+
+    const reader = liveResponse.body?.getReader();
+    expect(reader).toBeDefined();
+
+    const connectedChunk = await readUntilChunk(
+      reader as ReadableStreamDefaultReader<Uint8Array>,
+      "event: connected"
+    );
+    expect(connectedChunk).toContain("event: connected");
+
+    await db.insert(notification).values({
+      body: "SSE notification body",
+      title: "SSE notification",
+      type: "systemWarning",
+      userId: userId as string,
+    });
+
+    const stateChunk = await readUntilChunk(
+      reader as ReadableStreamDefaultReader<Uint8Array>,
+      "event: state"
+    );
+    expect(stateChunk).toContain('"notificationsChanged":true');
+
+    abortController.abort();
+
+    const [storedNotification] = await db
+      .select({ id: notification.id })
+      .from(notification)
+      .where(
+        and(
+          eq(notification.userId, userId as string),
+          eq(notification.title, "SSE notification")
+        )
+      )
+      .limit(1);
+
+    expect(storedNotification?.id).toBeString();
+  });
+});

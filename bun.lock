@@ -80,7 +80,10 @@
       "name": "worker",
       "dependencies": {
         "@mangy/db": "workspace:*",
+        "@mangy/downloader": "workspace:*",
         "@mangy/env": "workspace:*",
+        "@mangy/source-sdk": "workspace:*",
+        "drizzle-orm": "^0.45.1",
       },
       "devDependencies": {
         "@mangy/config": "workspace:*",
@@ -117,6 +120,13 @@
         "@mangy/config": "workspace:*",
         "@types/pg": "^8.15.6",
         "drizzle-kit": "^0.31.8",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/downloader": {
+      "name": "@mangy/downloader",
+      "devDependencies": {
+        "@mangy/config": "workspace:*",
         "typescript": "catalog:",
       },
     },
@@ -352,6 +362,8 @@
     "@mangy/config": ["@mangy/config@workspace:packages/config"],
 
     "@mangy/db": ["@mangy/db@workspace:packages/db"],
+
+    "@mangy/downloader": ["@mangy/downloader@workspace:packages/downloader"],
 
     "@mangy/env": ["@mangy/env@workspace:packages/env"],
 

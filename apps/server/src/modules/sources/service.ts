@@ -6,9 +6,9 @@ import type {
   SourceSearchInput,
   SourceSeries,
 } from "@mangy/source-sdk";
+import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { asc } from "drizzle-orm";
 
-import { sourceRegistry } from "./registry";
 import { SourcesStorage } from "./storage";
 
 interface DiscoverSection {
@@ -92,7 +92,7 @@ export abstract class SourcesService {
     return adapter;
   }
 
-  static async getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
+  static getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     return adapter.getFilters();
   }

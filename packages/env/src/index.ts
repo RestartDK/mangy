@@ -30,6 +30,7 @@ export const env = {
 
   // Worker
   WORKER_POLL_INTERVAL_MS: optional("WORKER_POLL_INTERVAL_MS", "15000"),
+  TRACKING_POLL_INTERVAL_MS: optional("TRACKING_POLL_INTERVAL_MS", "900000"),
 } as const;
 
 export type Env = typeof env;

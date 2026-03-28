@@ -14,6 +14,12 @@ import { authClient } from "@/lib/auth-client";
 
 type AuthMode = "signIn" | "signUp";
 
+const fieldIds = {
+  email: "auth-email",
+  name: "auth-name",
+  password: "auth-password",
+} as const;
+
 export const AuthPanel = () => {
   const [mode, setMode] = useState<AuthMode>("signIn");
   const [name, setName] = useState("");
@@ -61,6 +67,13 @@ export const AuthPanel = () => {
     }
   };
 
+  let submitLabel = "Create account";
+  if (isSubmitting) {
+    submitLabel = "Working...";
+  } else if (mode === "signIn") {
+    submitLabel = "Sign in";
+  }
+
   return (
     <Card className="border-border/60 bg-card/80 shadow-[0_24px_80px_rgba(54,39,25,0.16)] backdrop-blur">
       <CardHeader>
@@ -95,9 +108,10 @@ export const AuthPanel = () => {
 
         <form className="grid gap-4" onSubmit={handleSubmit}>
           {mode === "signUp" ? (
-            <label className="grid gap-2 text-sm">
+            <label className="grid gap-2 text-sm" htmlFor={fieldIds.name}>
               <span className="font-medium text-foreground">Display name</span>
               <Input
+                id={fieldIds.name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="A reader with a queue"
                 value={name}
@@ -105,9 +119,10 @@ export const AuthPanel = () => {
             </label>
           ) : null}
 
-          <label className="grid gap-2 text-sm">
+          <label className="grid gap-2 text-sm" htmlFor={fieldIds.email}>
             <span className="font-medium text-foreground">Email</span>
             <Input
+              id={fieldIds.email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="reader@example.com"
               type="email"
@@ -115,9 +130,10 @@ export const AuthPanel = () => {
             />
           </label>
 
-          <label className="grid gap-2 text-sm">
+          <label className="grid gap-2 text-sm" htmlFor={fieldIds.password}>
             <span className="font-medium text-foreground">Password</span>
             <Input
+              id={fieldIds.password}
               minLength={8}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="At least 8 characters"
@@ -127,11 +143,7 @@ export const AuthPanel = () => {
           </label>
 
           <Button disabled={isSubmitting} size="lg" type="submit">
-            {isSubmitting
-              ? "Working..."
-              : mode === "signIn"
-                ? "Sign in"
-                : "Create account"}
+            {submitLabel}
           </Button>
         </form>
       </CardContent>

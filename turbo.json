@@ -11,6 +11,9 @@
     "check-types": {
       "dependsOn": ["^check-types"]
     },
+    "test:integration": {
+      "dependsOn": ["^build"]
+    },
     "dev": {
       "cache": false,
       "persistent": true,
@@ -22,7 +25,8 @@
         "HOST",
         "PORT",
         "VITE_SERVER_URL",
-        "WORKER_POLL_INTERVAL_MS"
+        "WORKER_POLL_INTERVAL_MS",
+        "TRACKING_POLL_INTERVAL_MS"
       ]
     },
     "db:push": {
@@ -51,7 +55,8 @@
         "BETTER_AUTH_URL",
         "CORS_ORIGIN",
         "HOST",
-        "PORT"
+        "PORT",
+        "TRACKING_POLL_INTERVAL_MS"
       ]
     },
     "server#dev": {
@@ -64,7 +69,22 @@
         "BETTER_AUTH_URL",
         "CORS_ORIGIN",
         "HOST",
-        "PORT"
+        "PORT",
+        "TRACKING_POLL_INTERVAL_MS"
+      ]
+    },
+    "server#test:integration": {
+      "dependsOn": ["@mangy/db#db:migrate"],
+      "cache": false,
+      "env": [
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "HOST",
+        "PORT",
+        "TRACKING_POLL_INTERVAL_MS",
+        "WORKER_POLL_INTERVAL_MS"
       ]
     },
     "worker#start": {
@@ -78,7 +98,8 @@
         "CORS_ORIGIN",
         "HOST",
         "PORT",
-        "WORKER_POLL_INTERVAL_MS"
+        "WORKER_POLL_INTERVAL_MS",
+        "TRACKING_POLL_INTERVAL_MS"
       ]
     },
     "worker#dev": {
@@ -92,7 +113,8 @@
         "CORS_ORIGIN",
         "HOST",
         "PORT",
-        "WORKER_POLL_INTERVAL_MS"
+        "WORKER_POLL_INTERVAL_MS",
+        "TRACKING_POLL_INTERVAL_MS"
       ]
     },
     "web#build": {

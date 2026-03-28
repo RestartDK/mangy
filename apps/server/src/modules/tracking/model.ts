@@ -11,6 +11,15 @@ export const trackedSeriesSchema = z.object({
   checkFailureCount: z.number().int(),
 });
 
+export const refreshTrackedSeriesBody = z.object({
+  sourceId: z.string(),
+  seriesId: z.string(),
+});
+
 export const unauthorizedResponseSchema = z.object({
+  message: z.string(),
+});
+
+export const badRequestResponseSchema = z.object({
   message: z.string(),
 });

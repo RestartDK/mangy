@@ -18,4 +18,5 @@ export const useTracking = () =>
 
       return data ?? [];
     },
+    refetchInterval: 5000,
   });

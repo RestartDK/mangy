@@ -9,8 +9,11 @@
     "start": "./worker"
   },
   "dependencies": {
+    "@mangy/downloader": "workspace:*",
     "@mangy/db": "workspace:*",
-    "@mangy/env": "workspace:*"
+    "@mangy/env": "workspace:*",
+    "@mangy/source-sdk": "workspace:*",
+    "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

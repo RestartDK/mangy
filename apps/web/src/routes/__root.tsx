@@ -20,7 +20,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// biome-ignore lint/complexity/noBannedTypes: Empty context is intentional for TanStack Router
 export type RouterAppContext = {};
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
