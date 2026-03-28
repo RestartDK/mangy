@@ -55,8 +55,8 @@ const normalizeLimit = (limit: number | undefined): number => {
   return Math.min(limit, 24);
 };
 
-export abstract class SourcesService {
-  static async list() {
+export const SourcesService = {
+  async list() {
     await SourcesStorage.syncSources(sourceRegistry.list());
 
     const rows = await db.select().from(source).orderBy(asc(source.name));
@@ -81,23 +81,23 @@ export abstract class SourcesService {
         supportsPageFetch: row.supportsPageFetch,
       },
     }));
-  }
+  },
 
-  static getSourceOrThrow(sourceId: string) {
+  getSourceOrThrow(sourceId: string) {
     const adapter = sourceRegistry.get(sourceId);
     if (!adapter) {
       throw new Error(`Unknown source: ${sourceId}`);
     }
 
     return adapter;
-  }
+  },
 
-  static getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
+  getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     return adapter.getFilters();
-  }
+  },
 
-  static async getDiscover(sourceId: string, limit?: number) {
+  async getDiscover(sourceId: string, limit?: number) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     const resolvedLimit = normalizeLimit(limit);
 
@@ -142,12 +142,12 @@ export abstract class SourcesService {
       type: section.type,
       items: section.items.map((item) => mapSeriesResponse(sourceId, item)),
     }));
-  }
+  },
 
-  static async search(sourceId: string, input: SourceSearchInput) {
+  async search(sourceId: string, input: SourceSearchInput) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     const result = await adapter.searchSeries(input);
     await SourcesStorage.upsertSeries(sourceId, result.items);
     return mapListResponse(sourceId, result);
-  }
-}
+  },
+};

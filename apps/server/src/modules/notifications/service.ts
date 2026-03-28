@@ -2,8 +2,8 @@ import { db } from "@mangy/db";
 import { notification, notificationEndpoint } from "@mangy/db/schema";
 import { and, count, desc, eq } from "drizzle-orm";
 
-export abstract class NotificationsService {
-  static async list(userId: string) {
+export const NotificationsService = {
+  async list(userId: string) {
     const rows = await db
       .select()
       .from(notification)
@@ -18,9 +18,9 @@ export abstract class NotificationsService {
       isRead: row.isRead,
       createdAt: row.createdAt.toISOString(),
     }));
-  }
+  },
 
-  static async markRead(userId: string, notificationId: string) {
+  async markRead(userId: string, notificationId: string) {
     const [record] = await db
       .update(notification)
       .set({
@@ -50,9 +50,9 @@ export abstract class NotificationsService {
       ...record,
       createdAt: record.createdAt.toISOString(),
     };
-  }
+  },
 
-  static async markAllRead(userId: string) {
+  async markAllRead(userId: string) {
     const records = await db
       .update(notification)
       .set({
@@ -65,9 +65,9 @@ export abstract class NotificationsService {
       .returning({ id: notification.id });
 
     return { updatedCount: records.length };
-  }
+  },
 
-  static async getPreferences(userId: string) {
+  async getPreferences(userId: string) {
     const [endpoint, unreadRecord] = await Promise.all([
       db
         .select({ isEnabled: notificationEndpoint.isEnabled })
@@ -93,12 +93,9 @@ export abstract class NotificationsService {
       inAppEnabled: endpoint?.isEnabled ?? true,
       unreadCount: Number(unreadRecord.unreadCount ?? 0),
     };
-  }
+  },
 
-  static async updatePreferences(
-    userId: string,
-    input: { inAppEnabled: boolean }
-  ) {
+  async updatePreferences(userId: string, input: { inAppEnabled: boolean }) {
     const [existingEndpoint] = await db
       .select({ id: notificationEndpoint.id })
       .from(notificationEndpoint)
@@ -127,5 +124,5 @@ export abstract class NotificationsService {
     }
 
     return NotificationsService.getPreferences(userId);
-  }
-}
+  },
+};

@@ -66,8 +66,8 @@ const serializeSeriesState = (row: {
     : null,
 });
 
-export abstract class LibraryService {
-  static async list(userId: string) {
+export const LibraryService = {
+  async list(userId: string) {
     const rows = await db
       .select({
         id: libraryEntry.id,
@@ -94,13 +94,9 @@ export abstract class LibraryService {
       destinationName: row.destinationName ?? null,
       updatedAt: row.updatedAt.toISOString(),
     }));
-  }
+  },
 
-  static async getSeriesState(
-    userId: string,
-    sourceId: string,
-    seriesId: string
-  ) {
+  async getSeriesState(userId: string, sourceId: string, seriesId: string) {
     const row = await LibraryService.getSeriesStateRow(
       userId,
       sourceId,
@@ -112,9 +108,9 @@ export abstract class LibraryService {
     }
 
     return serializeSeriesState(row);
-  }
+  },
 
-  static async updateSeriesState(
+  async updateSeriesState(
     userId: string,
     input: {
       sourceId: string;
@@ -189,13 +185,9 @@ export abstract class LibraryService {
       input.sourceId,
       input.seriesId
     );
-  }
+  },
 
-  private static async getSeriesStateRow(
-    userId: string,
-    sourceId: string,
-    seriesId: string
-  ) {
+  async getSeriesStateRow(userId: string, sourceId: string, seriesId: string) {
     const [row] = await db
       .select({
         libraryEntryId: libraryEntry.id,
@@ -234,9 +226,9 @@ export abstract class LibraryService {
       .limit(1);
 
     return row ?? null;
-  }
+  },
 
-  private static async resolveSeriesRecord(sourceId: string, seriesId: string) {
+  async resolveSeriesRecord(sourceId: string, seriesId: string) {
     const existingRecord = await SourcesStorage.findSeriesRecord(
       sourceId,
       seriesId
@@ -248,9 +240,9 @@ export abstract class LibraryService {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     const seriesItem = await adapter.getSeries(seriesId);
     return SourcesStorage.upsertSeriesItem(sourceId, seriesItem);
-  }
+  },
 
-  private static async resolveDestinationId(
+  async resolveDestinationId(
     userId: string,
     requestedDestinationId: string | null | undefined,
     existingDestinationId: string | null
@@ -283,9 +275,9 @@ export abstract class LibraryService {
     }
 
     return destination.id;
-  }
+  },
 
-  private static async upsertTrackedState(input: {
+  async upsertTrackedState(input: {
     hadTrackingState: boolean;
     isAlreadyTracked: boolean;
     libraryEntryId: string;
@@ -347,5 +339,5 @@ export abstract class LibraryService {
         .delete(trackedSeriesState)
         .where(inArray(trackedSeriesState.id, duplicateIds));
     }
-  }
-}
+  },
+};

@@ -12,8 +12,8 @@ interface UserProfile {
   name: string;
 }
 
-export abstract class SettingsService {
-  static async getBootstrap(userId: string, profile: UserProfile) {
+export const SettingsService = {
+  async getBootstrap(userId: string, profile: UserProfile) {
     const [destinations, notifications] = await Promise.all([
       db
         .select({
@@ -38,9 +38,9 @@ export abstract class SettingsService {
       notifications,
       profile,
     };
-  }
+  },
 
-  static async createDestination(
+  async createDestination(
     userId: string,
     input: {
       name: string;
@@ -99,5 +99,5 @@ export abstract class SettingsService {
         komgaLibraryId: destination.komgaLibraryId ?? null,
       };
     });
-  }
-}
+  },
+};

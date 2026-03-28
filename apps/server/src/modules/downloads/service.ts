@@ -36,16 +36,16 @@ const serializeJob = (row: {
   updatedAt: row.updatedAt.toISOString(),
 });
 
-export abstract class DownloadsService {
-  static async list(userId: string) {
+export const DownloadsService = {
+  async list(userId: string) {
     const rows = await DownloadsService.baseQuery()
       .where(eq(downloadJob.userId, userId))
       .orderBy(desc(downloadJob.createdAt));
 
     return rows.map(serializeJob);
-  }
+  },
 
-  static async enqueue(
+  async enqueue(
     userId: string,
     input: {
       sourceId: string;
@@ -146,9 +146,9 @@ export abstract class DownloadsService {
     }
 
     return serializeJob(job);
-  }
+  },
 
-  static async cancel(userId: string, jobId: string) {
+  async cancel(userId: string, jobId: string) {
     const job = await DownloadsService.getJob(userId, jobId);
     if (!job) {
       throw new Error("The requested queue job could not be found.");
@@ -180,9 +180,9 @@ export abstract class DownloadsService {
     }
 
     return serializeJob(updatedJob);
-  }
+  },
 
-  static async retry(userId: string, jobId: string) {
+  async retry(userId: string, jobId: string) {
     const job = await DownloadsService.getJob(userId, jobId);
     if (!job) {
       throw new Error("The requested queue job could not be found.");
@@ -216,9 +216,9 @@ export abstract class DownloadsService {
     }
 
     return serializeJob(updatedJob);
-  }
+  },
 
-  static async prioritize(userId: string, jobId: string) {
+  async prioritize(userId: string, jobId: string) {
     const job = await DownloadsService.getJob(userId, jobId);
     if (!job) {
       throw new Error("The requested queue job could not be found.");
@@ -258,9 +258,9 @@ export abstract class DownloadsService {
     }
 
     return serializeJob(updatedJob);
-  }
+  },
 
-  private static baseQuery() {
+  baseQuery() {
     return db
       .select({
         id: downloadJob.id,
@@ -286,18 +286,18 @@ export abstract class DownloadsService {
         downloadDestination,
         eq(downloadJob.downloadDestinationId, downloadDestination.id)
       );
-  }
+  },
 
-  private static async getJob(userId: string, jobId: string) {
+  async getJob(userId: string, jobId: string) {
     const [job] = await DownloadsService.baseQuery()
       .where(and(eq(downloadJob.userId, userId), eq(downloadJob.id, jobId)))
       .orderBy(desc(downloadJob.createdAt))
       .limit(1);
 
     return job ?? null;
-  }
+  },
 
-  private static async resolveDestination(
+  async resolveDestination(
     userId: string,
     requestedDestinationId: string | undefined
   ) {
@@ -341,5 +341,5 @@ export abstract class DownloadsService {
     }
 
     return defaultDestination;
-  }
-}
+  },
+};

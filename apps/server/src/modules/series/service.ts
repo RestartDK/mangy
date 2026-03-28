@@ -52,15 +52,15 @@ const toChapterResponse = (item: SourceChapter) => ({
   isUnavailable: item.isUnavailable,
 });
 
-export abstract class SeriesService {
-  static async getSeries(sourceId: string, seriesId: string) {
+export const SeriesService = {
+  async getSeries(sourceId: string, seriesId: string) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     const seriesItem = await adapter.getSeries(seriesId);
     await SourcesStorage.upsertSeriesItem(sourceId, seriesItem);
     return toSeriesResponse(sourceId, seriesItem);
-  }
+  },
 
-  static async getChapters(sourceId: string, seriesId: string) {
+  async getChapters(sourceId: string, seriesId: string) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     const seriesItem = await adapter.getSeries(seriesId);
     const seriesRecord = await SourcesStorage.upsertSeriesItem(
@@ -70,5 +70,5 @@ export abstract class SeriesService {
     const chapters = await adapter.getChapters(seriesId);
     await SourcesStorage.upsertChapters(seriesRecord.id, chapters);
     return chapters.map(toChapterResponse);
-  }
-}
+  },
+};

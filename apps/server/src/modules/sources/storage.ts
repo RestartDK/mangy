@@ -59,8 +59,8 @@ const mapSourceValues = (adapter: SourceAdapter) => ({
   supportsPageFetch: adapter.metadata.capabilities.supportsPageFetch,
 });
 
-export class SourcesStorage {
-  static async syncSources(adapters: SourceAdapter[]): Promise<void> {
+export const SourcesStorage = {
+  async syncSources(adapters: SourceAdapter[]): Promise<void> {
     for (const adapter of adapters) {
       await db
         .insert(source)
@@ -88,18 +88,15 @@ export class SourcesStorage {
           },
         });
     }
-  }
+  },
 
-  static async upsertSeries(
-    sourceId: string,
-    items: SourceSeries[]
-  ): Promise<void> {
+  async upsertSeries(sourceId: string, items: SourceSeries[]): Promise<void> {
     for (const item of items) {
       await SourcesStorage.upsertSeriesItem(sourceId, item);
     }
-  }
+  },
 
-  static async upsertSeriesItem(
+  async upsertSeriesItem(
     sourceId: string,
     item: SourceSeries
   ): Promise<{ id: string; sourceId: string; externalId: string }> {
@@ -137,9 +134,9 @@ export class SourcesStorage {
     }
 
     return record;
-  }
+  },
 
-  static async upsertChapters(
+  async upsertChapters(
     seriesId: string,
     items: SourceChapter[]
   ): Promise<void> {
@@ -163,9 +160,9 @@ export class SourcesStorage {
           },
         });
     }
-  }
+  },
 
-  static async findSeriesRecord(
+  async findSeriesRecord(
     sourceId: string,
     externalId: string
   ): Promise<{ id: string } | null> {
@@ -177,5 +174,5 @@ export class SourcesStorage {
       );
 
     return record ?? null;
-  }
-}
+  },
+};

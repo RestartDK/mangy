@@ -25,9 +25,6 @@
   "extends": ["ultracite/core", "ultracite/react"],
   "linter": {
     "rules": {
-      "complexity": {
-        "noStaticOnlyClass": "off"
-      },
       "performance": {
         "noBarrelFile": "off"
       },

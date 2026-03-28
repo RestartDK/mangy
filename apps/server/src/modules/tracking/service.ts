@@ -18,20 +18,16 @@ const serializeTrackedSeries = (row: {
   lastSeenChapterExternalId: row.lastSeenChapterExternalId ?? null,
 });
 
-export abstract class TrackingService {
-  static async list(userId: string) {
+export const TrackingService = {
+  async list(userId: string) {
     const rows = await TrackingService.baseQuery(userId).orderBy(
       desc(trackedSeriesState.updatedAt)
     );
 
     return rows.map(serializeTrackedSeries);
-  }
+  },
 
-  static async requestRefresh(
-    userId: string,
-    sourceId: string,
-    seriesId: string
-  ) {
+  async requestRefresh(userId: string, sourceId: string, seriesId: string) {
     const [trackedState] = await TrackingService.baseQuery(
       userId,
       and(eq(series.sourceId, sourceId), eq(series.externalId, seriesId))
@@ -59,9 +55,9 @@ export abstract class TrackingService {
         : null,
       lastSeenChapterExternalId: trackedState.lastSeenChapterExternalId ?? null,
     };
-  }
+  },
 
-  private static baseQuery(userId: string, extraWhere?: SQL<unknown>) {
+  baseQuery(userId: string, extraWhere?: SQL<unknown>) {
     return db
       .select({
         id: trackedSeriesState.id,
@@ -91,5 +87,5 @@ export abstract class TrackingService {
               eq(libraryEntry.isTracked, true)
             )
       );
-  }
-}
+  },
+};
