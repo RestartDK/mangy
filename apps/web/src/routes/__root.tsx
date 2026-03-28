@@ -51,7 +51,7 @@ function RootComponent() {
         <div className="min-h-svh">
           <Outlet />
         </div>
-        <Toaster richColors />
+        <Toaster />
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
       <TanStackRouterDevtools position="bottom-left" />

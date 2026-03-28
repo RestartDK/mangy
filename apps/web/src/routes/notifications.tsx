@@ -1,13 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { AppShell } from "@/components/app-shell";
-import { PlaceholderPanel } from "@/components/placeholder-panel";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useMarkAllNotificationsRead } from "@/hooks/use-mark-all-notifications-read";
 import { useMarkNotificationRead } from "@/hooks/use-mark-notification-read";
 import { useNotificationPreferences } from "@/hooks/use-notification-preferences";
+import type { NotificationItem } from "@/hooks/use-notifications";
 import { useNotifications } from "@/hooks/use-notifications";
+import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/notifications")({
   beforeLoad: requireAuth,
@@ -21,62 +29,83 @@ function NotificationsRouteComponent() {
   const markAllNotificationsRead = useMarkAllNotificationsRead();
 
   return (
-    <AppShell
-      subtitle="In-app notifications now capture queue results and tracked-series updates, with Slack still able to layer on later without changing the core event flow."
-      title="Notification stream"
-    >
-      <PlaceholderPanel
-        description="Completed downloads, final queue failures, and tracked-series updates appear here first, while Slack delivery can build on the same pipeline later."
-        eyebrow="In-app"
-        title={`Messages: ${notificationsQuery.data?.length ?? 0}`}
-      >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-border/60 bg-background/70 p-4">
-          <div>
-            <div className="font-medium text-sm">Unread notifications</div>
-            <div className="mt-1 text-muted-foreground text-sm">
-              {preferencesQuery.data?.unreadCount ?? 0} unread in the in-app
-              feed
-            </div>
-          </div>
+    <AppShell>
+      <PageHeader
+        action={
           <Button
             disabled={markAllNotificationsRead.isPending}
             onClick={() => {
               markAllNotificationsRead.mutate();
             }}
-            size="sm"
-            type="button"
             variant="outline"
           >
             {markAllNotificationsRead.isPending
               ? "Working..."
               : "Mark all read"}
           </Button>
-        </div>
+        }
+        description="Keep up with completed downloads, failures, and tracked-series updates in one inbox."
+        title="Notifications"
+      />
 
-        <div className="grid gap-3">
-          {notificationsQuery.data?.map((item) => (
-            <div
-              className="rounded-[20px] border border-border/60 bg-background/70 p-4"
-              key={item.id}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
+      {notificationsQuery.error || preferencesQuery.error ? (
+        <Alert variant="destructive">
+          <AlertTitle>Unable to load notifications</AlertTitle>
+          <AlertDescription>
+            {getErrorMessage(
+              notificationsQuery.error ?? preferencesQuery.error,
+              "Try again in a moment."
+            )}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Card size="sm">
+        <CardHeader className="gap-1">
+          <CardTitle>Inbox</CardTitle>
+          <p className="text-muted-foreground text-sm">
+            {preferencesQuery.data?.unreadCount ?? 0} unread messages
+          </p>
+        </CardHeader>
+      </Card>
+
+      {notificationsQuery.isLoading ? <NotificationsSkeleton /> : null}
+
+      {notificationsQuery.isLoading ||
+      (notificationsQuery.data?.length ?? 0) ? null : (
+        <EmptyState
+          description="When downloads finish or tracked series change, updates will show up here."
+          title="No notifications yet"
+        />
+      )}
+
+      <div className="grid gap-3">
+        {notificationsQuery.data?.map((item) => (
+          <Card
+            className={cn(
+              item.isRead
+                ? "border-border/70"
+                : "border-primary/30 bg-accent/40"
+            )}
+            key={item.id}
+            size="sm"
+          >
+            <CardContent className="space-y-3 py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="font-medium">{item.title}</div>
+                    <h2 className="font-medium">{item.title}</h2>
+                    <NotificationTypeBadge type={item.type} />
                     {item.isRead ? null : (
-                      <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary uppercase tracking-[0.14em]">
-                        Unread
-                      </span>
+                      <StatusBadge tone="secondary">Unread</StatusBadge>
                     )}
                   </div>
-                  <div className="mt-1 text-muted-foreground text-sm">
-                    {item.body}
-                  </div>
+                  <p className="text-muted-foreground text-sm">{item.body}</p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="text-muted-foreground text-xs uppercase tracking-[0.18em]">
-                    {item.type}
-                  </div>
+                <div className="flex flex-col items-start gap-2 text-sm sm:items-end">
+                  <span className="text-muted-foreground">
+                    {formatDateTime(item.createdAt)}
+                  </span>
                   {item.isRead ? null : (
                     <Button
                       disabled={markNotificationRead.isPending}
@@ -92,10 +121,44 @@ function NotificationsRouteComponent() {
                   )}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </PlaceholderPanel>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </AppShell>
   );
 }
+
+const NotificationTypeBadge = ({
+  type,
+}: {
+  type: NotificationItem["type"];
+}) => {
+  if (type === "downloadCompleted") {
+    return <StatusBadge tone="secondary">Download complete</StatusBadge>;
+  }
+
+  if (type === "downloadFailed") {
+    return <StatusBadge tone="destructive">Download failed</StatusBadge>;
+  }
+
+  if (type === "trackedSeriesUpdated") {
+    return <StatusBadge>Tracked series</StatusBadge>;
+  }
+
+  return <StatusBadge>System</StatusBadge>;
+};
+
+const NotificationsSkeleton = () => (
+  <div className="grid gap-3">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <Card key={String(index)} size="sm">
+        <CardContent className="space-y-3 py-3">
+          <Skeleton className="h-5 w-1/3" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-1/4" />
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);

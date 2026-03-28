@@ -9,7 +9,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
 
 type AuthMode = "signIn" | "signUp";
@@ -68,6 +75,7 @@ export const AuthPanel = () => {
   };
 
   let submitLabel = "Create account";
+
   if (isSubmitting) {
     submitLabel = "Working...";
   } else if (mode === "signIn") {
@@ -75,74 +83,76 @@ export const AuthPanel = () => {
   }
 
   return (
-    <Card className="border-border/60 bg-card/80 shadow-[0_24px_80px_rgba(54,39,25,0.16)] backdrop-blur">
-      <CardHeader>
-        <div className="eyebrow">Homelab manga control</div>
-        <CardTitle className="mt-3 font-display text-4xl text-primary">
-          {mode === "signIn"
-            ? "Step into your queue."
-            : "Create your reading room."}
-        </CardTitle>
-        <CardDescription className="max-w-md text-base text-muted-foreground">
-          Browse live catalogs, save titles for later, and build the
-          TypeScript-first replacement for your old Suwayomi workflow.
-        </CardDescription>
+    <Card className="w-full max-w-md border-border/70 shadow-sm">
+      <CardHeader className="gap-3">
+        <div className="space-y-1">
+          <CardTitle className="text-xl sm:text-2xl">
+            {mode === "signIn" ? "Welcome back" : "Create your account"}
+          </CardTitle>
+          <CardDescription>
+            {mode === "signIn"
+              ? "Sign in to search titles, queue chapters, and manage your library."
+              : "Start saving series, choosing destinations, and tracking new releases."}
+          </CardDescription>
+        </div>
+        <Tabs
+          onValueChange={(value) => setMode(value as AuthMode)}
+          value={mode}
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signIn">Sign in</TabsTrigger>
+            <TabsTrigger value="signUp">Create account</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </CardHeader>
       <CardContent>
-        <div className="mb-5 flex gap-2">
-          <Button
-            onClick={() => setMode("signIn")}
-            type="button"
-            variant={mode === "signIn" ? "default" : "outline"}
-          >
-            Sign in
-          </Button>
-          <Button
-            onClick={() => setMode("signUp")}
-            type="button"
-            variant={mode === "signUp" ? "default" : "outline"}
-          >
-            Create account
-          </Button>
-        </div>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <FieldGroup>
+            {mode === "signUp" ? (
+              <Field>
+                <FieldLabel htmlFor={fieldIds.name}>Display name</FieldLabel>
+                <Input
+                  id={fieldIds.name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Reader name"
+                  value={name}
+                />
+              </Field>
+            ) : null}
 
-        <form className="grid gap-4" onSubmit={handleSubmit}>
-          {mode === "signUp" ? (
-            <label className="grid gap-2 text-sm" htmlFor={fieldIds.name}>
-              <span className="font-medium text-foreground">Display name</span>
+            <Field>
+              <FieldLabel htmlFor={fieldIds.email}>Email</FieldLabel>
               <Input
-                id={fieldIds.name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="A reader with a queue"
-                value={name}
+                id={fieldIds.email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="reader@example.com"
+                type="email"
+                value={email}
               />
-            </label>
-          ) : null}
+            </Field>
 
-          <label className="grid gap-2 text-sm" htmlFor={fieldIds.email}>
-            <span className="font-medium text-foreground">Email</span>
-            <Input
-              id={fieldIds.email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="reader@example.com"
-              type="email"
-              value={email}
-            />
-          </label>
+            <Field>
+              <FieldLabel htmlFor={fieldIds.password}>Password</FieldLabel>
+              <Input
+                id={fieldIds.password}
+                minLength={8}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="At least 8 characters"
+                type="password"
+                value={password}
+              />
+              <FieldDescription>
+                Use at least 8 characters for your password.
+              </FieldDescription>
+            </Field>
+          </FieldGroup>
 
-          <label className="grid gap-2 text-sm" htmlFor={fieldIds.password}>
-            <span className="font-medium text-foreground">Password</span>
-            <Input
-              id={fieldIds.password}
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="At least 8 characters"
-              type="password"
-              value={password}
-            />
-          </label>
-
-          <Button disabled={isSubmitting} size="lg" type="submit">
+          <Button
+            className="w-full"
+            disabled={isSubmitting}
+            size="lg"
+            type="submit"
+          >
             {submitLabel}
           </Button>
         </form>
