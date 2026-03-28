@@ -2,12 +2,25 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
-import Loader from "@/components/loader";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useCreateDestination } from "@/hooks/use-create-destination";
 import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
 import { useUpdateNotificationPreferences } from "@/hooks/use-update-notification-preferences";
+import { getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
 const destinationFieldIds = {
@@ -40,188 +53,281 @@ function SettingsRouteComponent() {
   }, [settingsQuery.data]);
 
   return (
-    <AppShell
-      subtitle="Settings now drive the actual download pipeline, starting with Komga-ready output folders that the worker can write to directly."
-      title="System settings"
-    >
-      {settingsQuery.isLoading ? <Loader /> : null}
+    <AppShell>
+      <PageHeader
+        description="Update your profile details, choose how notifications work, and manage download destinations."
+        title="Settings"
+      />
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section className="panelSurface p-6">
-          <div className="eyebrow">Profile</div>
-          <div className="mt-4 rounded-[24px] border border-border/60 bg-background/70 p-5">
-            <div className="font-display text-2xl text-primary">
-              {settingsQuery.data?.profile.name ?? "Reader profile"}
-            </div>
-            <div className="mt-2 text-muted-foreground text-sm">
-              {settingsQuery.data?.profile.email ?? "No email loaded"}
-            </div>
-          </div>
+      {settingsQuery.error ? (
+        <Alert variant="destructive">
+          <AlertTitle>Unable to load settings</AlertTitle>
+          <AlertDescription>
+            {getErrorMessage(settingsQuery.error, "Try again in a moment.")}
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
-          <div className="mt-6 rounded-[24px] border border-border/60 bg-background/70 p-5">
-            <div className="font-medium text-lg">Notification delivery</div>
-            <div className="mt-2 text-muted-foreground text-sm">
-              Control whether in-app alerts stay live while background jobs and
-              tracked updates arrive.
-            </div>
+      {settingsQuery.isLoading ? <SettingsSkeleton /> : null}
 
-            <label className="mt-4 flex items-center gap-3 text-sm">
-              <input
-                checked={inAppEnabled}
-                className="size-4 rounded border border-border"
-                onChange={(event) => setInAppEnabled(event.target.checked)}
-                type="checkbox"
-              />
-              <span>Enable in-app live notifications</span>
-            </label>
-
-            <div className="mt-3 text-muted-foreground text-sm">
-              Unread right now:{" "}
-              {settingsQuery.data?.notifications.unreadCount ?? 0}
-            </div>
-
-            <Button
-              className="mt-4"
-              disabled={
-                updateNotificationPreferences.isPending ||
-                inAppEnabled ===
-                  (settingsQuery.data?.notifications.inAppEnabled ?? true)
-              }
-              onClick={() => {
-                updateNotificationPreferences.mutate({ inAppEnabled });
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {updateNotificationPreferences.isPending
-                ? "Saving..."
-                : "Save notification settings"}
-            </Button>
-          </div>
-        </section>
-
-        <section className="panelSurface p-6">
-          <div className="eyebrow">Destinations</div>
-          <div className="mt-4 grid gap-4">
-            <form
-              className="grid gap-4 rounded-[24px] border border-border/60 bg-background/70 p-5"
-              onSubmit={(event) => {
-                event.preventDefault();
-
-                createDestination
-                  .mutateAsync({
-                    absolutePath,
-                    isDefault,
-                    komgaLibraryId,
-                    name,
-                  })
-                  .then(() => {
-                    setAbsolutePath("");
-                    setIsDefault(false);
-                    setKomgaLibraryId("");
-                    setName("");
-                  })
-                  .catch(() => undefined);
-              }}
-            >
-              <div className="font-medium text-lg">Add a download folder</div>
-
-              <label
-                className="grid gap-2 text-sm"
-                htmlFor={destinationFieldIds.name}
-              >
-                <span className="font-medium">Label</span>
-                <Input
-                  id={destinationFieldIds.name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Komga library"
-                  value={name}
+      {settingsQuery.isLoading ? null : (
+        <div className="page-grid lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile</CardTitle>
+                <p className="text-muted-foreground text-sm">
+                  Your account details for this workspace.
+                </p>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <ProfileField
+                  label="Name"
+                  value={settingsQuery.data?.profile.name ?? "Not available"}
                 />
-              </label>
-
-              <label
-                className="grid gap-2 text-sm"
-                htmlFor={destinationFieldIds.absolutePath}
-              >
-                <span className="font-medium">Absolute path</span>
-                <Input
-                  id={destinationFieldIds.absolutePath}
-                  onChange={(event) => setAbsolutePath(event.target.value)}
-                  placeholder="/srv/media/manga"
-                  value={absolutePath}
+                <ProfileField
+                  label="Email"
+                  value={settingsQuery.data?.profile.email ?? "Not available"}
                 />
-              </label>
+              </CardContent>
+            </Card>
 
-              <label
-                className="grid gap-2 text-sm"
-                htmlFor={destinationFieldIds.komgaLibraryId}
-              >
-                <span className="font-medium">Komga library id</span>
-                <Input
-                  id={destinationFieldIds.komgaLibraryId}
-                  onChange={(event) => setKomgaLibraryId(event.target.value)}
-                  placeholder="Optional"
-                  value={komgaLibraryId}
-                />
-              </label>
-
-              <label className="flex items-center gap-3 text-sm">
-                <input
-                  checked={isDefault}
-                  className="size-4 rounded border border-border"
-                  onChange={(event) => setIsDefault(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>Use as the default queue destination</span>
-              </label>
-
-              <Button
-                disabled={
-                  createDestination.isPending ||
-                  name.trim().length === 0 ||
-                  absolutePath.trim().length === 0
-                }
-                size="lg"
-                type="submit"
-              >
-                {createDestination.isPending ? "Saving..." : "Save destination"}
-              </Button>
-            </form>
-
-            <div className="grid gap-3">
-              {settingsQuery.data?.destinations.map((destination) => (
-                <div
-                  className="rounded-[20px] border border-border/60 bg-background/70 p-4"
-                  key={destination.id}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="font-medium">{destination.name}</div>
-                    <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em]">
-                      {destination.isDefault ? (
-                        <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-primary">
-                          Default
-                        </span>
-                      ) : null}
-                      <span className="rounded-full border border-border/60 px-2.5 py-1 text-muted-foreground">
-                        {destination.isEnabled ? "Enabled" : "Disabled"}
-                      </span>
-                    </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Notifications</CardTitle>
+                <p className="text-muted-foreground text-sm">
+                  Decide whether in-app notifications stay active.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                  <div className="space-y-1">
+                    <div className="font-medium">In-app notifications</div>
+                    <p className="text-muted-foreground text-sm">
+                      Show updates for completed downloads, failures, and
+                      tracked-series changes.
+                    </p>
                   </div>
-                  <div className="mt-2 break-all text-muted-foreground text-sm">
-                    {destination.absolutePath}
-                  </div>
-                  {destination.komgaLibraryId ? (
-                    <div className="mt-2 text-muted-foreground text-xs uppercase tracking-[0.16em]">
-                      Komga library: {destination.komgaLibraryId}
-                    </div>
-                  ) : null}
+                  <Switch
+                    checked={inAppEnabled}
+                    onCheckedChange={setInAppEnabled}
+                  />
                 </div>
-              ))}
-            </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {settingsQuery.data?.notifications.unreadCount ?? 0} unread
+                    notifications
+                  </span>
+                  <Button
+                    disabled={
+                      updateNotificationPreferences.isPending ||
+                      inAppEnabled ===
+                        (settingsQuery.data?.notifications.inAppEnabled ?? true)
+                    }
+                    onClick={() => {
+                      updateNotificationPreferences.mutate({ inAppEnabled });
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    {updateNotificationPreferences.isPending
+                      ? "Saving..."
+                      : "Save notification settings"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </section>
-      </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Destinations</CardTitle>
+              <p className="text-muted-foreground text-sm">
+                Add folders where queued chapters should be saved.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <form
+                className="space-y-4 rounded-lg border p-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+
+                  createDestination
+                    .mutateAsync({
+                      absolutePath,
+                      isDefault,
+                      komgaLibraryId,
+                      name,
+                    })
+                    .then(() => {
+                      setAbsolutePath("");
+                      setIsDefault(false);
+                      setKomgaLibraryId("");
+                      setName("");
+                    })
+                    .catch(() => undefined);
+                }}
+              >
+                <div className="space-y-1">
+                  <h2 className="font-medium">Add destination</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Save chapters to a folder that your reader or media server
+                    can access.
+                  </p>
+                </div>
+
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor={destinationFieldIds.name}>
+                      Name
+                    </FieldLabel>
+                    <Input
+                      id={destinationFieldIds.name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Main library"
+                      value={name}
+                    />
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor={destinationFieldIds.absolutePath}>
+                      Absolute path
+                    </FieldLabel>
+                    <Input
+                      id={destinationFieldIds.absolutePath}
+                      onChange={(event) => setAbsolutePath(event.target.value)}
+                      placeholder="/srv/media/manga"
+                      value={absolutePath}
+                    />
+                    <FieldDescription>
+                      Use the full path where downloads should be written.
+                    </FieldDescription>
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor={destinationFieldIds.komgaLibraryId}>
+                      Komga library ID
+                    </FieldLabel>
+                    <Input
+                      id={destinationFieldIds.komgaLibraryId}
+                      onChange={(event) =>
+                        setKomgaLibraryId(event.target.value)
+                      }
+                      placeholder="Optional"
+                      value={komgaLibraryId}
+                    />
+                    <FieldDescription>
+                      Add this if you want to tie the destination to a specific
+                      Komga library.
+                    </FieldDescription>
+                  </Field>
+                </FieldGroup>
+
+                <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                  <div className="space-y-1">
+                    <div className="font-medium">Default destination</div>
+                    <p className="text-muted-foreground text-sm">
+                      Use this folder automatically when a series does not have
+                      a destination saved yet.
+                    </p>
+                  </div>
+                  <Switch checked={isDefault} onCheckedChange={setIsDefault} />
+                </div>
+
+                <Button
+                  className="w-full"
+                  disabled={
+                    createDestination.isPending ||
+                    name.trim().length === 0 ||
+                    absolutePath.trim().length === 0
+                  }
+                  size="lg"
+                  type="submit"
+                >
+                  {createDestination.isPending
+                    ? "Saving..."
+                    : "Save destination"}
+                </Button>
+              </form>
+
+              {settingsQuery.data?.destinations.length ? (
+                <div className="grid gap-3">
+                  {settingsQuery.data.destinations.map((destination) => (
+                    <Card key={destination.id} size="sm">
+                      <CardContent className="space-y-3 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="font-medium">
+                              {destination.name}
+                            </div>
+                            <div className="break-all text-muted-foreground text-sm">
+                              {destination.absolutePath}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {destination.isDefault ? (
+                              <StatusBadge tone="secondary">
+                                Default
+                              </StatusBadge>
+                            ) : null}
+                            <StatusBadge
+                              tone={
+                                destination.isEnabled ? "secondary" : "outline"
+                              }
+                            >
+                              {destination.isEnabled ? "Enabled" : "Disabled"}
+                            </StatusBadge>
+                          </div>
+                        </div>
+                        {destination.komgaLibraryId ? (
+                          <div className="text-muted-foreground text-sm">
+                            Komga library ID: {destination.komgaLibraryId}
+                          </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  description="Add your first destination so queued chapters know where to go."
+                  title="No destinations yet"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </AppShell>
   );
 }
+
+const ProfileField = ({ label, value }: { label: string; value: string }) => {
+  return (
+    <div className="rounded-lg border p-4">
+      <div className="text-muted-foreground text-xs uppercase tracking-wide">
+        {label}
+      </div>
+      <div className="mt-1 text-sm">{value}</div>
+    </div>
+  );
+};
+
+const SettingsSkeleton = () => (
+  <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    <Card>
+      <CardContent className="space-y-4 p-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </CardContent>
+    </Card>
+    <Card>
+      <CardContent className="space-y-4 p-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </CardContent>
+    </Card>
+  </div>
+);

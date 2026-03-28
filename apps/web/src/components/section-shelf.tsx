@@ -6,18 +6,26 @@ interface SectionShelfProps {
   section: DiscoverSection;
 }
 
+const sectionLabelMap: Record<DiscoverSection["type"], string> = {
+  popular: "Popular now",
+  latest: "Latest updates",
+  trending: "Trending",
+};
+
 export const SectionShelf = ({ section }: SectionShelfProps) => (
-  <section className="space-y-4">
-    <div className="flex items-end justify-between gap-4">
+  <section className="page-section">
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <div className="eyebrow">{section.type}</div>
-        <h2 className="mt-2 font-display text-3xl text-primary">
+        <p className="text-muted-foreground text-sm">
+          {sectionLabelMap[section.type]}
+        </p>
+        <h2 className="font-heading font-semibold text-xl tracking-tight sm:text-2xl">
           {section.title}
         </h2>
       </div>
-      <div className="text-muted-foreground text-sm">
-        {section.items.length} picks loaded
-      </div>
+      <p className="text-muted-foreground text-sm">
+        {section.items.length} series
+      </p>
     </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {section.items.map((item) => (

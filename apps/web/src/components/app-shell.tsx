@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   BookMarked,
@@ -9,98 +9,144 @@ import {
 } from "lucide-react";
 import type { PropsWithChildren } from "react";
 
-import { Button } from "@/components/ui/button";
+import { ShellUserMenu } from "@/components/shell-user-menu";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarSeparator,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { useLiveUpdates } from "@/hooks/use-live-updates";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
-const navigationItems = [
-  { to: "/", label: "Discover", icon: Compass },
+const primaryNavigationItems = [
   { to: "/search", label: "Search", icon: Search },
   { to: "/library", label: "Library", icon: BookMarked },
   { to: "/queue", label: "Queue", icon: Download },
-  { to: "/notifications", label: "Alerts", icon: Bell },
+] as const;
+
+const secondaryNavigationItems = [
+  { to: "/", label: "Discover", icon: Compass },
+  { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 interface AppShellProps extends PropsWithChildren {
-  title: string;
-  subtitle: string;
+  contentClassName?: string;
 }
 
-export const AppShell = ({ children, title, subtitle }: AppShellProps) => {
-  const navigate = useNavigate();
+const isActiveRoute = (pathname: string, to: string): boolean => {
+  if (to === "/") {
+    return pathname === "/";
+  }
+
+  return pathname === to || pathname.startsWith(`${to}/`);
+};
+
+export const AppShell = ({ children, contentClassName }: AppShellProps) => {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   const { data: session } = authClient.useSession();
 
   useLiveUpdates(Boolean(session?.user.id));
 
   return (
-    <div className="min-h-svh bg-background text-foreground">
-      <div className="pageFrame py-6">
-        <header className="panelSurface mb-6 overflow-hidden">
-          <div className="grid gap-6 p-6 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
-            <div>
-              <div className="eyebrow">Mangy</div>
-              <h1 className="mt-3 text-balance font-display text-4xl text-primary md:text-5xl">
-                {title}
-              </h1>
-              <p className="mt-3 max-w-2xl text-base text-muted-foreground md:text-lg">
-                {subtitle}
-              </p>
-            </div>
-            <div className="flex flex-col justify-between gap-4 rounded-[28px] border border-border/60 bg-card/70 p-5">
-              <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-[0.3em]">
-                  Session
-                </div>
-                <div className="mt-2 font-medium text-lg">
-                  {session?.user.name ?? "Signed in"}
-                </div>
-                <div className="text-muted-foreground text-sm">
-                  {session?.user.email ?? "Ready for discovery"}
-                </div>
+    <SidebarProvider>
+      <Sidebar collapsible="icon" variant="inset">
+        <SidebarHeader>
+          <Link
+            className="flex flex-col gap-1 rounded-md px-2 py-1"
+            to="/search"
+          >
+            <span className="font-heading font-semibold text-sidebar-foreground text-sm">
+              Mangy
+            </span>
+            <span className="text-sidebar-foreground/70 text-xs">
+              Manga management
+            </span>
+          </Link>
+        </SidebarHeader>
+        <SidebarSeparator />
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Workflows</SidebarGroupLabel>
+            <SidebarMenu>
+              {primaryNavigationItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActiveRoute(pathname, item.to)}
+                    >
+                      <Link to={item.to}>
+                        <Icon className="size-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel>More</SidebarGroupLabel>
+            <SidebarMenu>
+              {secondaryNavigationItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActiveRoute(pathname, item.to)}
+                    >
+                      <Link to={item.to}>
+                        <Icon className="size-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
+          <ShellUserMenu
+            email={session?.user.email}
+            name={session?.user.name}
+          />
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset>
+        <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+          <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+            <SidebarTrigger className="md:hidden" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-heading font-medium text-sm">
+                Mangy
               </div>
-              <Button
-                onClick={() => {
-                  authClient.signOut({
-                    fetchOptions: {
-                      onSuccess: () => {
-                        navigate({ to: "/login" });
-                      },
-                    },
-                  });
-                }}
-                variant="outline"
-              >
-                Sign out
-              </Button>
+              <div className="truncate text-muted-foreground text-xs">
+                Search, queue, and manage manga in one place.
+              </div>
             </div>
           </div>
-        </header>
-
-        <nav className="mb-6 flex flex-wrap gap-2">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                activeProps={{
-                  className: "bg-primary text-primary-foreground",
-                }}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm transition-colors hover:border-primary/40 hover:text-primary"
-                )}
-                key={item.to}
-                to={item.to}
-              >
-                <Icon className="size-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {children}
-      </div>
-    </div>
+        </div>
+        <div className={cn("app-page", contentClassName)}>{children}</div>
+        <Separator />
+      </SidebarInset>
+    </SidebarProvider>
   );
 };
