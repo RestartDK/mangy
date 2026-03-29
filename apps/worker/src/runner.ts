@@ -1,8 +1,7 @@
-import { rm } from "node:fs/promises";
-
 import {
   downloadPagesToFolder,
   prepareChapterOutputDirectory,
+  removeDirectory,
 } from "@mangy/downloader";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 
@@ -80,7 +79,7 @@ export const runDownloadJob = async (
       outputPath: outputDirectory,
     });
   } catch (error) {
-    await rm(outputDirectory, { force: true, recursive: true });
+    await removeDirectory(outputDirectory);
 
     if (error instanceof CancelledError) {
       await cancelRunningDownloadJob(job.id);

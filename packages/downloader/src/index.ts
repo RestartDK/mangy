@@ -1,5 +1,52 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { ensureEmptyDirectory, writeBytes } from "./fs";
+
+export { ensureEmptyDirectory, removeDirectory, writeBytes } from "./fs";
+
+const trailingSeparatorsPattern = /[\\/]+$/u;
+const leadingAndTrailingSeparatorsPattern = /^[\\/]+|[\\/]+$/gu;
+const queryAndHashPattern = /[?#].*$/u;
+const pathSeparatorsPattern = /[\\/]/u;
+
+const getPathSeparator = (path: string): string =>
+  path.includes("\\") && !path.includes("/") ? "\\" : "/";
+
+const trimTrailingSeparators = (value: string): string =>
+  value.replace(trailingSeparatorsPattern, "");
+
+const joinPath = (...parts: string[]): string => {
+  const [firstPart, ...restParts] = parts.filter(Boolean);
+
+  if (!firstPart) {
+    return "";
+  }
+
+  const separator = getPathSeparator(firstPart);
+  let joined = trimTrailingSeparators(firstPart);
+
+  for (const part of restParts) {
+    const trimmedPart = part.replace(leadingAndTrailingSeparatorsPattern, "");
+
+    if (!trimmedPart) {
+      continue;
+    }
+
+    joined = `${joined}${separator}${trimmedPart}`;
+  }
+
+  return joined;
+};
+
+const getExtension = (value: string): string => {
+  const normalizedValue = value.replace(queryAndHashPattern, "");
+  const fileName = normalizedValue.split(pathSeparatorsPattern).pop() ?? "";
+  const extensionIndex = fileName.lastIndexOf(".");
+
+  if (extensionIndex <= 0) {
+    return "";
+  }
+
+  return fileName.slice(extensionIndex);
+};
 
 export interface DownloadPage {
   index: number;
@@ -75,12 +122,12 @@ const getFileExtension = (
 
   try {
     const url = new URL(imageUrl);
-    const extension = extname(url.pathname);
+    const extension = getExtension(url.pathname);
     if (extension) {
       return extension;
     }
   } catch {
-    const extension = extname(imageUrl);
+    const extension = getExtension(imageUrl);
     if (extension) {
       return extension;
     }
@@ -119,10 +166,13 @@ export const prepareChapterOutputDirectory = async ({
     chapterTitle,
     chapterId
   );
-  const outputDirectory = join(destinationPath, safeSeriesTitle, chapterLabel);
+  const outputDirectory = joinPath(
+    destinationPath,
+    safeSeriesTitle,
+    chapterLabel
+  );
 
-  await rm(outputDirectory, { force: true, recursive: true });
-  await mkdir(outputDirectory, { recursive: true });
+  await ensureEmptyDirectory(outputDirectory);
 
   return outputDirectory;
 };
@@ -162,7 +212,7 @@ export const downloadPagesToFolder = async ({
     );
     const fileName = `${String(index + 1).padStart(3, "0")}${extension}`;
 
-    await writeFile(join(outputDirectory, fileName), bytes);
+    await writeBytes(joinPath(outputDirectory, fileName), bytes);
 
     if (onProgress) {
       const completed = index + 1;
