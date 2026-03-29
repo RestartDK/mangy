@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { hostname } from "node:os";
+declare const Bun: typeof import("bun");
 
 import { env } from "@mangy/env";
 
@@ -11,12 +10,10 @@ import {
   processTrackedSeries,
 } from "./tracking";
 
-const sleep = (durationMs: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
+const sleep = (durationMs: number): Promise<void> => Bun.sleep(durationMs);
 
-const workerId = `${hostname()}-${process.pid}-${randomUUID()}`;
+const workerHostname = Bun.env.HOSTNAME ?? Bun.env.HOST ?? "worker";
+const workerId = `${workerHostname}-${Date.now()}-${crypto.randomUUID()}`;
 
 const runWorkerLoop = async (): Promise<never> => {
   const pollIntervalMs = Number(env.WORKER_POLL_INTERVAL_MS);
@@ -57,10 +54,12 @@ const main = async (): Promise<void> => {
   await runWorkerLoop();
 };
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   const message =
     error instanceof Error ? (error.stack ?? error.message) : String(error);
 
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});
+  console.error(message);
+  throw error;
+}
