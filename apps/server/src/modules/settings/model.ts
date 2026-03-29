@@ -9,6 +9,14 @@ export const destinationSchema = z.object({
   isEnabled: z.boolean(),
 });
 
+export const destinationParamsSchema = z.object({
+  destinationId: z.string(),
+});
+
+export const deleteDestinationResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const createDestinationBody = z.object({
   name: z.string().trim().min(1).max(120),
   absolutePath: z.string().trim().min(1),

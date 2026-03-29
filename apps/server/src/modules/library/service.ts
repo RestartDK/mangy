@@ -187,6 +187,32 @@ export const LibraryService = {
     );
   },
 
+  async removeSeries(userId: string, sourceId: string, seriesId: string) {
+    const row = await LibraryService.getSeriesStateRow(
+      userId,
+      sourceId,
+      seriesId
+    );
+
+    if (!row?.libraryEntryId) {
+      throw new Error("This series is not in your library.");
+    }
+
+    await db
+      .delete(libraryEntry)
+      .where(
+        and(
+          eq(libraryEntry.id, row.libraryEntryId),
+          eq(libraryEntry.userId, userId)
+        )
+      );
+
+    return {
+      sourceId,
+      seriesId,
+    };
+  },
+
   async getSeriesStateRow(userId: string, sourceId: string, seriesId: string) {
     const [row] = await db
       .select({

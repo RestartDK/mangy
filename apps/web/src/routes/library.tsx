@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -8,9 +10,18 @@ import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLibrary } from "@/hooks/use-library";
+import { useRemoveLibrarySeries } from "@/hooks/use-remove-library-series";
 import { useTracking } from "@/hooks/use-tracking";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
@@ -20,9 +31,26 @@ export const Route = createFileRoute("/library")({
   component: LibraryRouteComponent,
 });
 
+interface LibraryRouteItem {
+  id: string;
+  sourceId: string;
+  seriesId: string;
+  title: string;
+  destinationName: string | null;
+  isTracked: boolean;
+  autoDownload: boolean;
+  trackingState: {
+    nextCheckAt: string | null;
+    lastCheckedAt: string | null;
+  } | null;
+}
+
 function LibraryRouteComponent() {
   const libraryQuery = useLibrary();
   const trackingQuery = useTracking();
+  const removeLibrarySeries = useRemoveLibrarySeries();
+  const [seriesPendingRemoval, setSeriesPendingRemoval] =
+    useState<LibraryRouteItem | null>(null);
 
   const trackingMap = new Map(
     (trackingQuery.data ?? []).map((item) => [
@@ -58,7 +86,7 @@ function LibraryRouteComponent() {
       trackingState: item,
     }));
 
-  const items = [...libraryItems, ...trackingOnlyItems];
+  const items: LibraryRouteItem[] = [...libraryItems, ...trackingOnlyItems];
   const trackedItems = items.filter((item) => item.isTracked);
   const autoDownloadItems = items.filter((item) => item.autoDownload);
   const needsDestinationItems = items.filter((item) => !item.destinationName);
@@ -137,40 +165,102 @@ function LibraryRouteComponent() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="all">
-            <LibraryList items={items} />
+            <LibraryList
+              items={items}
+              onRemove={(item) => {
+                setSeriesPendingRemoval(item);
+              }}
+            />
           </TabsContent>
           <TabsContent value="tracked">
-            <LibraryList items={trackedItems} />
+            <LibraryList
+              items={trackedItems}
+              onRemove={(item) => {
+                setSeriesPendingRemoval(item);
+              }}
+            />
           </TabsContent>
           <TabsContent value="auto">
-            <LibraryList items={autoDownloadItems} />
+            <LibraryList
+              items={autoDownloadItems}
+              onRemove={(item) => {
+                setSeriesPendingRemoval(item);
+              }}
+            />
           </TabsContent>
           <TabsContent value="needs-destination">
-            <LibraryList items={needsDestinationItems} />
+            <LibraryList
+              items={needsDestinationItems}
+              onRemove={(item) => {
+                setSeriesPendingRemoval(item);
+              }}
+            />
           </TabsContent>
         </Tabs>
       ) : null}
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setSeriesPendingRemoval(null);
+          }
+        }}
+        open={seriesPendingRemoval !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove series</DialogTitle>
+            <DialogDescription>
+              {seriesPendingRemoval
+                ? `Remove ${seriesPendingRemoval.title} from your library? This also stops tracking for this series, but it does not delete files already on disk or cancel existing download jobs.`
+                : "Remove this series from your library?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (!seriesPendingRemoval) {
+                  return;
+                }
+
+                removeLibrarySeries
+                  .mutateAsync({
+                    seriesId: seriesPendingRemoval.seriesId,
+                    sourceId: seriesPendingRemoval.sourceId,
+                  })
+                  .then(() => {
+                    setSeriesPendingRemoval(null);
+                  })
+                  .catch(() => undefined);
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {removeLibrarySeries.isPending ? "Removing..." : "Remove"}
+            </Button>
+            <Button
+              disabled={removeLibrarySeries.isPending}
+              onClick={() => {
+                setSeriesPendingRemoval(null);
+              }}
+              type="button"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
 
 interface LibraryListProps {
-  items: Array<{
-    id: string;
-    sourceId: string;
-    seriesId: string;
-    title: string;
-    destinationName: string | null;
-    isTracked: boolean;
-    autoDownload: boolean;
-    trackingState: {
-      nextCheckAt: string | null;
-      lastCheckedAt: string | null;
-    } | null;
-  }>;
+  items: LibraryRouteItem[];
+  onRemove: (item: LibraryRouteItem) => void;
 }
 
-const LibraryList = ({ items }: LibraryListProps) => {
+const LibraryList = ({ items, onRemove }: LibraryListProps) => {
   if (items.length === 0) {
     return (
       <EmptyState
@@ -192,14 +282,29 @@ const LibraryList = ({ items }: LibraryListProps) => {
                   Destination: {item.destinationName ?? "Not set"}
                 </p>
               </div>
-              <Button asChild variant="outline">
-                <Link
-                  params={{ seriesId: item.seriesId, sourceId: item.sourceId }}
-                  to="/series/$sourceId/$seriesId"
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline">
+                  <Link
+                    params={{
+                      seriesId: item.seriesId,
+                      sourceId: item.sourceId,
+                    }}
+                    to="/series/$sourceId/$seriesId"
+                  >
+                    Manage
+                  </Link>
+                </Button>
+                <Button
+                  onClick={() => {
+                    onRemove(item);
+                  }}
+                  type="button"
+                  variant="destructive"
                 >
-                  Manage
-                </Link>
-              </Button>
+                  <Trash2 className="size-4" />
+                  Remove
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">

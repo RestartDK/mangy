@@ -588,6 +588,389 @@ describe("server and worker integration", () => {
     ).toBe(true);
   });
 
+  test("destinations can be removed and tracked auto-download is turned off safely", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+    const primaryDirectory = await mkdtemp(join(tmpdir(), "mangy-delete-a-"));
+    const fallbackDirectory = await mkdtemp(join(tmpdir(), "mangy-delete-b-"));
+
+    cleanupState.sourceIds.add(adapterId);
+    cleanupState.tempPaths.add(primaryDirectory);
+    cleanupState.tempPaths.add(fallbackDirectory);
+
+    const series: SourceSeries = {
+      artistNames: ["Artist"],
+      authorNames: ["Author"],
+      availableTranslatedLanguages: ["en"],
+      canonicalUrl: `https://example.test/${seriesExternalId}`,
+      contentRating: null,
+      coverImageUrl: "https://example.test/cover.png",
+      description: "Destination deletion series",
+      externalId: seriesExternalId,
+      latestChapter: "1",
+      originalLanguage: "en",
+      publicationDemographic: null,
+      status: "ongoing",
+      tags: ["test"],
+      title: "Delete Destination Series",
+    };
+
+    const chapterOne: SourceChapter = {
+      chapterNumber: "1",
+      externalId: `chapter-${crypto.randomUUID()}`,
+      externalUrl: `https://example.test/${seriesExternalId}/1`,
+      isUnavailable: false,
+      pageCount: 1,
+      publishedAt: new Date("2025-01-01T00:00:00.000Z"),
+      sourceOrder: "1",
+      title: "Chapter One",
+      translatedLanguage: "en",
+      volumeNumber: "1",
+    };
+
+    const fakeAdapter = createFakeAdapter({
+      adapterId,
+      chapters: [chapterOne],
+      series,
+    });
+
+    sourceRegistry.register(fakeAdapter.adapter);
+    await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+    const email = `reader-${crypto.randomUUID()}@example.com`;
+    const password = "reader-password-123";
+    const { apiFetch, userId } = await createApiClient(
+      email,
+      password,
+      "Destination Reader"
+    );
+
+    expect(userId).toBeString();
+    cleanupState.userIds.add(userId as string);
+
+    const primaryDestinationResponse = await apiFetch(
+      "/api/settings/destinations",
+      jsonRequest(
+        {
+          absolutePath: primaryDirectory,
+          isDefault: true,
+          name: "Primary Library",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(primaryDestinationResponse.status).toBe(200);
+    const primaryDestination = await readJson<{ id: string }>(
+      primaryDestinationResponse
+    );
+
+    const fallbackDestinationResponse = await apiFetch(
+      "/api/settings/destinations",
+      jsonRequest(
+        {
+          absolutePath: fallbackDirectory,
+          name: "Fallback Library",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(fallbackDestinationResponse.status).toBe(200);
+    const fallbackDestination = await readJson<{ id: string }>(
+      fallbackDestinationResponse
+    );
+
+    const saveTrackingResponse = await apiFetch(
+      "/api/library/series-state",
+      jsonRequest(
+        {
+          autoDownload: true,
+          downloadDestinationId: primaryDestination.id,
+          isTracked: true,
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+        },
+        { method: "PATCH" }
+      )
+    );
+    expect(saveTrackingResponse.status).toBe(200);
+
+    const deleteResponse = await apiFetch(
+      `/api/settings/destinations/${primaryDestination.id}`,
+      { method: "DELETE" }
+    );
+    expect(deleteResponse.status).toBe(200);
+    expect((await readJson<{ id: string }>(deleteResponse)).id).toBe(
+      primaryDestination.id
+    );
+
+    const settingsBootstrapResponse = await apiFetch(
+      "/api/settings/bootstrap",
+      {
+        method: "GET",
+      }
+    );
+    expect(settingsBootstrapResponse.status).toBe(200);
+    const settingsBootstrap = await readJson<{
+      destinations: Array<{ id: string; isDefault: boolean }>;
+    }>(settingsBootstrapResponse);
+    expect(settingsBootstrap.destinations).toHaveLength(1);
+    expect(settingsBootstrap.destinations[0]?.id).toBe(fallbackDestination.id);
+    expect(settingsBootstrap.destinations[0]?.isDefault).toBe(true);
+
+    const libraryStateResponse = await apiFetch(
+      `/api/library/series-state?sourceId=${adapterId}&seriesId=${seriesExternalId}`,
+      { method: "GET" }
+    );
+    expect(libraryStateResponse.status).toBe(200);
+    const libraryState = await readJson<{
+      autoDownload: boolean;
+      downloadDestinationId: string | null;
+      isTracked: boolean;
+    }>(libraryStateResponse);
+    expect(libraryState.isTracked).toBe(true);
+    expect(libraryState.autoDownload).toBe(false);
+    expect(libraryState.downloadDestinationId).toBeNull();
+  });
+
+  test("destinations with queued downloads cannot be removed", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-delete-job-"));
+
+    cleanupState.sourceIds.add(adapterId);
+    cleanupState.tempPaths.add(tempDirectory);
+
+    const series: SourceSeries = {
+      artistNames: ["Artist"],
+      authorNames: ["Author"],
+      availableTranslatedLanguages: ["en"],
+      canonicalUrl: `https://example.test/${seriesExternalId}`,
+      contentRating: null,
+      coverImageUrl: "https://example.test/cover.png",
+      description: "Queued deletion guard series",
+      externalId: seriesExternalId,
+      latestChapter: "1",
+      originalLanguage: "en",
+      publicationDemographic: null,
+      status: "ongoing",
+      tags: ["test"],
+      title: "Queued Guard Series",
+    };
+
+    const chapterOne: SourceChapter = {
+      chapterNumber: "1",
+      externalId: `chapter-${crypto.randomUUID()}`,
+      externalUrl: `https://example.test/${seriesExternalId}/1`,
+      isUnavailable: false,
+      pageCount: 1,
+      publishedAt: new Date("2025-01-01T00:00:00.000Z"),
+      sourceOrder: "1",
+      title: "Queued Chapter",
+      translatedLanguage: "en",
+      volumeNumber: "1",
+    };
+
+    const fakeAdapter = createFakeAdapter({
+      adapterId,
+      chapters: [chapterOne],
+      series,
+    });
+
+    sourceRegistry.register(fakeAdapter.adapter);
+    await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+    const email = `reader-${crypto.randomUUID()}@example.com`;
+    const password = "reader-password-123";
+    const { apiFetch, userId } = await createApiClient(
+      email,
+      password,
+      "Queued Guard Reader"
+    );
+
+    expect(userId).toBeString();
+    cleanupState.userIds.add(userId as string);
+
+    const destinationResponse = await apiFetch(
+      "/api/settings/destinations",
+      jsonRequest(
+        {
+          absolutePath: tempDirectory,
+          isDefault: true,
+          name: "Busy Library",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(destinationResponse.status).toBe(200);
+    const destination = await readJson<{ id: string }>(destinationResponse);
+
+    const queueResponse = await apiFetch(
+      "/api/downloads",
+      jsonRequest(
+        {
+          chapterId: chapterOne.externalId,
+          downloadDestinationId: destination.id,
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+        },
+        { method: "POST" }
+      )
+    );
+    expect(queueResponse.status).toBe(200);
+
+    const deleteResponse = await apiFetch(
+      `/api/settings/destinations/${destination.id}`,
+      { method: "DELETE" }
+    );
+    expect(deleteResponse.status).toBe(400);
+    expect((await readJson<{ message: string }>(deleteResponse)).message).toBe(
+      "This destination is still used by queued or running downloads. Cancel or finish those jobs first."
+    );
+  });
+
+  test("library series can be removed and tracking state is cleared", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+    const tempDirectory = await mkdtemp(
+      join(tmpdir(), "mangy-library-remove-")
+    );
+
+    cleanupState.sourceIds.add(adapterId);
+    cleanupState.tempPaths.add(tempDirectory);
+
+    const series: SourceSeries = {
+      artistNames: ["Artist"],
+      authorNames: ["Author"],
+      availableTranslatedLanguages: ["en"],
+      canonicalUrl: `https://example.test/${seriesExternalId}`,
+      contentRating: null,
+      coverImageUrl: "https://example.test/cover.png",
+      description: "Library removal series",
+      externalId: seriesExternalId,
+      latestChapter: "1",
+      originalLanguage: "en",
+      publicationDemographic: null,
+      status: "ongoing",
+      tags: ["test"],
+      title: "Library Removal Series",
+    };
+
+    const chapterOne: SourceChapter = {
+      chapterNumber: "1",
+      externalId: `chapter-${crypto.randomUUID()}`,
+      externalUrl: `https://example.test/${seriesExternalId}/1`,
+      isUnavailable: false,
+      pageCount: 1,
+      publishedAt: new Date("2025-01-01T00:00:00.000Z"),
+      sourceOrder: "1",
+      title: "Chapter One",
+      translatedLanguage: "en",
+      volumeNumber: "1",
+    };
+
+    const fakeAdapter = createFakeAdapter({
+      adapterId,
+      chapters: [chapterOne],
+      series,
+    });
+
+    sourceRegistry.register(fakeAdapter.adapter);
+    await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+    const email = `reader-${crypto.randomUUID()}@example.com`;
+    const password = "reader-password-123";
+    const { apiFetch, userId } = await createApiClient(
+      email,
+      password,
+      "Library Removal Reader"
+    );
+
+    expect(userId).toBeString();
+    cleanupState.userIds.add(userId as string);
+
+    const destinationResponse = await apiFetch(
+      "/api/settings/destinations",
+      jsonRequest(
+        {
+          absolutePath: tempDirectory,
+          isDefault: true,
+          name: "Library Removal Destination",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(destinationResponse.status).toBe(200);
+    const destination = await readJson<{ id: string }>(destinationResponse);
+
+    const saveTrackingResponse = await apiFetch(
+      "/api/library/series-state",
+      jsonRequest(
+        {
+          autoDownload: true,
+          downloadDestinationId: destination.id,
+          isTracked: true,
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+        },
+        { method: "PATCH" }
+      )
+    );
+    expect(saveTrackingResponse.status).toBe(200);
+
+    const removeResponse = await apiFetch(
+      `/api/library/series-state?sourceId=${adapterId}&seriesId=${seriesExternalId}`,
+      { method: "DELETE" }
+    );
+    expect(removeResponse.status).toBe(200);
+    expect(
+      (await readJson<{ sourceId: string; seriesId: string }>(removeResponse))
+        .seriesId
+    ).toBe(seriesExternalId);
+
+    const libraryResponse = await apiFetch("/api/library", {
+      method: "GET",
+    });
+    expect(libraryResponse.status).toBe(200);
+    expect(
+      await readJson<Array<{ seriesId: string }>>(libraryResponse)
+    ).toHaveLength(0);
+
+    const trackingResponse = await apiFetch("/api/tracking", {
+      method: "GET",
+    });
+    expect(trackingResponse.status).toBe(200);
+    expect(
+      await readJson<Array<{ seriesId: string }>>(trackingResponse)
+    ).toHaveLength(0);
+
+    const seriesStateResponse = await apiFetch(
+      `/api/library/series-state?sourceId=${adapterId}&seriesId=${seriesExternalId}`,
+      { method: "GET" }
+    );
+    expect(seriesStateResponse.status).toBe(200);
+    expect(
+      await readJson<{
+        autoDownload: boolean;
+        downloadDestinationName: string | null;
+        downloadDestinationId: string | null;
+        isTracked: boolean;
+        libraryEntryId: string | null;
+        seriesId: string;
+        sourceId: string;
+        trackingState: null;
+      }>(seriesStateResponse)
+    ).toEqual({
+      autoDownload: false,
+      downloadDestinationId: null,
+      downloadDestinationName: null,
+      isTracked: false,
+      libraryEntryId: null,
+      seriesId: seriesExternalId,
+      sourceId: adapterId,
+      trackingState: null,
+    });
+  });
+
   test("page endpoints and worker downloads honor page headers and referer metadata", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
