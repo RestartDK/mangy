@@ -8,8 +8,8 @@ Your homelab is responsible for running them.
 - `Dockerfile` for `web`, `server`, and `worker`
 - `compose.example.yml` as a starting point for your homelab runtime stack
 - `compose.env.example` as the matching env template
-- `.github/workflows/ci.yml` for standard validation on pull requests and non-main pushes
-- `.github/workflows/publish.yml` to publish private GHCR images on pushes to `main`
+- `.github/workflows/ci.yml` for pull request validation, including integration tests against PostgreSQL
+- `.github/workflows/publish.yml` to re-run verification and publish private GHCR images on pushes to `main`
 - application source code
 
 ## What should live outside this repo

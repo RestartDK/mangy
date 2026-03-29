@@ -12,11 +12,33 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
+  DATABASE_URL: postgresql://postgres:password@127.0.0.1:5432/mangy
+  BETTER_AUTH_SECRET: replace-with-a-32-character-secret
+  BETTER_AUTH_URL: http://127.0.0.1:3000
+  CORS_ORIGIN: http://127.0.0.1:3001
+  HOST: 0.0.0.0
+  PORT: 3000
   DEFAULT_VITE_SERVER_URL: http://127.0.0.1:3000
+  WORKER_POLL_INTERVAL_MS: 15000
+  TRACKING_POLL_INTERVAL_MS: 900000
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: mangy
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mangy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Check out repository
@@ -32,6 +54,12 @@ jobs:
 
       - name: Type check
         run: bun run check-types
+
+      - name: Apply database migrations
+        run: bun run db:migrate
+
+      - name: Run integration tests
+        run: bun run test:integration
 
       - name: Build workspaces
         run: bun run build
