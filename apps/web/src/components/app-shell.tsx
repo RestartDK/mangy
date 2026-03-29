@@ -70,14 +70,12 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
       <Sidebar collapsible="offcanvas" variant="inset">
         <SidebarHeader>
           <Link
-            className="flex flex-col gap-1 rounded-md px-2 py-1"
-            to="/search"
+            className="flex items-center gap-2 rounded-md px-2 py-1"
+            to="/"
           >
+            <img alt="Mangy Logo" className="h-6 w-auto" height="24" src="/mangy.png" width="24" />
             <span className="font-heading font-semibold text-sidebar-foreground text-sm">
               Mangy
-            </span>
-            <span className="text-sidebar-foreground/70 text-xs">
-              Manga management
             </span>
           </Link>
         </SidebarHeader>
