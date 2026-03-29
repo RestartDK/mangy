@@ -1,15 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Layers3, Search } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { useMemo } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
-import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { SectionShelf } from "@/components/section-shelf";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePreferredSource } from "@/hooks/use-preferred-source";
 import { useSourceDiscover } from "@/hooks/use-source-discover";
 import { useSources } from "@/hooks/use-sources";
 import { getErrorMessage } from "@/lib/format";
@@ -22,9 +30,15 @@ export const Route = createFileRoute("/")({
 
 function DiscoverRouteComponent() {
   const sourcesQuery = useSources();
+  const enabledSources = useMemo(
+    () => (sourcesQuery.data ?? []).filter((source) => source.isEnabled),
+    [sourcesQuery.data]
+  );
+  const { selectedSourceId, setSelectedSourceId } =
+    usePreferredSource(enabledSources);
+
   const activeSource =
-    sourcesQuery.data?.find((source) => source.isEnabled) ??
-    sourcesQuery.data?.[0];
+    enabledSources.find((source) => source.id === selectedSourceId) ?? null;
   const discoverQuery = useSourceDiscover(activeSource?.id, 8);
 
   const isLoading = sourcesQuery.isLoading || discoverQuery.isLoading;
@@ -34,14 +48,32 @@ function DiscoverRouteComponent() {
     <AppShell>
       <PageHeader
         action={
-          <Button asChild>
-            <Link to="/search">
-              Go to search
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Select
+              onValueChange={setSelectedSourceId}
+              value={activeSource?.id ?? undefined}
+            >
+              <SelectTrigger className="w-full min-w-44 sm:w-52">
+                <SelectValue placeholder="Choose a source" />
+              </SelectTrigger>
+              <SelectContent>
+                {enabledSources.map((source) => (
+                  <SelectItem key={source.id} value={source.id}>
+                    {source.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button asChild>
+              <Link to="/search">
+                Go to search
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
         }
-        description="Browse a quick snapshot of what is available, then jump into search when you know what you want."
+        description="Browse a quick snapshot from the source you want, then jump into search when you know what you want."
         title="Discover"
       />
 
@@ -66,42 +98,6 @@ function DiscoverRouteComponent() {
 
       {!isLoading && activeSource ? (
         <div className="page-grid">
-          <div className="grid gap-4 md:grid-cols-3">
-            <MetricCard
-              helper={activeSource.description}
-              icon={<Layers3 className="size-4" />}
-              label="Source"
-              value={activeSource.name}
-            />
-            <MetricCard
-              helper={
-                activeSource.capabilities.supportsSearch
-                  ? "Ready for direct title searches"
-                  : "Search is not available for this source"
-              }
-              icon={<Search className="size-4" />}
-              label="Search"
-              value={
-                activeSource.capabilities.supportsSearch
-                  ? "Available"
-                  : "Unavailable"
-              }
-            />
-            <MetricCard
-              helper={
-                activeSource.capabilities.supportsFilters
-                  ? "Source filters can refine results"
-                  : "This source does not expose filters"
-              }
-              label="Filters"
-              value={
-                activeSource.capabilities.supportsFilters
-                  ? "Available"
-                  : "Unavailable"
-              }
-            />
-          </div>
-
           {discoverQuery.data?.length ? (
             discoverQuery.data.map((section) => (
               <SectionShelf key={section.id} section={section} />

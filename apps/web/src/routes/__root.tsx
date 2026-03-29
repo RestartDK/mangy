@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 import "../index.css";
@@ -47,13 +48,20 @@ function RootComponent() {
   return (
     <>
       <HeadContent />
-      <QueryClientProvider client={queryClient}>
-        <div className="min-h-svh">
-          <Outlet />
-        </div>
-        <Toaster />
-        <ReactQueryDevtools initialIsOpen={false} />
-      </QueryClientProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        disableTransitionOnChange
+        enableSystem
+      >
+        <QueryClientProvider client={queryClient}>
+          <div className="min-h-svh bg-background text-foreground">
+            <Outlet />
+          </div>
+          <Toaster />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientProvider>
+      </ThemeProvider>
       <TanStackRouterDevtools position="bottom-left" />
     </>
   );
