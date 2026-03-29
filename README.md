@@ -151,6 +151,16 @@ Mangy is intended to run as separate web, server, and worker services.
 - the worker must run anywhere the configured download destinations are reachable
 - Komga can watch those destination folders directly
 
+This repo now covers image build and publish concerns only:
+
+- `Dockerfile` builds `web`, `server`, and `worker` container images
+- `compose.example.yml` is a reference Podman/Docker Compose template for GHCR-based runtime wiring
+- `compose.env.example` is the matching example env file for that compose template
+- `.github/workflows/ci.yml` runs pull request validation, including integration tests against PostgreSQL
+- `.github/workflows/publish.yml` publishes private GHCR images on pushes to `main`
+- host-specific Podman Compose files, env files, and update scripts are expected to live outside this repo, such as under `/opt/homelab/`
+- `docs/homelab-ghcr.md` explains the intended split between this repo and your homelab runtime config
+
 ## Status
 
 The project has moved well beyond the old calendar template, but some polish work is still ongoing:

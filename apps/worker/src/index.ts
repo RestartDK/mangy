@@ -53,4 +53,14 @@ const runWorkerLoop = async (): Promise<never> => {
   }
 };
 
-await runWorkerLoop();
+const main = async (): Promise<void> => {
+  await runWorkerLoop();
+};
+
+main().catch((error) => {
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
+
+  process.stderr.write(`${message}\n`);
+  process.exit(1);
+});

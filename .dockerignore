@@ -1,0 +1,17 @@
+.git
+.github
+.turbo
+.vscode
+.idea
+node_modules
+**/node_modules
+.env
+.env.local
+.env.production
+.env.development
+*.log
+coverage
+apps/server/server
+apps/worker/worker
+dist
+build
