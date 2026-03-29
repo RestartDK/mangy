@@ -1,10 +1,13 @@
-import { type Browser, chromium, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 
 import { defaultUserAgent } from "./http";
 
 const defaultTimeoutMs = 20_000;
 const idleBrowserCloseDelayMs = 1000;
 const maxConcurrentPages = 2;
+const playwrightModuleName = ["play", "wright"].join("");
+
+type PlaywrightModule = typeof import("playwright");
 
 interface BrowserLocalStorage {
   setItem(key: string, value: string): void;
@@ -116,18 +119,24 @@ const autoScroll = async (page: Page): Promise<void> => {
   });
 };
 
+const loadPlaywrightModule = async (): Promise<PlaywrightModule> => {
+  return (await import(playwrightModuleName)) as PlaywrightModule;
+};
+
 const getBrowser = (): Promise<Browser> => {
   if (!browserPromise) {
-    browserPromise = chromium
-      .launch({
-        args: [
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-        ],
-        headless: true,
-      })
+    browserPromise = loadPlaywrightModule()
+      .then((playwright) =>
+        playwright.chromium.launch({
+          args: [
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+          ],
+          headless: true,
+        })
+      )
       .catch((error: unknown) => {
         browserPromise = null;
 
