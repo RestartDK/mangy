@@ -1,5 +1,7 @@
 # Mangy
 
+![Mangy mascot](apps/web/public/mangy.png)
+
 Mangy is a pure TypeScript manga discovery, download, and tracking app for homelab setups.
 
 It replaces a Suwayomi-based workflow with a typed monorepo that includes:
