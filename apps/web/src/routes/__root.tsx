@@ -41,6 +41,10 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         href: "/favicon.ico",
         type: "image/x-icon",
       },
+      {
+        rel: "apple-touch-icon",
+        href: "/apple-touch-icon.png",
+      },
     ],
   }),
 });
