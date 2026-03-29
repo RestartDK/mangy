@@ -54,12 +54,10 @@ const main = async (): Promise<void> => {
   await runWorkerLoop();
 };
 
-try {
-  await main();
-} catch (error) {
+main().catch((error) => {
   const message =
     error instanceof Error ? (error.stack ?? error.message) : String(error);
 
   console.error(message);
-  throw error;
-}
+  process.exit(1);
+});
