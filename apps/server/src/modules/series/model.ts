@@ -8,6 +8,17 @@ export const seriesSourceQuerySchema = z.object({
   sourceId: z.string(),
 });
 
+export const seriesChapterParamsSchema = z.object({
+  chapterId: z.string(),
+  seriesId: z.string(),
+});
+
+export const seriesPageParamsSchema = z.object({
+  chapterId: z.string(),
+  pageIndex: z.coerce.number().int().min(0),
+  seriesId: z.string(),
+});
+
 export const chapterSchema = z.object({
   chapterId: z.string(),
   title: z.string().nullable(),
@@ -19,6 +30,19 @@ export const chapterSchema = z.object({
   pageCount: z.number().int().nullable(),
   publishedAt: z.string().datetime().nullable(),
   isUnavailable: z.boolean(),
+});
+
+export const sourcePageSchema = z.object({
+  imageUrl: z.string().url(),
+  index: z.number().int().min(0),
+});
+
+export const sourcePageListSchema = z.object({
+  pages: z.array(sourcePageSchema),
+});
+
+export const errorResponseSchema = z.object({
+  message: z.string(),
 });
 
 export {

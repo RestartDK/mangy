@@ -93,6 +93,8 @@ export interface SourceChapter {
 export interface SourcePage {
   index: number;
   imageUrl: string;
+  headers?: Record<string, string>;
+  referer?: string;
 }
 
 export interface SourcePageList {

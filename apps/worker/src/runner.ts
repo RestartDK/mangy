@@ -54,6 +54,13 @@ export const runDownloadJob = async (
     throw new Error("The source returned no pages for this chapter.");
   }
 
+  const pages = pageList.pages.map((page) => ({
+    headers: page.headers,
+    imageUrl: page.imageUrl,
+    index: page.index,
+    referer: page.referer,
+  }));
+
   const outputDirectory = await prepareChapterOutputDirectory({
     chapterId: chapterExternalId,
     chapterNumber: job.chapterNumber,
@@ -71,7 +78,7 @@ export const runDownloadJob = async (
       },
       onProgress: ({ percent }) => updateDownloadJobProgress(job.id, percent),
       outputDirectory,
-      pages: pageList.pages,
+      pages,
     });
 
     await completeDownloadJob(job, {

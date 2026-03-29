@@ -1,4 +1,5 @@
-import { CalendarDays, FileText } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { BookOpen, CalendarDays, FileText } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,8 @@ interface ChapterListItemProps {
   canQueue: boolean;
   isPending: boolean;
   onQueue: (chapterId: string) => void;
+  seriesId: string;
+  sourceId: string;
 }
 
 export const ChapterListItem = ({
@@ -24,6 +27,8 @@ export const ChapterListItem = ({
   chapter,
   isPending,
   onQueue,
+  seriesId,
+  sourceId,
 }: ChapterListItemProps) => {
   const title = chapter.chapterNumber
     ? `Chapter ${chapter.chapterNumber}`
@@ -67,7 +72,27 @@ export const ChapterListItem = ({
       <CardContent>
         <p className="text-muted-foreground text-sm">{queueHelper}</p>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="grid grid-cols-2 gap-2">
+        {chapter.isUnavailable ? (
+          <Button className="w-full" disabled type="button" variant="outline">
+            <BookOpen className="size-4" />
+            Read
+          </Button>
+        ) : (
+          <Button asChild className="w-full" type="button" variant="outline">
+            <Link
+              params={{
+                chapterId: chapter.chapterId,
+                seriesId,
+                sourceId,
+              }}
+              to="/series/$sourceId/$seriesId/read/$chapterId"
+            >
+              <BookOpen className="size-4" />
+              Read
+            </Link>
+          </Button>
+        )}
         <Button
           className="w-full"
           disabled={chapter.isUnavailable || !canQueue || isPending}

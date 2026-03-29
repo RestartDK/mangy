@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { db } from "@mangy/db";
@@ -7,9 +7,11 @@ import { notification, source, user } from "@mangy/db/schema";
 import type {
   SourceAdapter,
   SourceChapter,
+  SourcePage,
   SourceSeries,
 } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
+import { serve } from "bun";
 import { and, eq } from "drizzle-orm";
 
 import { claimNextDownloadJob } from "../../worker/src/jobs";
@@ -39,6 +41,9 @@ const extractSessionCookie = (header: string | null): string | null => {
 const createFakeAdapter = (config: {
   adapterId: string;
   chapters: SourceChapter[];
+  getPages?:
+    | ((chapterId: string) => Promise<{ pages: SourcePage[] }>)
+    | ((chapterId: string) => { pages: SourcePage[] });
   series: SourceSeries;
 }) => {
   const state = {
@@ -85,6 +90,10 @@ const createFakeAdapter = (config: {
       };
     },
     async getPages(chapterId) {
+      if (config.getPages) {
+        return await config.getPages(chapterId);
+      }
+
       const chapter = state.chapters.find(
         (item) => item.externalId === chapterId
       );
@@ -577,6 +586,189 @@ describe("server and worker integration", () => {
           job.chapterId === chapterTwo.externalId && job.status === "queued"
       )
     ).toBe(true);
+  });
+
+  test("page endpoints and worker downloads honor page headers and referer metadata", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-pages-test-"));
+    const requiredReferer = "https://reader.example/chapter";
+    const requiredToken = `token-${crypto.randomUUID()}`;
+    const imageRequests: Array<{
+      referer: string | null;
+      token: string | null;
+    }> = [];
+    const pngBytes = Buffer.from(pngDataUrl.split(",")[1] ?? "", "base64");
+
+    cleanupState.sourceIds.add(adapterId);
+    cleanupState.tempPaths.add(tempDirectory);
+
+    const imageServer = serve({
+      fetch(request) {
+        imageRequests.push({
+          referer: request.headers.get("referer"),
+          token: request.headers.get("x-test-token"),
+        });
+
+        if (
+          request.headers.get("referer") !== requiredReferer ||
+          request.headers.get("x-test-token") !== requiredToken
+        ) {
+          return new Response("Forbidden", { status: 403 });
+        }
+
+        return new Response(pngBytes, {
+          headers: {
+            "content-type": "image/png",
+          },
+          status: 200,
+        });
+      },
+      hostname: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const series: SourceSeries = {
+        artistNames: ["Artist"],
+        authorNames: ["Author"],
+        availableTranslatedLanguages: ["en"],
+        canonicalUrl: `https://example.test/${seriesExternalId}`,
+        contentRating: null,
+        coverImageUrl: "https://example.test/cover.png",
+        description: "Header-gated pages series",
+        externalId: seriesExternalId,
+        latestChapter: "1",
+        originalLanguage: "en",
+        publicationDemographic: null,
+        status: "ongoing",
+        tags: ["test"],
+        title: "Header Gated Series",
+      };
+
+      const chapterOne: SourceChapter = {
+        chapterNumber: "1",
+        externalId: `chapter-${crypto.randomUUID()}`,
+        externalUrl: `https://example.test/${seriesExternalId}/1`,
+        isUnavailable: false,
+        pageCount: 1,
+        publishedAt: new Date("2025-01-01T00:00:00.000Z"),
+        sourceOrder: "1",
+        title: "Access Check",
+        translatedLanguage: "en",
+        volumeNumber: "1",
+      };
+
+      const fakeAdapter = createFakeAdapter({
+        adapterId,
+        chapters: [chapterOne],
+        getPages(chapterId) {
+          if (chapterId !== chapterOne.externalId) {
+            throw new Error("Unexpected chapter requested in fake adapter.");
+          }
+
+          return {
+            pages: [
+              {
+                headers: {
+                  "x-test-token": requiredToken,
+                },
+                imageUrl: `http://127.0.0.1:${imageServer.port}/page.png`,
+                index: 0,
+                referer: requiredReferer,
+              },
+            ],
+          };
+        },
+        series,
+      });
+
+      sourceRegistry.register(fakeAdapter.adapter);
+      await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+      const email = `reader-${crypto.randomUUID()}@example.com`;
+      const password = "reader-password-123";
+      const { apiFetch, userId } = await createApiClient(
+        email,
+        password,
+        "Metadata Reader"
+      );
+
+      expect(userId).toBeString();
+      cleanupState.userIds.add(userId as string);
+
+      const destinationResponse = await apiFetch(
+        "/api/settings/destinations",
+        jsonRequest(
+          {
+            absolutePath: tempDirectory,
+            isDefault: true,
+            name: "Metadata Library",
+          },
+          { method: "POST" }
+        )
+      );
+      expect(destinationResponse.status).toBe(200);
+      const destination = await readJson<{ id: string }>(destinationResponse);
+
+      const pagesResponse = await apiFetch(
+        `/api/series/${seriesExternalId}/chapters/${chapterOne.externalId}/pages?sourceId=${adapterId}`,
+        { method: "GET" }
+      );
+      expect(pagesResponse.status).toBe(200);
+      const pageList = await readJson<{
+        pages: Array<{ imageUrl: string; index: number }>;
+      }>(pagesResponse);
+      expect(pageList.pages).toHaveLength(1);
+      expect(pageList.pages[0]?.index).toBe(0);
+
+      const proxiedImageUrl = new URL(pageList.pages[0]?.imageUrl ?? "");
+      const proxiedImageResponse = await apiFetch(
+        `${proxiedImageUrl.pathname}${proxiedImageUrl.search}`,
+        { method: "GET" }
+      );
+      expect(proxiedImageResponse.status).toBe(200);
+      expect(proxiedImageResponse.headers.get("content-type")).toContain(
+        "image/png"
+      );
+      expect(
+        (await proxiedImageResponse.arrayBuffer()).byteLength
+      ).toBeGreaterThan(0);
+
+      const queueResponse = await apiFetch(
+        "/api/downloads",
+        jsonRequest(
+          {
+            chapterId: chapterOne.externalId,
+            downloadDestinationId: destination.id,
+            seriesId: seriesExternalId,
+            sourceId: adapterId,
+          },
+          { method: "POST" }
+        )
+      );
+      expect(queueResponse.status).toBe(200);
+      const queuedJob = await readJson<{ id: string }>(queueResponse);
+
+      const claimedJob = await claimNextDownloadJob("metadata-worker");
+      expect(claimedJob?.id).toBe(queuedJob.id);
+      await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+
+      const downloadedFiles = (
+        await readdir(tempDirectory, { recursive: true })
+      ).filter((entry) => entry.endsWith(".png"));
+      expect(downloadedFiles).toHaveLength(1);
+      expect(imageRequests.length).toBe(2);
+      expect(
+        imageRequests.every(
+          (request) =>
+            request.referer === requiredReferer &&
+            request.token === requiredToken
+        )
+      ).toBe(true);
+    } finally {
+      imageServer.stop(true);
+    }
   });
 
   test("live SSE endpoint emits update events when notification state changes", async () => {

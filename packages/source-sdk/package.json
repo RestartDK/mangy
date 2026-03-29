@@ -1,6 +1,11 @@
 {
   "name": "@mangy/source-sdk",
   "type": "module",
+  "scripts": {
+    "check-types": "tsc -b",
+    "test": "bun test",
+    "test:live": "LIVE_SOURCE_TESTS=1 bun test --timeout 30000 tests/*.live.test.ts"
+  },
   "exports": {
     ".": {
       "default": "./src/index.ts"
@@ -10,10 +15,13 @@
     }
   },
   "dependencies": {
+    "cheerio": "^1.1.2",
+    "playwright": "^1.53.2",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "@mangy/config": "workspace:*"
+    "@mangy/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
   }
 }

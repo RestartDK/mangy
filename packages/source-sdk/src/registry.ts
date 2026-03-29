@@ -1,4 +1,6 @@
 import { createMangaDexSourceAdapter } from "./adapters/manga-dex";
+import { createMangaworldSourceAdapter } from "./adapters/manga-world";
+import { createWeebCentralSourceAdapter } from "./adapters/weeb-central";
 import type { SourceAdapter } from "./types";
 
 export interface SourceRegistry {
@@ -12,6 +14,8 @@ export interface SourceRegistry {
 
 const createDefaultAdapters = (): SourceAdapter[] => [
   createMangaDexSourceAdapter(),
+  createMangaworldSourceAdapter(),
+  createWeebCentralSourceAdapter(),
 ];
 
 let adapters = createDefaultAdapters();
