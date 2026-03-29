@@ -16,6 +16,7 @@
     }
   },
   "scripts": {
+    "check-types": "tsc -b",
     "db:push": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit push\"",
     "db:generate": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit generate\"",
     "db:studio": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit studio\"",

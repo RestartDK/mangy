@@ -1,0 +1,22 @@
+{
+  "name": "@mangy/push",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc -b"
+  },
+  "dependencies": {
+    "@mangy/env": "workspace:*",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@mangy/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "@types/web-push": "^3.6.4",
+    "typescript": "catalog:"
+  }
+}

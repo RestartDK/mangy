@@ -25,6 +25,9 @@
         "HOST",
         "PORT",
         "VITE_SERVER_URL",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "VAPID_SUBJECT",
         "WORKER_POLL_INTERVAL_MS",
         "TRACKING_POLL_INTERVAL_MS"
       ]
@@ -56,6 +59,9 @@
         "CORS_ORIGIN",
         "HOST",
         "PORT",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "VAPID_SUBJECT",
         "TRACKING_POLL_INTERVAL_MS"
       ]
     },
@@ -70,6 +76,9 @@
         "CORS_ORIGIN",
         "HOST",
         "PORT",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "VAPID_SUBJECT",
         "TRACKING_POLL_INTERVAL_MS"
       ]
     },
@@ -83,6 +92,9 @@
         "CORS_ORIGIN",
         "HOST",
         "PORT",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "VAPID_SUBJECT",
         "TRACKING_POLL_INTERVAL_MS",
         "WORKER_POLL_INTERVAL_MS"
       ]
@@ -98,6 +110,9 @@
         "CORS_ORIGIN",
         "HOST",
         "PORT",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "VAPID_SUBJECT",
         "WORKER_POLL_INTERVAL_MS",
         "TRACKING_POLL_INTERVAL_MS"
       ]
@@ -113,6 +128,9 @@
         "CORS_ORIGIN",
         "HOST",
         "PORT",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "VAPID_SUBJECT",
         "WORKER_POLL_INTERVAL_MS",
         "TRACKING_POLL_INTERVAL_MS"
       ]

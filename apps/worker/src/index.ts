@@ -3,6 +3,11 @@ declare const Bun: typeof import("bun");
 import { env } from "@mangy/env";
 
 import { claimNextDownloadJob, failDownloadJob } from "./jobs";
+import {
+  claimNextPushDelivery,
+  failPushDelivery,
+  processPushDelivery,
+} from "./notifications";
 import { CancelledError, runDownloadJob } from "./runner";
 import {
   claimDueTrackedSeries,
@@ -25,7 +30,19 @@ const runWorkerLoop = async (): Promise<never> => {
       const trackedSeries = await claimDueTrackedSeries();
 
       if (!trackedSeries) {
-        await sleep(pollIntervalMs);
+        const pushDelivery = await claimNextPushDelivery(workerId);
+
+        if (!pushDelivery) {
+          await sleep(pollIntervalMs);
+          continue;
+        }
+
+        try {
+          await processPushDelivery(pushDelivery);
+        } catch (error) {
+          await failPushDelivery(pushDelivery, error);
+        }
+
         continue;
       }
 

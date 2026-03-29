@@ -9,6 +9,9 @@
       "default": "./src/client.ts"
     }
   },
+  "scripts": {
+    "check-types": "tsc -b"
+  },
   "devDependencies": {
     "typescript": "catalog:",
     "@mangy/config": "workspace:*"

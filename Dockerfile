@@ -11,6 +11,7 @@ COPY packages/config/package.json packages/config/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/downloader/package.json packages/downloader/package.json
 COPY packages/env/package.json packages/env/package.json
+COPY packages/push/package.json packages/push/package.json
 COPY packages/source-sdk/package.json packages/source-sdk/package.json
 RUN bun install --frozen-lockfile
 

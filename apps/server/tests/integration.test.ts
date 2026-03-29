@@ -3,7 +3,14 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { db } from "@mangy/db";
-import { notification, source, user } from "@mangy/db/schema";
+import {
+  notification,
+  notificationDelivery,
+  pushSubscription,
+  source,
+  user,
+} from "@mangy/db/schema";
+import { setBrowserPushSenderForTests } from "@mangy/push";
 import type {
   SourceAdapter,
   SourceChapter,
@@ -15,6 +22,10 @@ import { serve } from "bun";
 import { and, eq } from "drizzle-orm";
 
 import { claimNextDownloadJob } from "../../worker/src/jobs";
+import {
+  claimNextPushDelivery,
+  processPushDelivery,
+} from "../../worker/src/notifications";
 import { runDownloadJob } from "../../worker/src/runner";
 import {
   claimDueTrackedSeries,
@@ -155,9 +166,13 @@ const createFakeAdapter = (config: {
 const createApiClient = async (
   email: string,
   password: string,
-  name: string
+  name: string,
+  options?: {
+    origin?: string;
+  }
 ) => {
   const headers = new Headers();
+  const origin = options?.origin;
 
   const authRequest = async (path: string, body: unknown) => {
     return app.handle(
@@ -165,6 +180,7 @@ const createApiClient = async (
         body: JSON.stringify(body),
         headers: {
           "content-type": "application/json",
+          ...(origin ? { origin } : {}),
         },
         method: "POST",
       })
@@ -203,7 +219,10 @@ const createApiClient = async (
     return app.handle(
       new Request(`http://localhost${path}`, {
         ...init,
-        headers: requestHeaders,
+        headers: {
+          ...Object.fromEntries(requestHeaders.entries()),
+          ...(origin ? { origin } : {}),
+        },
       })
     );
   };
@@ -278,10 +297,36 @@ afterEach(async () => {
   cleanupState.sourceIds.clear();
   cleanupState.tempPaths.clear();
   cleanupState.userIds.clear();
+  setBrowserPushSenderForTests(null);
   sourceRegistry.reset();
 });
 
 describe("server and worker integration", () => {
+  test("auth accepts tailscale-style dev origins", async () => {
+    const email = `tailscale-reader-${crypto.randomUUID()}@example.com`;
+    const password = "reader-password-123";
+    const tailscaleOrigin = "http://100.91.192.69:3001";
+    const { apiFetch, userId } = await createApiClient(
+      email,
+      password,
+      "Tailscale Reader",
+      {
+        origin: tailscaleOrigin,
+      }
+    );
+
+    expect(userId).toBeString();
+    cleanupState.userIds.add(userId as string);
+
+    const settingsBootstrapResponse = await apiFetch(
+      "/api/settings/bootstrap",
+      {
+        method: "GET",
+      }
+    );
+    expect(settingsBootstrapResponse.status).toBe(200);
+  });
+
   test("queue controls, worker processing, tracking automation, and notification APIs work together", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
@@ -586,6 +631,242 @@ describe("server and worker integration", () => {
           job.chapterId === chapterTwo.externalId && job.status === "queued"
       )
     ).toBe(true);
+  });
+
+  test("browser push settings and queued deliveries work together", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-push-test-"));
+    const sentPushes: Array<{
+      endpoint: string;
+      payload: { body: string; title: string; url: string };
+    }> = [];
+
+    cleanupState.sourceIds.add(adapterId);
+    cleanupState.tempPaths.add(tempDirectory);
+
+    setBrowserPushSenderForTests(async (subscription, payload) => {
+      sentPushes.push({
+        endpoint: subscription.endpoint,
+        payload: {
+          body: payload.body,
+          title: payload.title,
+          url: payload.url,
+        },
+      });
+    });
+
+    const series: SourceSeries = {
+      artistNames: ["Artist"],
+      authorNames: ["Author"],
+      availableTranslatedLanguages: ["en"],
+      canonicalUrl: `https://example.test/${seriesExternalId}`,
+      contentRating: null,
+      coverImageUrl: "https://example.test/cover.png",
+      description: "Push delivery test series",
+      externalId: seriesExternalId,
+      latestChapter: "1",
+      originalLanguage: "en",
+      publicationDemographic: null,
+      status: "ongoing",
+      tags: ["test"],
+      title: "Push Delivery Series",
+    };
+
+    const chapterOne: SourceChapter = {
+      chapterNumber: "1",
+      externalId: `chapter-${crypto.randomUUID()}`,
+      externalUrl: `https://example.test/${seriesExternalId}/1`,
+      isUnavailable: false,
+      pageCount: 1,
+      publishedAt: new Date("2025-01-01T00:00:00.000Z"),
+      sourceOrder: "1",
+      title: "Push Arrival",
+      translatedLanguage: "en",
+      volumeNumber: "1",
+    };
+
+    const fakeAdapter = createFakeAdapter({
+      adapterId,
+      chapters: [chapterOne],
+      series,
+    });
+
+    sourceRegistry.register(fakeAdapter.adapter);
+    await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+    const email = `push-reader-${crypto.randomUUID()}@example.com`;
+    const password = "reader-password-123";
+    const { apiFetch, userId } = await createApiClient(
+      email,
+      password,
+      "Push Reader"
+    );
+
+    expect(userId).toBeString();
+    cleanupState.userIds.add(userId as string);
+
+    const pushSettingsResponse = await apiFetch("/api/settings/push", {
+      method: "GET",
+    });
+    expect(pushSettingsResponse.status).toBe(200);
+    expect(
+      (
+        await readJson<{ activeSubscriptionCount: number; isEnabled: boolean }>(
+          pushSettingsResponse
+        )
+      ).activeSubscriptionCount
+    ).toBe(0);
+
+    const subscriptionEndpoint = `https://push.example/${crypto.randomUUID()}`;
+    const subscribeResponse = await apiFetch(
+      "/api/settings/push/subscriptions",
+      jsonRequest(
+        {
+          endpoint: subscriptionEndpoint,
+          expirationTime: null,
+          keys: {
+            auth: `auth-${crypto.randomUUID()}`,
+            p256dh: `p256dh-${crypto.randomUUID()}`,
+          },
+          userAgent: "integration-test-browser",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(subscribeResponse.status).toBe(200);
+    expect(
+      (
+        await readJson<{ activeSubscriptionCount: number; isEnabled: boolean }>(
+          subscribeResponse
+        )
+      ).activeSubscriptionCount
+    ).toBe(1);
+
+    const updatePushPreferencesResponse = await apiFetch(
+      "/api/settings/push/preferences",
+      jsonRequest(
+        {
+          isEnabled: true,
+          notifyOnDownloadCompleted: true,
+          notifyOnDownloadFailed: true,
+          notifyOnTrackedSeriesUpdate: false,
+          notifyOnSystemWarning: true,
+        },
+        { method: "PATCH" }
+      )
+    );
+    expect(updatePushPreferencesResponse.status).toBe(200);
+    expect(
+      (
+        await readJson<{ notifyOnTrackedSeriesUpdate: boolean }>(
+          updatePushPreferencesResponse
+        )
+      ).notifyOnTrackedSeriesUpdate
+    ).toBe(false);
+
+    const sendTestResponse = await apiFetch("/api/settings/push/test", {
+      method: "POST",
+    });
+    expect(sendTestResponse.status).toBe(200);
+    expect(
+      (await readJson<{ deliveredCount: number }>(sendTestResponse))
+        .deliveredCount
+    ).toBe(1);
+    expect(sentPushes).toHaveLength(1);
+    expect(sentPushes[0]?.payload.title).toBe("Browser notifications ready");
+
+    const destinationResponse = await apiFetch(
+      "/api/settings/destinations",
+      jsonRequest(
+        {
+          absolutePath: tempDirectory,
+          isDefault: true,
+          name: "Push Library",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(destinationResponse.status).toBe(200);
+    const destination = await readJson<{ id: string }>(destinationResponse);
+
+    const queueResponse = await apiFetch(
+      "/api/downloads",
+      jsonRequest(
+        {
+          chapterId: chapterOne.externalId,
+          downloadDestinationId: destination.id,
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+        },
+        { method: "POST" }
+      )
+    );
+    expect(queueResponse.status).toBe(200);
+    const queuedJob = await readJson<{ id: string }>(queueResponse);
+
+    const claimedJob = await claimNextDownloadJob("push-worker");
+    expect(claimedJob?.id).toBe(queuedJob.id);
+    await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+
+    const queuedDeliveries = await db
+      .select({
+        id: notificationDelivery.id,
+        status: notificationDelivery.status,
+      })
+      .from(notificationDelivery)
+      .innerJoin(
+        notification,
+        eq(notificationDelivery.notificationId, notification.id)
+      )
+      .where(eq(notification.userId, userId as string));
+
+    expect(queuedDeliveries).toHaveLength(1);
+    expect(queuedDeliveries[0]?.status).toBe("queued");
+
+    const claimedPushDelivery = await claimNextPushDelivery("push-worker");
+    expect(claimedPushDelivery?.notificationType).toBe("downloadCompleted");
+    await processPushDelivery(
+      claimedPushDelivery as NonNullable<typeof claimedPushDelivery>
+    );
+
+    expect(sentPushes).toHaveLength(2);
+    expect(sentPushes[1]?.endpoint).toBe(subscriptionEndpoint);
+    expect(sentPushes[1]?.payload.title).toBe(series.title);
+    expect(sentPushes[1]?.payload.body).toContain("finished");
+
+    const savedSubscriptions = await db
+      .select({
+        endpoint: pushSubscription.endpoint,
+        isActive: pushSubscription.isActive,
+      })
+      .from(pushSubscription)
+      .where(eq(pushSubscription.userId, userId as string));
+    expect(savedSubscriptions).toHaveLength(1);
+    expect(savedSubscriptions[0]?.isActive).toBe(true);
+
+    const unsubscribeResponse = await apiFetch(
+      "/api/settings/push/subscriptions/remove",
+      jsonRequest(
+        {
+          endpoint: subscriptionEndpoint,
+        },
+        { method: "POST" }
+      )
+    );
+    expect(unsubscribeResponse.status).toBe(200);
+    const unsubscribeSettings = await readJson<{
+      activeSubscriptionCount: number;
+      isEnabled: boolean;
+    }>(unsubscribeResponse);
+    expect(unsubscribeSettings.activeSubscriptionCount).toBe(0);
+    expect(unsubscribeSettings.isEnabled).toBe(false);
+
+    const inactiveSubscriptions = await db
+      .select({ isActive: pushSubscription.isActive })
+      .from(pushSubscription)
+      .where(eq(pushSubscription.userId, userId as string));
+    expect(inactiveSubscriptions[0]?.isActive).toBe(false);
   });
 
   test("destinations can be removed and tracked auto-download is turned off safely", async () => {
