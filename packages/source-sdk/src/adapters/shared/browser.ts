@@ -6,6 +6,28 @@ const defaultTimeoutMs = 20_000;
 const idleBrowserCloseDelayMs = 1000;
 const maxConcurrentPages = 2;
 
+interface BrowserLocalStorage {
+  setItem(key: string, value: string): void;
+}
+
+interface BrowserDocument {
+  body: {
+    scrollHeight: number;
+  };
+}
+
+interface BrowserWindow {
+  clearInterval(timer: ReturnType<typeof setInterval>): void;
+  document: BrowserDocument;
+  innerHeight: number;
+  localStorage: BrowserLocalStorage;
+  scrollBy(x: number, y: number): void;
+  setInterval(
+    handler: () => void,
+    timeout: number
+  ): ReturnType<typeof setInterval>;
+}
+
 export class BrowserUnavailableError extends Error {
   constructor(message: string) {
     super(message);
@@ -75,16 +97,18 @@ const closeBrowser = async (): Promise<void> => {
 
 const autoScroll = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {
+    const pageWindow = globalThis as unknown as BrowserWindow;
+
     await new Promise<void>((resolve) => {
       let totalHeight = 0;
-      const distance = window.innerHeight * 0.8;
-      const timer = window.setInterval(() => {
-        const scrollHeight = document.body.scrollHeight;
-        window.scrollBy(0, distance);
+      const distance = pageWindow.innerHeight * 0.8;
+      const timer = pageWindow.setInterval(() => {
+        const scrollHeight = pageWindow.document.body.scrollHeight;
+        pageWindow.scrollBy(0, distance);
         totalHeight += distance;
 
         if (totalHeight >= scrollHeight) {
-          window.clearInterval(timer);
+          pageWindow.clearInterval(timer);
           resolve();
         }
       }, 150);
@@ -155,8 +179,10 @@ export const withBrowserPage = async <TResult>(
 
       await context.addInitScript(
         (values) => {
+          const pageWindow = globalThis as unknown as BrowserWindow;
+
           for (const [key, value] of values) {
-            window.localStorage.setItem(key, value);
+            pageWindow.localStorage.setItem(key, value);
           }
         },
         entries as [string, string][]

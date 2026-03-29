@@ -54,6 +54,17 @@ interface WeebCentralDependencies {
   renderChapterPageImages: (chapterId: string) => Promise<string[]>;
 }
 
+interface BrowserImageElement {
+  dataset?: {
+    src?: string;
+  };
+  src?: string;
+}
+
+interface BrowserDocumentLike {
+  querySelectorAll(selector: string): ArrayLike<BrowserImageElement>;
+}
+
 interface WeebCentralSeriesContext {
   canonicalUrl: string;
   externalId: string;
@@ -645,11 +656,12 @@ const renderChapterPageImages = (chapterId: string): Promise<string[]> => {
     chapterUrl,
     async (page) => {
       const imageUrls = await page.evaluate((selector: string) => {
-        return Array.from(document.querySelectorAll(selector))
-          .map((image) => {
-            const element = image as HTMLImageElement;
-            return element.src || element.dataset.src || "";
-          })
+        const pageDocument = globalThis as unknown as {
+          document: BrowserDocumentLike;
+        };
+
+        return Array.from(pageDocument.document.querySelectorAll(selector))
+          .map((image) => image.src || image.dataset?.src || "")
           .filter((value) => value.includes("/manga/"));
       }, pageImageSelector);
 
