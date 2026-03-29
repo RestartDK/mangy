@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Trash2 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -24,6 +25,13 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useCreateDestination } from "@/hooks/use-create-destination";
@@ -52,14 +60,20 @@ function SettingsRouteComponent() {
   const createDestination = useCreateDestination();
   const deleteDestination = useDeleteDestination();
   const updateNotificationPreferences = useUpdateNotificationPreferences();
+  const { setTheme, theme } = useTheme();
   const [name, setName] = useState("");
   const [absolutePath, setAbsolutePath] = useState("");
   const [komgaLibraryId, setKomgaLibraryId] = useState("");
   const [isDefault, setIsDefault] = useState(false);
   const [inAppEnabled, setInAppEnabled] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
   const [destinationPendingRemoval, setDestinationPendingRemoval] = useState<
     SettingsBootstrap["destinations"][number] | null
   >(null);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!settingsQuery.data) {
@@ -106,6 +120,39 @@ function SettingsRouteComponent() {
                   label="Email"
                   value={settingsQuery.data?.profile.email ?? "Not available"}
                 />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Appearance</CardTitle>
+                <p className="text-muted-foreground text-sm">
+                  Choose whether Mangy follows your system theme or forces a
+                  light or dark surface.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="theme-preference">Theme</FieldLabel>
+                    <Select
+                      onValueChange={setTheme}
+                      value={hasMounted ? (theme ?? "system") : "system"}
+                    >
+                      <SelectTrigger className="w-full" id="theme-preference">
+                        <SelectValue placeholder="Choose a theme" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">System</SelectItem>
+                        <SelectItem value="light">Light</SelectItem>
+                        <SelectItem value="dark">Dark</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      System matches your OS preference automatically.
+                    </FieldDescription>
+                  </Field>
+                </FieldGroup>
               </CardContent>
             </Card>
 

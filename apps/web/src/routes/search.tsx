@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Filter, RotateCcw, Search as SearchIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -34,6 +34,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePreferredSource } from "@/hooks/use-preferred-source";
 import type { SourceFilterDefinition } from "@/hooks/use-source-filters";
 import { useSourceFilters } from "@/hooks/use-source-filters";
 import { useSourceSearch } from "@/hooks/use-source-search";
@@ -65,21 +66,20 @@ const normalizeSelectValue = (
 
 function SearchRouteComponent() {
   const sourcesQuery = useSources();
-  const [sourceId, setSourceId] = useState<string | undefined>(undefined);
+  const enabledSources = useMemo(
+    () => (sourcesQuery.data ?? []).filter((source) => source.isEnabled),
+    [sourcesQuery.data]
+  );
+  const { selectedSourceId: sourceId, setSelectedSourceId: setSourceId } =
+    usePreferredSource(enabledSources);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Record<string, unknown>>({});
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const filtersQuery = useSourceFilters(sourceId);
   const searchMutation = useSourceSearch(sourceId);
 
-  useEffect(() => {
-    if (!sourceId && sourcesQuery.data?.[0]) {
-      setSourceId(sourcesQuery.data[0].id);
-    }
-  }, [sourceId, sourcesQuery.data]);
-
   const selectedSource =
-    sourcesQuery.data?.find((source) => source.id === sourceId) ?? null;
+    enabledSources.find((source) => source.id === sourceId) ?? null;
   const activeFilterCount = useMemo(() => {
     return Object.values(filters).filter((value) => {
       if (Array.isArray(value)) {
@@ -135,7 +135,7 @@ function SearchRouteComponent() {
       }}
       query={query}
       selectedSourceId={sourceId ?? ""}
-      sources={sourcesQuery.data ?? []}
+      sources={enabledSources}
     />
   );
 

@@ -10,13 +10,11 @@ import {
 import type { PropsWithChildren } from "react";
 
 import { ShellUserMenu } from "@/components/shell-user-menu";
-import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -31,15 +29,20 @@ import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 const primaryNavigationItems = [
+  { to: "/", label: "Discover", icon: Compass },
   { to: "/search", label: "Search", icon: Search },
   { to: "/library", label: "Library", icon: BookMarked },
   { to: "/queue", label: "Queue", icon: Download },
 ] as const;
 
 const secondaryNavigationItems = [
-  { to: "/", label: "Discover", icon: Compass },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/settings", label: "Settings", icon: Settings },
+] as const;
+
+const navigationItems = [
+  ...primaryNavigationItems,
+  ...secondaryNavigationItems,
 ] as const;
 
 interface AppShellProps extends PropsWithChildren {
@@ -63,8 +66,8 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
   useLiveUpdates(Boolean(session?.user.id));
 
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon" variant="inset">
+    <SidebarProvider className="h-svh overflow-hidden">
+      <Sidebar collapsible="offcanvas" variant="inset">
         <SidebarHeader>
           <Link
             className="flex flex-col gap-1 rounded-md px-2 py-1"
@@ -81,30 +84,8 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
         <SidebarSeparator />
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Workflows</SidebarGroupLabel>
             <SidebarMenu>
-              {primaryNavigationItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActiveRoute(pathname, item.to)}
-                    >
-                      <Link to={item.to}>
-                        <Icon className="size-4" />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel>More</SidebarGroupLabel>
-            <SidebarMenu>
-              {secondaryNavigationItems.map((item) => {
+              {navigationItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.to}>
@@ -130,22 +111,18 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
           />
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
-        <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
-          <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <SidebarTrigger className="md:hidden" />
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-heading font-medium text-sm">
-                Mangy
-              </div>
-              <div className="truncate text-muted-foreground text-xs">
-                Search, queue, and manage manga in one place.
-              </div>
-            </div>
-          </div>
+      <SidebarInset className="min-h-0 overflow-hidden">
+        <div className="flex h-14 items-center px-4 sm:px-6 lg:px-8">
+          <SidebarTrigger className="-ml-1" />
         </div>
-        <div className={cn("app-page", contentClassName)}>{children}</div>
-        <Separator />
+        <div
+          className={cn(
+            "app-page min-h-0 overflow-y-auto pt-0",
+            contentClassName
+          )}
+        >
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );
