@@ -2,10 +2,20 @@ import { mkdir } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 
 import { db } from "@mangy/db";
-import { downloadDestination } from "@mangy/db/schema";
-import { asc, eq } from "drizzle-orm";
+import {
+  downloadDestination,
+  downloadJob,
+  libraryEntry,
+} from "@mangy/db/schema";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { NotificationsService } from "../notifications/service";
+
+const activeDownloadJobStatuses = [
+  "queued",
+  "running",
+  "retryableFailed",
+] as const;
 
 interface UserProfile {
   email: string;
@@ -98,6 +108,84 @@ export const SettingsService = {
         ...destination,
         komgaLibraryId: destination.komgaLibraryId ?? null,
       };
+    });
+  },
+
+  async deleteDestination(userId: string, destinationId: string) {
+    return await db.transaction(async (tx) => {
+      const destinations = await tx
+        .select({
+          id: downloadDestination.id,
+          isDefault: downloadDestination.isDefault,
+          isEnabled: downloadDestination.isEnabled,
+        })
+        .from(downloadDestination)
+        .where(eq(downloadDestination.userId, userId))
+        .orderBy(asc(downloadDestination.name));
+
+      const destination = destinations.find(
+        (item) => item.id === destinationId
+      );
+      if (!destination) {
+        throw new Error("Destination not found.");
+      }
+
+      const [activeJob] = await tx
+        .select({ id: downloadJob.id })
+        .from(downloadJob)
+        .where(
+          and(
+            eq(downloadJob.userId, userId),
+            eq(downloadJob.downloadDestinationId, destinationId),
+            inArray(downloadJob.status, activeDownloadJobStatuses)
+          )
+        )
+        .limit(1);
+
+      if (activeJob) {
+        throw new Error(
+          "This destination is still used by queued or running downloads. Cancel or finish those jobs first."
+        );
+      }
+
+      const fallbackDestination = destination.isDefault
+        ? (destinations.find(
+            (item) => item.id !== destinationId && item.isEnabled
+          ) ?? destinations.find((item) => item.id !== destinationId))
+        : null;
+      const now = new Date();
+
+      await tx
+        .update(libraryEntry)
+        .set({
+          autoDownload: false,
+          downloadDestinationId: null,
+          updatedAt: now,
+        })
+        .where(eq(libraryEntry.downloadDestinationId, destinationId));
+
+      await tx
+        .delete(downloadDestination)
+        .where(
+          and(
+            eq(downloadDestination.id, destinationId),
+            eq(downloadDestination.userId, userId)
+          )
+        );
+
+      if (destination.isDefault && fallbackDestination) {
+        await tx
+          .update(downloadDestination)
+          .set({ isDefault: false, updatedAt: now })
+          .where(eq(downloadDestination.userId, userId));
+
+        await tx
+          .update(downloadDestination)
+          .set({ isDefault: true, updatedAt: now })
+          .where(eq(downloadDestination.id, fallbackDestination.id));
+      }
+
+      return { id: destinationId };
     });
   },
 };

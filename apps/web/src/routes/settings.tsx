@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -9,6 +10,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Field,
   FieldDescription,
   FieldGroup,
@@ -18,7 +27,11 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useCreateDestination } from "@/hooks/use-create-destination";
-import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
+import { useDeleteDestination } from "@/hooks/use-delete-destination";
+import {
+  type SettingsBootstrap,
+  useSettingsBootstrap,
+} from "@/hooks/use-settings-bootstrap";
 import { useUpdateNotificationPreferences } from "@/hooks/use-update-notification-preferences";
 import { getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
@@ -37,12 +50,16 @@ export const Route = createFileRoute("/settings")({
 function SettingsRouteComponent() {
   const settingsQuery = useSettingsBootstrap();
   const createDestination = useCreateDestination();
+  const deleteDestination = useDeleteDestination();
   const updateNotificationPreferences = useUpdateNotificationPreferences();
   const [name, setName] = useState("");
   const [absolutePath, setAbsolutePath] = useState("");
   const [komgaLibraryId, setKomgaLibraryId] = useState("");
   const [isDefault, setIsDefault] = useState(false);
   const [inAppEnabled, setInAppEnabled] = useState(true);
+  const [destinationPendingRemoval, setDestinationPendingRemoval] = useState<
+    SettingsBootstrap["destinations"][number] | null
+  >(null);
 
   useEffect(() => {
     if (!settingsQuery.data) {
@@ -284,6 +301,19 @@ function SettingsRouteComponent() {
                             Komga library ID: {destination.komgaLibraryId}
                           </div>
                         ) : null}
+                        <div className="flex justify-end">
+                          <Button
+                            disabled={deleteDestination.isPending}
+                            onClick={() => {
+                              setDestinationPendingRemoval(destination);
+                            }}
+                            type="button"
+                            variant="destructive"
+                          >
+                            <Trash2 className="size-4" />
+                            Remove
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -298,6 +328,57 @@ function SettingsRouteComponent() {
           </Card>
         </div>
       )}
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setDestinationPendingRemoval(null);
+          }
+        }}
+        open={destinationPendingRemoval !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove destination</DialogTitle>
+            <DialogDescription>
+              {destinationPendingRemoval
+                ? `Remove ${destinationPendingRemoval.name}? Any tracked series using this destination will keep tracking, but auto-download will be turned off.`
+                : "Remove this destination?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                const destinationId = destinationPendingRemoval?.id;
+                if (!destinationId) {
+                  return;
+                }
+
+                deleteDestination
+                  .mutateAsync(destinationId)
+                  .then(() => {
+                    setDestinationPendingRemoval(null);
+                  })
+                  .catch(() => undefined);
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {deleteDestination.isPending ? "Removing..." : "Remove"}
+            </Button>
+            <Button
+              disabled={deleteDestination.isPending}
+              onClick={() => {
+                setDestinationPendingRemoval(null);
+              }}
+              type="button"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

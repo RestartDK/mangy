@@ -17,6 +17,11 @@ export const librarySeriesQuerySchema = z.object({
   seriesId: z.string(),
 });
 
+export const removeLibrarySeriesResponseSchema = z.object({
+  sourceId: z.string(),
+  seriesId: z.string(),
+});
+
 export const trackedSeriesStateSummarySchema = z.object({
   id: z.string(),
   nextCheckAt: z.string().datetime().nullable(),
