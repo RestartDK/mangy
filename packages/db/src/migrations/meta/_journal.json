@@ -29,6 +29,13 @@
       "when": 1774712119480,
       "tag": "0003_phase3_manga_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774766400000,
+      "tag": "0004_browser_push_notifications",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,6 @@ import {
   downloadDestination,
   downloadJob,
   libraryEntry,
-  notification,
   series,
   trackedSeriesState,
 } from "@mangy/db/schema";
@@ -12,6 +11,8 @@ import { env } from "@mangy/env";
 import type { SourceChapter } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { and, eq, inArray, sql } from "drizzle-orm";
+
+import { queueNotificationForTransaction } from "./notifications";
 
 const activeDownloadJobStatuses = [
   "queued",
@@ -220,7 +221,7 @@ const completeTrackedSeriesCheck = async (
       .where(eq(trackedSeriesState.id, trackedSeries.id));
 
     if (notificationBody) {
-      await tx.insert(notification).values({
+      await queueNotificationForTransaction(tx, {
         body: notificationBody,
         title: buildTrackedSeriesTitle(trackedSeries.seriesTitle),
         type: "trackedSeriesUpdated",
@@ -353,7 +354,7 @@ export const failTrackedSeries = async (
       .where(eq(trackedSeriesState.id, trackedSeries.id));
 
     if (shouldNotify) {
-      await tx.insert(notification).values({
+      await queueNotificationForTransaction(tx, {
         body: `Tracking check failed. ${message}`,
         title: buildTrackedSeriesTitle(trackedSeries.seriesTitle),
         type: "systemWarning",

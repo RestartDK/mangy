@@ -12,6 +12,7 @@
     "@mangy/downloader": "workspace:*",
     "@mangy/db": "workspace:*",
     "@mangy/env": "workspace:*",
+    "@mangy/push": "workspace:*",
     "@mangy/source-sdk": "workspace:*",
     "drizzle-orm": "^0.45.1"
   },

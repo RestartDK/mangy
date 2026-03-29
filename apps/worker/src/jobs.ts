@@ -4,10 +4,11 @@ import {
   downloadArtifact,
   downloadDestination,
   downloadJob,
-  notification,
   series,
 } from "@mangy/db/schema";
 import { and, eq, sql } from "drizzle-orm";
+
+import { queueNotificationForTransaction } from "./notifications";
 
 export interface ClaimedDownloadJob {
   attempts: number;
@@ -191,7 +192,7 @@ export const completeDownloadJob = async (
       });
     }
 
-    await tx.insert(notification).values({
+    await queueNotificationForTransaction(tx, {
       body: `${chapterLabel} finished and was written to ${job.destinationName ?? "your destination"}.`,
       title: buildDownloadTitle(job),
       type: "downloadCompleted",
@@ -224,7 +225,7 @@ export const failDownloadJob = async (
       .where(eq(downloadJob.id, job.id));
 
     if (shouldNotify) {
-      await tx.insert(notification).values({
+      await queueNotificationForTransaction(tx, {
         body: `${buildChapterLabel(job)} failed after ${job.attempts} attempts. ${message}`,
         title: buildDownloadTitle(job),
         type: "downloadFailed",

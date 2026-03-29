@@ -31,6 +31,11 @@ export const env = {
   // Worker
   WORKER_POLL_INTERVAL_MS: optional("WORKER_POLL_INTERVAL_MS", "15000"),
   TRACKING_POLL_INTERVAL_MS: optional("TRACKING_POLL_INTERVAL_MS", "900000"),
+
+  // Browser push notifications
+  VAPID_PUBLIC_KEY: optional("VAPID_PUBLIC_KEY", undefined),
+  VAPID_PRIVATE_KEY: optional("VAPID_PRIVATE_KEY", undefined),
+  VAPID_SUBJECT: optional("VAPID_SUBJECT", undefined),
 } as const;
 
 export type Env = typeof env;
