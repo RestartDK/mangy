@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { RefreshCcw, Save } from "lucide-react";
+import { BookOpen, RefreshCcw, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -455,37 +455,67 @@ function SeriesDetailRouteComponent() {
                                 </StatusBadge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  disabled={
-                                    chapter.isUnavailable ||
-                                    !canQueue ||
-                                    enqueueDownload.isPending
-                                  }
-                                  onClick={() => {
-                                    setPendingChapterId(chapter.chapterId);
-                                    enqueueDownload
-                                      .mutateAsync({
-                                        chapterId: chapter.chapterId,
-                                        downloadDestinationId:
-                                          selectedDestinationId,
-                                        seriesId,
-                                        sourceId,
-                                      })
-                                      .finally(() => {
-                                        setPendingChapterId((current) =>
-                                          current === chapter.chapterId
-                                            ? null
-                                            : current
-                                        );
-                                      })
-                                      .catch(() => undefined);
-                                  }}
-                                  type="button"
-                                >
-                                  {pendingChapterId === chapter.chapterId
-                                    ? "Queueing..."
-                                    : "Queue"}
-                                </Button>
+                                <div className="flex justify-end gap-2">
+                                  {chapter.isUnavailable ? (
+                                    <Button
+                                      disabled
+                                      type="button"
+                                      variant="outline"
+                                    >
+                                      <BookOpen className="size-4" />
+                                      Read
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      asChild
+                                      type="button"
+                                      variant="outline"
+                                    >
+                                      <Link
+                                        params={{
+                                          chapterId: chapter.chapterId,
+                                          seriesId,
+                                          sourceId,
+                                        }}
+                                        to="/series/$sourceId/$seriesId/read/$chapterId"
+                                      >
+                                        <BookOpen className="size-4" />
+                                        Read
+                                      </Link>
+                                    </Button>
+                                  )}
+                                  <Button
+                                    disabled={
+                                      chapter.isUnavailable ||
+                                      !canQueue ||
+                                      enqueueDownload.isPending
+                                    }
+                                    onClick={() => {
+                                      setPendingChapterId(chapter.chapterId);
+                                      enqueueDownload
+                                        .mutateAsync({
+                                          chapterId: chapter.chapterId,
+                                          downloadDestinationId:
+                                            selectedDestinationId,
+                                          seriesId,
+                                          sourceId,
+                                        })
+                                        .finally(() => {
+                                          setPendingChapterId((current) =>
+                                            current === chapter.chapterId
+                                              ? null
+                                              : current
+                                          );
+                                        })
+                                        .catch(() => undefined);
+                                    }}
+                                    type="button"
+                                  >
+                                    {pendingChapterId === chapter.chapterId
+                                      ? "Queueing..."
+                                      : "Queue"}
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -517,6 +547,8 @@ function SeriesDetailRouteComponent() {
                             })
                             .catch(() => undefined);
                         }}
+                        seriesId={seriesId}
+                        sourceId={sourceId}
                       />
                     ))}
                   </div>

@@ -51,7 +51,19 @@ const getExtension = (value: string): string => {
 export interface DownloadPage {
   index: number;
   imageUrl: string;
+  headers?: Record<string, string>;
+  referer?: string;
 }
+
+const createRequestHeaders = (page: DownloadPage): Headers => {
+  const headers = new Headers(page.headers);
+
+  if (page.referer && !headers.has("referer")) {
+    headers.set("referer", page.referer);
+  }
+
+  return headers;
+};
 
 export interface DownloadPagesResult {
   fileCount: number;
@@ -198,7 +210,9 @@ export const downloadPagesToFolder = async ({
       await beforePage(page);
     }
 
-    const response = await fetch(page.imageUrl);
+    const response = await fetch(page.imageUrl, {
+      headers: createRequestHeaders(page),
+    });
     if (!response.ok) {
       throw new Error(`Page download failed with status ${response.status}`);
     }

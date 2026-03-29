@@ -17,6 +17,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SeriesSourceIdSeriesIdRouteImport } from './routes/series.$sourceId.$seriesId'
+import { Route as SeriesSourceIdSeriesIdReadChapterIdRouteImport } from './routes/series.$sourceId.$seriesId.read.$chapterId'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -58,6 +59,12 @@ const SeriesSourceIdSeriesIdRoute = SeriesSourceIdSeriesIdRouteImport.update({
   path: '/series/$sourceId/$seriesId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeriesSourceIdSeriesIdReadChapterIdRoute =
+  SeriesSourceIdSeriesIdReadChapterIdRouteImport.update({
+    id: '/read/$chapterId',
+    path: '/read/$chapterId',
+    getParentRoute: () => SeriesSourceIdSeriesIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -67,7 +74,8 @@ export interface FileRoutesByFullPath {
   '/queue': typeof QueueRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
-  '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRoute
+  '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRouteWithChildren
+  '/series/$sourceId/$seriesId/read/$chapterId': typeof SeriesSourceIdSeriesIdReadChapterIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -77,7 +85,8 @@ export interface FileRoutesByTo {
   '/queue': typeof QueueRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
-  '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRoute
+  '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRouteWithChildren
+  '/series/$sourceId/$seriesId/read/$chapterId': typeof SeriesSourceIdSeriesIdReadChapterIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -88,7 +97,8 @@ export interface FileRoutesById {
   '/queue': typeof QueueRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
-  '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRoute
+  '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRouteWithChildren
+  '/series/$sourceId/$seriesId/read/$chapterId': typeof SeriesSourceIdSeriesIdReadChapterIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +111,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/series/$sourceId/$seriesId'
+    | '/series/$sourceId/$seriesId/read/$chapterId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +122,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/series/$sourceId/$seriesId'
+    | '/series/$sourceId/$seriesId/read/$chapterId'
   id:
     | '__root__'
     | '/'
@@ -121,6 +133,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/series/$sourceId/$seriesId'
+    | '/series/$sourceId/$seriesId/read/$chapterId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -131,7 +144,7 @@ export interface RootRouteChildren {
   QueueRoute: typeof QueueRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
-  SeriesSourceIdSeriesIdRoute: typeof SeriesSourceIdSeriesIdRoute
+  SeriesSourceIdSeriesIdRoute: typeof SeriesSourceIdSeriesIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -192,8 +205,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeriesSourceIdSeriesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/series/$sourceId/$seriesId/read/$chapterId': {
+      id: '/series/$sourceId/$seriesId/read/$chapterId'
+      path: '/read/$chapterId'
+      fullPath: '/series/$sourceId/$seriesId/read/$chapterId'
+      preLoaderRoute: typeof SeriesSourceIdSeriesIdReadChapterIdRouteImport
+      parentRoute: typeof SeriesSourceIdSeriesIdRoute
+    }
   }
 }
+
+interface SeriesSourceIdSeriesIdRouteChildren {
+  SeriesSourceIdSeriesIdReadChapterIdRoute: typeof SeriesSourceIdSeriesIdReadChapterIdRoute
+}
+
+const SeriesSourceIdSeriesIdRouteChildren: SeriesSourceIdSeriesIdRouteChildren =
+  {
+    SeriesSourceIdSeriesIdReadChapterIdRoute:
+      SeriesSourceIdSeriesIdReadChapterIdRoute,
+  }
+
+const SeriesSourceIdSeriesIdRouteWithChildren =
+  SeriesSourceIdSeriesIdRoute._addFileChildren(
+    SeriesSourceIdSeriesIdRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -203,7 +238,7 @@ const rootRouteChildren: RootRouteChildren = {
   QueueRoute: QueueRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
-  SeriesSourceIdSeriesIdRoute: SeriesSourceIdSeriesIdRoute,
+  SeriesSourceIdSeriesIdRoute: SeriesSourceIdSeriesIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
