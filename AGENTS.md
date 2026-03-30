@@ -109,3 +109,30 @@ env.VITE_SERVER_URL  // required - throws if missing
 ## Deployment
 
 Uses **Railpack** for builds and **Dokploy** for deployment. Web and server are deployed as separate applications. Database is also hosted on Dokploy.
+
+## Cursor Cloud specific instructions
+
+### Prerequisites
+
+Docker and Bun v1.3.4 must be available. The VM snapshot has both pre-installed. Docker daemon must be started before any database commands (`sudo dockerd &` then wait a few seconds; grant socket access with `sudo chmod 666 /var/run/docker.sock` if needed).
+
+### Starting the stack
+
+1. **Database**: `cd packages/db && docker compose up -d` — starts PostgreSQL on port 5432.
+2. **Migrations**: `bun db:migrate` — auto-runs as a turbo dependency of `server#dev`, but can be run manually.
+3. **Dev servers**: `bun dev` starts web (port 3001), server (port 3000), and worker together. Use `bun dev:web` / `bun dev:server` / `bun dev:worker` individually.
+
+### Environment
+
+Copy `.env.example` to `.env` at the repo root if it doesn't exist. The only value that must be changed from the example is `BETTER_AUTH_SECRET` (set any 32+ char string). All other defaults work for local development. VAPID keys are optional (push notifications only).
+
+### Lint & tests
+
+- `bun lint` — Biome/Ultracite check (pre-existing warnings exist in the codebase; these are not regressions).
+- `bun check-types` — TypeScript strict-mode type check across all packages.
+- `bun test:integration` — runs the server integration test suite; requires PostgreSQL running and migrated.
+
+### Gotchas
+
+- The Docker-in-Docker setup requires `fuse-overlayfs` storage driver and `iptables-legacy` (configured via `/etc/docker/daemon.json` and `update-alternatives`).
+- Turbo `dev` task runs migrations automatically before starting `server` and `worker` (defined in `turbo.json` via `dependsOn`).
