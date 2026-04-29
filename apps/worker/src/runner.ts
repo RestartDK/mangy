@@ -12,6 +12,7 @@ import {
   isDownloadJobCancelled,
   updateDownloadJobProgress,
 } from "./jobs";
+import { scanKomgaLibrary } from "./komga";
 
 export class CancelledError extends Error {
   constructor() {
@@ -68,6 +69,7 @@ export const runDownloadJob = async (
     destinationPath,
     seriesTitle: job.seriesTitle ?? "Series",
   });
+  let didFinishDownload = false;
 
   try {
     const downloadResult = await downloadPagesToFolder({
@@ -80,13 +82,20 @@ export const runDownloadJob = async (
       outputDirectory,
       pages,
     });
+    didFinishDownload = true;
+    const importedToKomgaAt = await scanKomgaLibrary({
+      libraryId: job.destinationKomgaLibraryId,
+    });
 
     await completeDownloadJob(job, {
       fileSizeBytes: downloadResult.totalBytes,
+      importedToKomgaAt,
       outputPath: outputDirectory,
     });
   } catch (error) {
-    await removeDirectory(outputDirectory);
+    if (!didFinishDownload) {
+      await removeDirectory(outputDirectory);
+    }
 
     if (error instanceof CancelledError) {
       await cancelRunningDownloadJob(job.id);

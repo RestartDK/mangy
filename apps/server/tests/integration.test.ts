@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { db } from "@mangy/db";
 import {
+  downloadArtifact,
   notification,
   notificationDelivery,
   pushSubscription,
@@ -22,6 +23,7 @@ import { serve } from "bun";
 import { and, eq } from "drizzle-orm";
 
 import { claimNextDownloadJob } from "../../worker/src/jobs";
+import { setKomgaConfigForTests } from "../../worker/src/komga";
 import {
   claimNextPushDelivery,
   processPushDelivery,
@@ -298,6 +300,7 @@ afterEach(async () => {
   cleanupState.tempPaths.clear();
   cleanupState.userIds.clear();
   setBrowserPushSenderForTests(null);
+  setKomgaConfigForTests(null);
   sourceRegistry.reset();
 });
 
@@ -631,6 +634,153 @@ describe("server and worker integration", () => {
           job.chapterId === chapterTwo.externalId && job.status === "queued"
       )
     ).toBe(true);
+  });
+
+  test("worker triggers a Komga library scan after a destination download", async () => {
+    const adapterId = `test-source-${crypto.randomUUID()}`;
+    const seriesExternalId = `series-${crypto.randomUUID()}`;
+    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-komga-test-"));
+    const komgaLibraryId = `komga-library-${crypto.randomUUID()}`;
+    const komgaApiKey = `komga-key-${crypto.randomUUID()}`;
+    const scanRequests: Array<{
+      apiKey: string | null;
+      method: string;
+      pathname: string;
+    }> = [];
+
+    cleanupState.sourceIds.add(adapterId);
+    cleanupState.tempPaths.add(tempDirectory);
+
+    const komgaServer = serve({
+      fetch(request) {
+        const url = new URL(request.url);
+        scanRequests.push({
+          apiKey: request.headers.get("x-api-key"),
+          method: request.method,
+          pathname: url.pathname,
+        });
+
+        return new Response(null, { status: 202 });
+      },
+      hostname: "127.0.0.1",
+      port: 0,
+    });
+
+    setKomgaConfigForTests({
+      apiKey: komgaApiKey,
+      baseUrl: `http://127.0.0.1:${komgaServer.port}`,
+      password: undefined,
+      username: undefined,
+    });
+
+    try {
+      const series: SourceSeries = {
+        artistNames: ["Artist"],
+        authorNames: ["Author"],
+        availableTranslatedLanguages: ["en"],
+        canonicalUrl: `https://example.test/${seriesExternalId}`,
+        contentRating: null,
+        coverImageUrl: "https://example.test/cover.png",
+        description: "Komga scan test series",
+        externalId: seriesExternalId,
+        latestChapter: "1",
+        originalLanguage: "en",
+        publicationDemographic: null,
+        status: "ongoing",
+        tags: ["test"],
+        title: "Komga Scan Series",
+      };
+
+      const chapterOne: SourceChapter = {
+        chapterNumber: "1",
+        externalId: `chapter-${crypto.randomUUID()}`,
+        externalUrl: `https://example.test/${seriesExternalId}/1`,
+        isUnavailable: false,
+        pageCount: 1,
+        publishedAt: new Date("2025-01-01T00:00:00.000Z"),
+        sourceOrder: "1",
+        title: "Komga Arrival",
+        translatedLanguage: "en",
+        volumeNumber: "1",
+      };
+
+      const fakeAdapter = createFakeAdapter({
+        adapterId,
+        chapters: [chapterOne],
+        series,
+      });
+
+      sourceRegistry.register(fakeAdapter.adapter);
+      await SourcesStorage.syncSources([fakeAdapter.adapter]);
+
+      const email = `komga-reader-${crypto.randomUUID()}@example.com`;
+      const password = "reader-password-123";
+      const { apiFetch, userId } = await createApiClient(
+        email,
+        password,
+        "Komga Reader"
+      );
+
+      expect(userId).toBeString();
+      cleanupState.userIds.add(userId as string);
+
+      const destinationResponse = await apiFetch(
+        "/api/settings/destinations",
+        jsonRequest(
+          {
+            absolutePath: tempDirectory,
+            isDefault: true,
+            komgaLibraryId,
+            name: "Komga Library",
+          },
+          { method: "POST" }
+        )
+      );
+      expect(destinationResponse.status).toBe(200);
+      const destination = await readJson<{ id: string }>(destinationResponse);
+
+      const queueResponse = await apiFetch(
+        "/api/downloads",
+        jsonRequest(
+          {
+            chapterId: chapterOne.externalId,
+            downloadDestinationId: destination.id,
+            seriesId: seriesExternalId,
+            sourceId: adapterId,
+          },
+          { method: "POST" }
+        )
+      );
+      expect(queueResponse.status).toBe(200);
+      const queuedJob = await readJson<{ id: string }>(queueResponse);
+
+      const claimedJob = await claimNextDownloadJob("komga-worker");
+      expect(claimedJob?.id).toBe(queuedJob.id);
+      expect(claimedJob?.destinationKomgaLibraryId).toBe(komgaLibraryId);
+      await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+
+      expect(scanRequests).toEqual([
+        {
+          apiKey: komgaApiKey,
+          method: "POST",
+          pathname: `/api/v1/libraries/${komgaLibraryId}/scan`,
+        },
+      ]);
+
+      const [artifact] = await db
+        .select({
+          importedToKomgaAt: downloadArtifact.importedToKomgaAt,
+          outputPath: downloadArtifact.outputPath,
+        })
+        .from(downloadArtifact)
+        .where(eq(downloadArtifact.downloadJobId, queuedJob.id))
+        .limit(1);
+
+      expect(artifact?.outputPath).toContain(tempDirectory);
+      expect(artifact?.importedToKomgaAt).toBeInstanceOf(Date);
+    } finally {
+      komgaServer.stop(true);
+    }
   });
 
   test("browser push settings and queued deliveries work together", async () => {
