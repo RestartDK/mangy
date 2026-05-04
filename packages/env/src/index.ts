@@ -32,6 +32,12 @@ export const env = {
   WORKER_POLL_INTERVAL_MS: optional("WORKER_POLL_INTERVAL_MS", "15000"),
   TRACKING_POLL_INTERVAL_MS: optional("TRACKING_POLL_INTERVAL_MS", "900000"),
 
+  // Komga
+  KOMGA_BASE_URL: optional("KOMGA_BASE_URL", undefined),
+  KOMGA_API_KEY: optional("KOMGA_API_KEY", undefined),
+  KOMGA_USERNAME: optional("KOMGA_USERNAME", undefined),
+  KOMGA_PASSWORD: optional("KOMGA_PASSWORD", undefined),
+
   // Browser push notifications
   VAPID_PUBLIC_KEY: optional("VAPID_PUBLIC_KEY", undefined),
   VAPID_PRIVATE_KEY: optional("VAPID_PRIVATE_KEY", undefined),

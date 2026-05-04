@@ -1,7 +1,7 @@
 import {
-  downloadPagesToFolder,
-  prepareChapterOutputDirectory,
-  removeDirectory,
+  downloadPagesToCbz,
+  prepareChapterOutputFile,
+  removePath,
 } from "@mangy/downloader";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 
@@ -12,6 +12,7 @@ import {
   isDownloadJobCancelled,
   updateDownloadJobProgress,
 } from "./jobs";
+import { scanKomgaLibrary } from "./komga";
 
 export class CancelledError extends Error {
   constructor() {
@@ -61,32 +62,42 @@ export const runDownloadJob = async (
     referer: page.referer,
   }));
 
-  const outputDirectory = await prepareChapterOutputDirectory({
+  const outputPath = await prepareChapterOutputFile({
     chapterId: chapterExternalId,
     chapterNumber: job.chapterNumber,
     chapterTitle: job.chapterTitle,
     destinationPath,
+    extension: ".cbz",
     seriesTitle: job.seriesTitle ?? "Series",
   });
+  let didFinishDownload = false;
 
   try {
-    const downloadResult = await downloadPagesToFolder({
+    const downloadResult = await downloadPagesToCbz({
       beforePage: async () => {
         if (await isDownloadJobCancelled(job.id)) {
           throw new CancelledError();
         }
       },
       onProgress: ({ percent }) => updateDownloadJobProgress(job.id, percent),
-      outputDirectory,
+      outputPath,
       pages,
+    });
+    didFinishDownload = true;
+    const importedToKomgaAt = await scanKomgaLibrary({
+      libraryId: job.destinationKomgaLibraryId,
     });
 
     await completeDownloadJob(job, {
       fileSizeBytes: downloadResult.totalBytes,
-      outputPath: outputDirectory,
+      importedToKomgaAt,
+      outputPath,
+      packageFormat: "cbz",
     });
   } catch (error) {
-    await removeDirectory(outputDirectory);
+    if (!didFinishDownload) {
+      await removePath(outputPath);
+    }
 
     if (error instanceof CancelledError) {
       await cancelRunningDownloadJob(job.id);

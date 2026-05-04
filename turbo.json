@@ -29,7 +29,11 @@
         "VAPID_PRIVATE_KEY",
         "VAPID_SUBJECT",
         "WORKER_POLL_INTERVAL_MS",
-        "TRACKING_POLL_INTERVAL_MS"
+        "TRACKING_POLL_INTERVAL_MS",
+        "KOMGA_BASE_URL",
+        "KOMGA_API_KEY",
+        "KOMGA_USERNAME",
+        "KOMGA_PASSWORD"
       ]
     },
     "db:push": {
@@ -114,7 +118,11 @@
         "VAPID_PRIVATE_KEY",
         "VAPID_SUBJECT",
         "WORKER_POLL_INTERVAL_MS",
-        "TRACKING_POLL_INTERVAL_MS"
+        "TRACKING_POLL_INTERVAL_MS",
+        "KOMGA_BASE_URL",
+        "KOMGA_API_KEY",
+        "KOMGA_USERNAME",
+        "KOMGA_PASSWORD"
       ]
     },
     "worker#dev": {
@@ -132,7 +140,11 @@
         "VAPID_PRIVATE_KEY",
         "VAPID_SUBJECT",
         "WORKER_POLL_INTERVAL_MS",
-        "TRACKING_POLL_INTERVAL_MS"
+        "TRACKING_POLL_INTERVAL_MS",
+        "KOMGA_BASE_URL",
+        "KOMGA_API_KEY",
+        "KOMGA_USERNAME",
+        "KOMGA_PASSWORD"
       ]
     },
     "web#build": {

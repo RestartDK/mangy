@@ -142,7 +142,7 @@ This test expects the local database to be running and migrated.
 - `apps/server` exposes feature modules for sources, series, library, downloads, tracking, notifications, settings, and live events
 - `apps/worker` claims jobs from Postgres, downloads chapter pages, updates queue state, and checks tracked series on a schedule
 - source adapters normalize external payloads at the adapter boundary so app code stays camelCase
-- completed downloads are written directly into configured filesystem destinations for Komga import
+- completed downloads are written directly into configured filesystem destinations and can trigger Komga library scans when a destination has a Komga library ID
 
 ## Deployment Notes
 
@@ -152,6 +152,7 @@ Mangy is intended to run as separate web, server, and worker services.
 - PostgreSQL is an external persistent dependency
 - the worker must run anywhere the configured download destinations are reachable
 - Komga can watch those destination folders directly
+- set `KOMGA_BASE_URL` and either `KOMGA_API_KEY` or `KOMGA_USERNAME`/`KOMGA_PASSWORD` on the worker to request `POST /api/v1/libraries/:libraryId/scan` after downloads for destinations with a Komga library ID
 
 This repo now covers image build and publish concerns only:
 

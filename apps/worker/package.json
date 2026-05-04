@@ -5,6 +5,7 @@
   "scripts": {
     "build": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile worker",
     "check-types": "tsc -b",
+    "test": "bun test src",
     "dev": "bun --env-file=../../.env --env-file=../../.env.local run --hot src/index.ts",
     "start": "./worker"
   },

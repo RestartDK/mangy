@@ -16,6 +16,7 @@ export interface ClaimedDownloadJob {
   chapterNumber: string | null;
   chapterRecordId: string | null;
   chapterTitle: string | null;
+  destinationKomgaLibraryId: string | null;
   destinationName: string | null;
   destinationPath: string | null;
   id: string;
@@ -25,9 +26,13 @@ export interface ClaimedDownloadJob {
   userId: string;
 }
 
+type ArtifactPackageFormat = "cbz" | "folder";
+
 interface CompletedArtifact {
   fileSizeBytes: number;
+  importedToKomgaAt?: Date | null;
   outputPath: string;
+  packageFormat: ArtifactPackageFormat;
 }
 
 const buildChapterLabel = (job: ClaimedDownloadJob): string => {
@@ -93,6 +98,7 @@ export const claimNextDownloadJob = async (
       chapterNumber: chapter.chapterNumber,
       chapterRecordId: chapter.id,
       chapterTitle: chapter.title,
+      destinationKomgaLibraryId: downloadDestination.komgaLibraryId,
       destinationName: downloadDestination.name,
       destinationPath: downloadDestination.absolutePath,
       id: downloadJob.id,
@@ -188,7 +194,9 @@ export const completeDownloadJob = async (
         chapterId: job.chapterRecordId,
         downloadJobId: job.id,
         fileSizeBytes: artifact.fileSizeBytes,
+        importedToKomgaAt: artifact.importedToKomgaAt ?? null,
         outputPath: artifact.outputPath,
+        packageFormat: artifact.packageFormat,
       });
     }
 
