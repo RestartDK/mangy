@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { db } from "@mangy/db";
@@ -21,6 +21,7 @@ import type {
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { serve } from "bun";
 import { and, eq } from "drizzle-orm";
+import { unzipSync } from "fflate";
 
 import { claimNextDownloadJob } from "../../worker/src/jobs";
 import { setKomgaConfigForTests } from "../../worker/src/komga";
@@ -771,12 +772,15 @@ describe("server and worker integration", () => {
         .select({
           importedToKomgaAt: downloadArtifact.importedToKomgaAt,
           outputPath: downloadArtifact.outputPath,
+          packageFormat: downloadArtifact.packageFormat,
         })
         .from(downloadArtifact)
         .where(eq(downloadArtifact.downloadJobId, queuedJob.id))
         .limit(1);
 
       expect(artifact?.outputPath).toContain(tempDirectory);
+      expect(artifact?.outputPath.endsWith(".cbz")).toBe(true);
+      expect(artifact?.packageFormat).toBe("cbz");
       expect(artifact?.importedToKomgaAt).toBeInstanceOf(Date);
     } finally {
       komgaServer.stop(true);
@@ -1570,8 +1574,18 @@ describe("server and worker integration", () => {
 
       const downloadedFiles = (
         await readdir(tempDirectory, { recursive: true })
-      ).filter((entry) => entry.endsWith(".png"));
+      ).filter((entry) => entry.endsWith(".cbz"));
       expect(downloadedFiles).toHaveLength(1);
+
+      const downloadedFile = downloadedFiles[0];
+      expect(downloadedFile).toBeString();
+      if (!downloadedFile) {
+        throw new Error("Expected the worker to write a CBZ file.");
+      }
+
+      const archiveBytes = await readFile(join(tempDirectory, downloadedFile));
+      const archiveFiles = unzipSync(new Uint8Array(archiveBytes));
+      expect(Object.keys(archiveFiles)).toEqual(["001.png"]);
       expect(imageRequests.length).toBe(2);
       expect(
         imageRequests.every(

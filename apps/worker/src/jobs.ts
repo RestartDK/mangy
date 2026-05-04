@@ -26,10 +26,13 @@ export interface ClaimedDownloadJob {
   userId: string;
 }
 
+type ArtifactPackageFormat = "cbz" | "folder";
+
 interface CompletedArtifact {
   fileSizeBytes: number;
   importedToKomgaAt?: Date | null;
   outputPath: string;
+  packageFormat: ArtifactPackageFormat;
 }
 
 const buildChapterLabel = (job: ClaimedDownloadJob): string => {
@@ -193,6 +196,7 @@ export const completeDownloadJob = async (
         fileSizeBytes: artifact.fileSizeBytes,
         importedToKomgaAt: artifact.importedToKomgaAt ?? null,
         outputPath: artifact.outputPath,
+        packageFormat: artifact.packageFormat,
       });
     }
 

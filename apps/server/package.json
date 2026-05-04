@@ -24,9 +24,10 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@mangy/config": "workspace:*",
     "@types/bun": "catalog:",
+    "fflate": "^0.8.2",
     "playwright": "^1.53.2",
-    "typescript": "catalog:",
-    "@mangy/config": "workspace:*"
+    "typescript": "catalog:"
   }
 }

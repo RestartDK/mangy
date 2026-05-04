@@ -1,6 +1,19 @@
-import { ensureEmptyDirectory, writeBytes } from "./fs";
+import { zipSync } from "fflate";
 
-export { ensureEmptyDirectory, removeDirectory, writeBytes } from "./fs";
+import {
+  ensureDirectory,
+  ensureEmptyDirectory,
+  removePath,
+  writeBytes,
+} from "./fs";
+
+export {
+  ensureDirectory,
+  ensureEmptyDirectory,
+  removeDirectory,
+  removePath,
+  writeBytes,
+} from "./fs";
 
 const trailingSeparatorsPattern = /[\\/]+$/u;
 const leadingAndTrailingSeparatorsPattern = /^[\\/]+|[\\/]+$/gu;
@@ -84,6 +97,15 @@ interface PrepareChapterOutputInput {
   seriesTitle: string;
 }
 
+interface PrepareChapterOutputFileInput extends PrepareChapterOutputInput {
+  extension: string;
+}
+
+interface ChapterOutputPaths {
+  chapterLabel: string;
+  seriesDirectory: string;
+}
+
 const invalidPathCharacters = new Set([
   "<",
   ">",
@@ -165,28 +187,51 @@ export const formatChapterLabel = (
   );
 };
 
-export const prepareChapterOutputDirectory = async ({
+const getChapterOutputPaths = ({
   chapterId,
   chapterNumber,
   chapterTitle,
   destinationPath,
   seriesTitle,
-}: PrepareChapterOutputInput): Promise<string> => {
+}: PrepareChapterOutputInput): ChapterOutputPaths => {
   const safeSeriesTitle = sanitizePathSegment(seriesTitle, "Series");
   const chapterLabel = formatChapterLabel(
     chapterNumber,
     chapterTitle,
     chapterId
   );
-  const outputDirectory = joinPath(
-    destinationPath,
-    safeSeriesTitle,
-    chapterLabel
-  );
+
+  return {
+    chapterLabel,
+    seriesDirectory: joinPath(destinationPath, safeSeriesTitle),
+  };
+};
+
+const normalizeExtension = (extension: string): string =>
+  extension.startsWith(".") ? extension : `.${extension}`;
+
+export const prepareChapterOutputDirectory = async (
+  input: PrepareChapterOutputInput
+): Promise<string> => {
+  const { chapterLabel, seriesDirectory } = getChapterOutputPaths(input);
+  const outputDirectory = joinPath(seriesDirectory, chapterLabel);
 
   await ensureEmptyDirectory(outputDirectory);
 
   return outputDirectory;
+};
+
+export const prepareChapterOutputFile = async ({
+  extension,
+  ...input
+}: PrepareChapterOutputFileInput): Promise<string> => {
+  const { chapterLabel, seriesDirectory } = getChapterOutputPaths(input);
+  const outputPath = `${joinPath(seriesDirectory, chapterLabel)}${normalizeExtension(extension)}`;
+
+  await ensureDirectory(seriesDirectory);
+  await removePath(outputPath);
+
+  return outputPath;
 };
 
 export const downloadPagesToFolder = async ({
@@ -241,5 +286,60 @@ export const downloadPagesToFolder = async ({
   return {
     fileCount: orderedPages.length,
     totalBytes,
+  };
+};
+
+export const downloadPagesToCbz = async ({
+  beforePage,
+  onProgress,
+  outputPath,
+  pages,
+}: {
+  beforePage?: (page: DownloadPage) => Promise<void> | void;
+  onProgress?: (progress: DownloadProgress) => Promise<void> | void;
+  outputPath: string;
+  pages: DownloadPage[];
+}): Promise<DownloadPagesResult> => {
+  const orderedPages = [...pages].sort(
+    (left, right) => left.index - right.index
+  );
+  const files: Record<string, Uint8Array> = {};
+
+  for (const [index, page] of orderedPages.entries()) {
+    if (beforePage) {
+      await beforePage(page);
+    }
+
+    const response = await fetch(page.imageUrl, {
+      headers: createRequestHeaders(page),
+    });
+    if (!response.ok) {
+      throw new Error(`Page download failed with status ${response.status}`);
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const extension = getFileExtension(
+      page.imageUrl,
+      response.headers.get("content-type")
+    );
+    const fileName = `${String(index + 1).padStart(3, "0")}${extension}`;
+    files[fileName] = bytes;
+
+    if (onProgress) {
+      const completed = index + 1;
+      await onProgress({
+        completed,
+        percent: Math.round((completed / orderedPages.length) * 100),
+        total: orderedPages.length,
+      });
+    }
+  }
+
+  const cbzBytes = zipSync(files, { level: 0 });
+  await writeBytes(outputPath, cbzBytes);
+
+  return {
+    fileCount: orderedPages.length,
+    totalBytes: cbzBytes.byteLength,
   };
 };
