@@ -28,8 +28,8 @@
       # `nix build .#bun-deps` prints the resolved hash when it does not match.
       # x86_64-linux is resolved by CI; x86_64-darwin resolves on first build.
       depsHashes = {
-        aarch64-darwin = "sha256-ILxUaMvSCPBJqJkGN1q197IMHHOvVU/2fo8OFjTrb2s=";
-        x86_64-darwin = "sha256-ILxUaMvSCPBJqJkGN1q197IMHHOvVU/2fo8OFjTrb2s=";
+        aarch64-darwin = "sha256-+F5y4h8TsSvKUaRGefDCa8opAYzAX9yY3Xw1sD3wr5s=";
+        x86_64-darwin = "sha256-+F5y4h8TsSvKUaRGefDCa8opAYzAX9yY3Xw1sD3wr5s=";
         x86_64-linux = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
       };
       depsHashFor = system: depsHashes.${system} or (throw "no mangy bun deps hash for ${system}");
