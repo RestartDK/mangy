@@ -90,6 +90,8 @@
           };
 
           # Static web build, served by whatever front the host already runs.
+          # The output is the dist content itself, so a front can point its
+          # document root straight at the package.
           web = pkgs.stdenvNoCC.mkDerivation {
             pname = "mangy-web";
             inherit version;
@@ -99,16 +101,13 @@
               runHook preBuild
               export BUN_INSTALL_CACHE_DIR=${bunDeps}/share/bun-cache
               HOME="$TMPDIR" bun install --frozen-lockfile --ignore-scripts
-              ${copySource}
-              cd "$out/apps/web"
-              # .bin shims are absent in store builds, so invoke vite by its
-              # real entry file instead of the package script.
-              HOME="$TMPDIR" bun node_modules/vite/bin/vite.js build
+              cd apps/web
+              HOME="$TMPDIR" bun node_modules/vite/bin/vite.js build --outDir "$PWD/../mangy-dist"
               runHook postBuild
             '';
             installPhase = ''
               mkdir -p "$out"
-              cp -a "$out/apps/web/dist" "$out/dist"
+              cp -a "$PWD/../mangy-dist/." "$out/"
             '';
           };
         in
