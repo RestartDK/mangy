@@ -32,10 +32,8 @@
     "db:studio": "turbo -F @mangy/db db:studio",
     "db:generate": "turbo -F @mangy/db db:generate",
     "db:migrate": "turbo -F @mangy/db db:migrate",
-    "db:start": "turbo -F @mangy/db db:start",
-    "db:watch": "turbo -F @mangy/db db:watch",
-    "db:stop": "turbo -F @mangy/db db:stop",
-    "db:down": "turbo -F @mangy/db db:down"
+    "db:start": "bash scripts/dev-db.sh start",
+    "db:stop": "bash scripts/dev-db.sh stop"
   },
   "dependencies": {
     "zod": "catalog:"

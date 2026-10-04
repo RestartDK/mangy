@@ -3,6 +3,10 @@ import { env } from "@mangy/env/client";
 const loopbackHosts = new Set(["127.0.0.1", "::1", "localhost"]);
 
 const resolveConfiguredOrigin = (): URL | null => {
+  if (env.VITE_SERVER_URL === undefined) {
+    return null;
+  }
+
   try {
     if (typeof window === "undefined") {
       return new URL(env.VITE_SERVER_URL);
