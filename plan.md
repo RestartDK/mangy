@@ -133,7 +133,7 @@ Key rules:
 - source-specific formats are mapped into normalized app models at the adapter boundary
 - source capability metadata drives the UI so unsupported features degrade gracefully
 - no JVM or Mihon runtime dependency is allowed in the final product
-- first ship a small set of high-value native adapters and expand later
+- WeebCentral is the shipped source; add adapters only when a source earns its maintenance cost
 
 ## Data Model Plan
 
