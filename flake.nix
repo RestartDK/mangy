@@ -4,6 +4,11 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
+    bun2nix = {
+      url = "github:nix-community/bun2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -14,6 +19,7 @@
     {
       self,
       nixpkgs,
+      bun2nix,
       treefmt-nix,
       ...
     }:
@@ -24,18 +30,8 @@
         "x86_64-linux"
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-
-      # `nix build .#bun-deps` prints the resolved hash when it does not match.
-      # x86_64-linux is resolved by CI; x86_64-darwin resolves on first build.
-      depsHashes = {
-        aarch64-darwin = "sha256-+F5y4h8TsSvKUaRGefDCa8opAYzAX9yY3Xw1sD3wr5s=";
-        x86_64-darwin = "sha256-+F5y4h8TsSvKUaRGefDCa8opAYzAX9yY3Xw1sD3wr5s=";
-        x86_64-linux = "sha256-esHr3MC2YF4jsPLSsLoip6Tn9sNTS+KB8qYIu34By/E=";
-      };
-      depsHashFor = system: depsHashes.${system} or (throw "no mangy bun deps hash for ${system}");
       version = self.rev or "dirty";
-      formatterFor =
-        system:
+      formatterFor = system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           treefmtEval = treefmt-nix.lib.evalModule pkgs {
@@ -49,8 +45,7 @@
     {
       formatter = nixpkgs.lib.genAttrs systems formatterFor;
 
-      # flake check must build the real artifacts, not just evaluate them:
-      # the Linux dependency hash only resolves under a real Linux build.
+      # flake check must build the real artifacts, not just evaluate them.
       checks = forAllSystems (pkgs: {
         web = self.packages.${pkgs.system}.web;
         app = self.packages.${pkgs.system}.app;
@@ -61,60 +56,35 @@
         pkgs:
         let
           bun = pkgs.bun;
+          bun2nixPkg = bun2nix.packages.${pkgs.system}.default;
 
-          # Fixed-output fetch of the complete installed tree so derivations
-          # build offline. bunfig.toml sets the isolated linker: every
-          # workspace carries its own node_modules and dependencies resolve
-          # through relative symlinks into node_modules/.bun, so the whole
-          # tree copies as one unit.
-          bunDeps = pkgs.stdenvNoCC.mkDerivation {
-            pname = "mangy-bun-deps";
-            inherit version;
-            src = self;
-            nativeBuildInputs = [ bun ];
-            # fixupPhase would patchShebangs every package script to a store
-            # bash, embedding store references into a fixed-output artifact.
-            dontFixup = true;
-            outputHashMode = "recursive";
-            outputHashAlgo = "sha256";
-            outputHash = depsHashFor pkgs.system;
-            buildPhase = ''
-              runHook preBuild
-              HOME="$TMPDIR" bun install --frozen-lockfile --ignore-scripts
-              runHook postBuild
-            '';
-            installPhase = ''
-              runHook preInstall
-              # .bin shims are regenerated state and can vary between runs;
-              # nothing here runs them, drizzle-kit is invoked by entry file.
-              find . -type d -name .bin -path '*/node_modules/*' -exec rm -rf {} +
-              mkdir -p "$out"
-              # Real copy: the sandbox sits on a different device than the
-              # store on Linux CI, so hard links are not portable.
-              cp -a . "$out/"
-              # Keep the output hash independent of this flake's own files:
-              # only bun.lock and the package manifests shape node_modules.
-              rm -f "$out/flake.nix" "$out/flake.lock"
-              runHook postInstall
-            '';
+          # Bun-compatible offline cache assembled from per-tarball
+          # fixed-output fetches; see the generated bun.nix.
+          bunDeps = bun2nixPkg.fetchBunDeps {
+            bunNix = ./bun.nix;
           };
 
-          # Runtime bundle for server and worker: the installed tree with a
-          # writable copy of apps/web so vite can regenerate the router file.
+          copySource = ''
+            mkdir -p "$out"
+            # Real copies, not hardlinks: darwin sandbox builds run under
+            # different _nixbldN users per attempt, so hardlinked store
+            # files mix owners in one output and fail nix's ownership check.
+            cp -a . "$out/"
+            rm -f "$out/flake.nix" "$out/flake.lock"
+          '';
+
+          # Runtime bundle for server and worker.
           app = pkgs.stdenvNoCC.mkDerivation {
             pname = "mangy-app";
             inherit version;
-            phases = [ "buildPhase" ];
+            src = self;
+            nativeBuildInputs = [ bun ];
             buildPhase = ''
-              mkdir -p "$out"
-              # Real copies, not hardlinks: darwin sandbox builds run under
-              # different _nixbldN users per attempt, so hardlinked store
-              # files mix owners in one output and fail nix's ownership check.
-              cp -r ${bunDeps}/apps "$out/apps"
-              cp -r ${bunDeps}/packages "$out/packages"
-              cp -r ${bunDeps}/node_modules "$out/node_modules"
-              cp ${bunDeps}/bunfig.toml "$out/bunfig.toml"
-              cp ${bunDeps}/package.json "$out/package.json"
+              runHook preBuild
+              export BUN_INSTALL_CACHE_DIR=${bunDeps}/share/bun-cache
+              HOME="$TMPDIR" bun install --frozen-lockfile --ignore-scripts
+              ${copySource}
+              runHook postBuild
             '';
           };
 
@@ -122,55 +92,46 @@
           web = pkgs.stdenvNoCC.mkDerivation {
             pname = "mangy-web";
             inherit version;
+            src = self;
             nativeBuildInputs = [ bun ];
-            phases = [
-              "buildPhase"
-              "installPhase"
-            ];
             buildPhase = ''
-              mkdir -p "$out"
-              # apps/ is a real copy: vite rewrites routeTree.gen.ts in place,
-              # and darwin store files are immutable, so hardlinks cannot be
-              # written or removed. packages/, node_modules/, and the manifests
-              # are only ever read and stay hardlinked.
-              cp -r ${bunDeps}/apps "$out/apps"
-              # The copy preserves read-only modes; vite writes a timestamped
-              # config bundle beside vite.config.ts. Real copies only, for the
-              # same ownership reason as the app derivation.
-              chmod -R u+w "$out/apps"
-              cp -r ${bunDeps}/packages "$out/packages"
-              cp -r ${bunDeps}/node_modules "$out/node_modules"
-              cp ${bunDeps}/bunfig.toml "$out/bunfig.toml"
-              cp ${bunDeps}/package.json "$out/package.json"
+              runHook preBuild
+              export BUN_INSTALL_CACHE_DIR=${bunDeps}/share/bun-cache
+              HOME="$TMPDIR" bun install --frozen-lockfile --ignore-scripts
+              ${copySource}
               cd "$out/apps/web"
-              # .bin shims are stripped from the deps tree, so invoke vite by
-              # its real entry file instead of the package script.
+              # .bin shims are absent in store builds, so invoke vite by its
+              # real entry file instead of the package script.
               HOME="$TMPDIR" bun node_modules/vite/bin/vite.js build
+              runHook postBuild
             '';
             installPhase = ''
               mkdir -p "$out"
-              cp -r "$out/apps/web/dist" "$out/dist"
+              cp -a apps/web/dist "$out/dist"
             '';
           };
         in
         {
-          inherit
-            app
-            web
-            ;
-          bun-deps = bunDeps;
+          inherit app web bunDeps;
           default = app;
         }
       );
 
-      devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
-          packages = [
-            pkgs.bun
-            pkgs.postgresql
-          ];
-        };
-      });
+      devShells = forAllSystems (
+        pkgs:
+        let
+          bun2nixPkg = bun2nix.packages.${pkgs.system}.default;
+        in
+        {
+          default = pkgs.mkShell {
+            packages = [
+              pkgs.bun
+              pkgs.postgresql
+              bun2nixPkg
+            ];
+          };
+        }
+      );
 
       nixosModules.default =
         {
@@ -178,7 +139,7 @@
           lib,
           pkgs,
           ...
-        }@args:
+        } @ args:
         let
           cfg = config.services.mangy;
           bun = pkgs.bun;
