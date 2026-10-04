@@ -30,7 +30,7 @@
       depsHashes = {
         aarch64-darwin = "sha256-+F5y4h8TsSvKUaRGefDCa8opAYzAX9yY3Xw1sD3wr5s=";
         x86_64-darwin = "sha256-+F5y4h8TsSvKUaRGefDCa8opAYzAX9yY3Xw1sD3wr5s=";
-        x86_64-linux = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        x86_64-linux = "sha256-esHr3MC2YF4jsPLSsLoip6Tn9sNTS+KB8qYIu34By/E=";
       };
       depsHashFor = system: depsHashes.${system} or (throw "no mangy bun deps hash for ${system}");
       version = self.rev or "dirty";
