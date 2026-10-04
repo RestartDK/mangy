@@ -157,6 +157,8 @@ Mangy runs as three processes against a Postgres database: the web app (static f
 
 The flake module deliberately owns no reverse proxy: the consuming host wires its own front (for example a Caddy vhost serving the web store path and proxying `/api/*` to the server port). Browser rendering for the WeebCentral adapter is development-only; the deployed worker uses the HTTP fallback path.
 
+See `docs/releases.md` for tagged binary releases and installs without Nix.
+
 ## Status
 
 The project has moved well beyond the old calendar template, but some polish work is still ongoing:
