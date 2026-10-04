@@ -31,7 +31,8 @@
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
       version = self.rev or "dirty";
-      formatterFor = system:
+      formatterFor =
+        system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           treefmtEval = treefmt-nix.lib.evalModule pkgs {
@@ -139,7 +140,7 @@
           lib,
           pkgs,
           ...
-        } @ args:
+        }@args:
         let
           cfg = config.services.mangy;
           bun = pkgs.bun;
