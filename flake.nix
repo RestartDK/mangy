@@ -89,7 +89,9 @@
               # nothing here runs them, drizzle-kit is invoked by entry file.
               find . -type d -name .bin -path '*/node_modules/*' -exec rm -rf {} +
               mkdir -p "$out"
-              cp -al . "$out/"
+              # Real copy: the sandbox sits on a different device than the
+              # store on Linux CI, so hard links are not portable.
+              cp -a . "$out/"
               # Keep the output hash independent of this flake's own files:
               # only bun.lock and the package manifests shape node_modules.
               rm -f "$out/flake.nix" "$out/flake.lock"
