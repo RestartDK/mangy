@@ -47,8 +47,7 @@ mangy/
 
 ## Prerequisites
 
-- Bun `1.3.4` or newer
-- Docker, for the local PostgreSQL service
+- Bun `1.3.4` or newer (or the `nix develop` dev shell, which provides Bun and PostgreSQL)
 
 ## Getting Started
 
@@ -112,7 +111,7 @@ Default local URLs:
 | `bun build` | Build all workspaces |
 | `bun check-types` | Run workspace TypeScript checks |
 | `bun check` | Run Biome formatting and checks |
-| `bun db:start` | Start PostgreSQL via Docker |
+| `bun db:start` | Start the local PostgreSQL data dir (`.mangy-postgres`) |
 | `bun db:migrate` | Apply Drizzle migrations |
 | `bun db:studio` | Open Drizzle Studio |
 | `bun test:integration` | Run the server/worker integration test suite |
@@ -146,23 +145,17 @@ This test expects the local database to be running and migrated.
 
 ## Deployment Notes
 
-Mangy is intended to run as separate web, server, and worker services.
+Mangy runs as three processes against a Postgres database: the web app (static files), the API server, and the worker. The repo ships a Nix flake with everything a host needs.
 
-- web and server are built with Railpack-compatible workspace builds
+- `nix build .#mangy-web` produces the static web build, origin-agnostic and safe to serve from any front
+- `nix build .#mangy-app` produces the runtime bundle for the server and worker, run with `bun run apps/server/src/index.ts` and `bun run apps/worker/src/index.ts`
+- `nixosModules.default` provides `services.mangy` with systemd units for migrate, server, and worker
 - PostgreSQL is an external persistent dependency
 - the worker must run anywhere the configured download destinations are reachable
 - Komga can watch those destination folders directly
 - set `KOMGA_BASE_URL` and either `KOMGA_API_KEY` or `KOMGA_USERNAME`/`KOMGA_PASSWORD` on the worker to request `POST /api/v1/libraries/:libraryId/scan` after downloads for destinations with a Komga library ID
 
-This repo now covers image build and publish concerns only:
-
-- `Dockerfile` builds `web`, `server`, and `worker` container images
-- `compose.example.yml` is a reference Podman/Docker Compose template for GHCR-based runtime wiring
-- `compose.env.example` is the matching example env file for that compose template
-- `.github/workflows/ci.yml` runs pull request validation, including integration tests against PostgreSQL
-- `.github/workflows/publish.yml` publishes private GHCR images on pushes to `main`
-- host-specific Podman Compose files, env files, and update scripts are expected to live outside this repo, such as under `/opt/homelab/`
-- `docs/homelab-ghcr.md` explains the intended split between this repo and your homelab runtime config
+The flake module deliberately owns no reverse proxy: the consuming host wires its own front (for example a Caddy vhost serving the web store path and proxying `/api/*` to the server port). Browser rendering for the WeebCentral adapter is development-only; the deployed worker uses the HTTP fallback path.
 
 ## Status
 

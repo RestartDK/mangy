@@ -52,3 +52,7 @@ coverage
 .cache
 tmp
 temp
+
+# Local development
+.mangy-postgres
+result

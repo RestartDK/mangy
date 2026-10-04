@@ -108,17 +108,17 @@ env.VITE_SERVER_URL  // required - throws if missing
 
 ## Deployment
 
-Uses **Railpack** for builds and **Dokploy** for deployment. Web and server are deployed as separate applications. Database is also hosted on Dokploy.
+Packaging is Nix: `flake.nix` provides `mangy-web`, `mangy-app`, a dev shell, and the `services.mangy` NixOS module. The module owns systemd units and no reverse proxy; hosts wire their own front.
 
 ## Cursor Cloud specific instructions
 
 ### Prerequisites
 
-Docker and Bun v1.3.4 must be available. The VM snapshot has both pre-installed. Docker daemon must be started before any database commands (`sudo dockerd &` then wait a few seconds; grant socket access with `sudo chmod 666 /var/run/docker.sock` if needed).
+Bun v1.3.4 or newer must be available. PostgreSQL comes from the Nix dev shell (`nix develop`) or any local install; the database scripts need `initdb`/`pg_ctl` on PATH.
 
 ### Starting the stack
 
-1. **Database**: `cd packages/db && docker compose up -d` — starts PostgreSQL on port 5432.
+1. **Database**: `bun db:start` — starts PostgreSQL on port 5432 from the `.mangy-postgres` data dir.
 2. **Migrations**: `bun db:migrate` — auto-runs as a turbo dependency of `server#dev`, but can be run manually.
 3. **Dev servers**: `bun dev` starts web (port 3001), server (port 3000), and worker together. Use `bun dev:web` / `bun dev:server` / `bun dev:worker` individually.
 
@@ -134,5 +134,5 @@ Copy `.env.example` to `.env` at the repo root if it doesn't exist. The only val
 
 ### Gotchas
 
-- The Docker-in-Docker setup requires `fuse-overlayfs` storage driver and `iptables-legacy` (configured via `/etc/docker/daemon.json` and `update-alternatives`).
+- `bun db:start` initializes `.mangy-postgres` on first run and starts PostgreSQL with trust auth on localhost; `bun db:stop` stops it.
 - Turbo `dev` task runs migrations automatically before starting `server` and `worker` (defined in `turbo.json` via `dependsOn`).
