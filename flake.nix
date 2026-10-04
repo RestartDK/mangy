@@ -49,6 +49,14 @@
     {
       formatter = nixpkgs.lib.genAttrs systems formatterFor;
 
+      # flake check must build the real artifacts, not just evaluate them:
+      # the Linux dependency hash only resolves under a real Linux build.
+      checks = forAllSystems (pkgs: {
+        web = self.packages.${pkgs.system}.web;
+        app = self.packages.${pkgs.system}.app;
+        bun-deps = self.packages.${pkgs.system}.bun-deps;
+      });
+
       packages = forAllSystems (
         pkgs:
         let
