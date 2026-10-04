@@ -164,6 +164,8 @@ This repo now covers image build and publish concerns only:
 - host-specific Podman Compose files, env files, and update scripts are expected to live outside this repo, such as under `/opt/homelab/`
 - `docs/homelab-ghcr.md` explains the intended split between this repo and your homelab runtime config
 
+See `docs/releases.md` for tagged binary releases and installs without Nix.
+
 ## Status
 
 The project has moved well beyond the old calendar template, but some polish work is still ongoing:
