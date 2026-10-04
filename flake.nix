@@ -108,12 +108,13 @@
             '';
             installPhase = ''
               mkdir -p "$out"
-              cp -a apps/web/dist "$out/dist"
+              cp -a "$out/apps/web/dist" "$out/dist"
             '';
           };
         in
         {
-          inherit app web bunDeps;
+          inherit app web;
+          bun-deps = bunDeps;
           default = app;
         }
       );
