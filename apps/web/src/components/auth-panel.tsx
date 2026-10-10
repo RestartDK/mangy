@@ -2,13 +2,7 @@ import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Field,
   FieldDescription,
@@ -44,7 +38,6 @@ export const AuthPanel = () => {
           { name, email, password },
           {
             onSuccess: () => {
-              toast.success("Account created. Welcome to Mangy.");
               window.location.assign("/");
             },
             onError: (error) => {
@@ -61,7 +54,6 @@ export const AuthPanel = () => {
         { email, password },
         {
           onSuccess: () => {
-            toast.success("Signed in.");
             window.location.assign("/");
           },
           onError: (error) => {
@@ -83,18 +75,8 @@ export const AuthPanel = () => {
   }
 
   return (
-    <Card className="border-border/70 w-full max-w-md shadow-sm">
-      <CardHeader className="gap-3">
-        <div className="space-y-1">
-          <CardTitle className="text-xl sm:text-2xl">
-            {mode === "signIn" ? "Welcome back" : "Create your account"}
-          </CardTitle>
-          <CardDescription>
-            {mode === "signIn"
-              ? "Sign in to search titles, queue chapters, and manage your library."
-              : "Start saving series, choosing destinations, and tracking new releases."}
-          </CardDescription>
-        </div>
+    <Card className="w-full max-w-sm">
+      <CardHeader className="gap-4">
         <Tabs
           onValueChange={(value) => setMode(value as AuthMode)}
           value={mode}
@@ -106,51 +88,55 @@ export const AuthPanel = () => {
         </Tabs>
       </CardHeader>
       <CardContent>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <FieldGroup>
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <FieldGroup className="gap-4">
             {mode === "signUp" ? (
-              <Field>
-                <FieldLabel htmlFor={fieldIds.name}>Display name</FieldLabel>
+              <Field className="gap-2">
+                <FieldLabel htmlFor={fieldIds.name}>Name</FieldLabel>
                 <Input
+                  className="h-9 text-sm"
                   id={fieldIds.name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Reader name"
+                  required
                   value={name}
                 />
               </Field>
             ) : null}
 
-            <Field>
+            <Field className="gap-2">
               <FieldLabel htmlFor={fieldIds.email}>Email</FieldLabel>
               <Input
+                className="h-9 text-sm"
                 id={fieldIds.email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="reader@example.com"
+                required
                 type="email"
                 value={email}
               />
             </Field>
 
-            <Field>
+            <Field className="gap-2">
               <FieldLabel htmlFor={fieldIds.password}>Password</FieldLabel>
               <Input
+                className="h-9 text-sm"
                 id={fieldIds.password}
                 minLength={8}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="At least 8 characters"
+                required
                 type="password"
                 value={password}
               />
-              <FieldDescription>
-                Use at least 8 characters for your password.
-              </FieldDescription>
+              {mode === "signUp" ? (
+                <FieldDescription className="text-xs">
+                  At least 8 characters.
+                </FieldDescription>
+              ) : null}
             </Field>
           </FieldGroup>
 
           <Button
-            className="w-full"
+            className="h-9 w-full text-sm"
             disabled={isSubmitting}
-            size="lg"
             type="submit"
           >
             {submitLabel}
