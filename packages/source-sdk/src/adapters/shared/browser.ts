@@ -1,3 +1,4 @@
+import { Effect, Semaphore } from "effect";
 import type { Browser, Page } from "playwright";
 
 import { defaultUserAgent } from "./http";
@@ -53,9 +54,7 @@ let browserPromise: Promise<Browser> | null = null;
 let browserCloseTimer: ReturnType<typeof setTimeout> | null = null;
 let activePages = 0;
 
-const sleep = async (delayMs: number): Promise<void> => {
-  await new Promise((resolve) => setTimeout(resolve, delayMs));
-};
+const pageSlots = Semaphore.makeUnsafe(maxConcurrentPages);
 
 const acquirePageSlot = async (): Promise<void> => {
   if (browserCloseTimer) {
@@ -63,14 +62,13 @@ const acquirePageSlot = async (): Promise<void> => {
     browserCloseTimer = null;
   }
 
-  while (activePages >= maxConcurrentPages) {
-    await sleep(50);
-  }
+  await Effect.runPromise(pageSlots.take(1));
 
   activePages += 1;
 };
 
 const releasePageSlot = (): void => {
+  Effect.runSync(pageSlots.release(1));
   activePages = Math.max(0, activePages - 1);
 
   if (activePages === 0 && browserPromise && !browserCloseTimer) {

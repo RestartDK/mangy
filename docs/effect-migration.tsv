@@ -10,3 +10,10 @@ when	unit	kind	decision	evidence	status
 2026-10-10	PR-01	hazard	port 3000 is shared with the taste-ui worktree dev stack and Bun binds both via SO_REUSEPORT; isolated to 3100 to avoid a contaminated baseline	ss -ltnp | grep :3000	isolated
 2026-10-10	PR-01	hazard	taste-ui runs a worker polling the same database; bootstrapped an isolated postgres on 5544 to stop test races	initdb && pg_ctl start	5544, gitignored
 2026-10-10	PR-01	change	gitignore the index.js.map files bun emits next to the compiled binaries	git status --short	no stray artifacts
+2026-10-10	PR-02	defect	fetchWithRetry threw inside its own try, so the catch retried it; a 404 was fetched three times despite the branch that looks like it fails fast	bun test packages/source-sdk/tests/http.test.ts	1 call not 3
+2026-10-10	PR-02	defect	429 fell through to the same throw and was retried with zero delay, the worst response to a rate limit	bun test packages/source-sdk/tests/http.test.ts	retried with backoff
+2026-10-10	PR-02	defect	the timeout wrapped only fetch(), which resolves on headers, so a slow body was unbounded	read of fetchHtmlPage	body now inside the budget
+2026-10-10	PR-02	decision	retry policy is Schedule.exponential 200ms plus jitter, bounded by upTo times, gated on error.retryable so permanent 4xx never retries	bun test packages/source-sdk/tests/http.test.ts	5 tests pass
+2026-10-10	PR-02	decision	browser pool keeps its promise surface and module-level singleton; only the busy-wait loop is replaced, with Semaphore.take, because restructuring the lifetime would change error propagation that weeb-central matches on instanceof	bun run test:sources	8 pass
+2026-10-10	PR-02	scope	downloader dropped from this slice: downloadPagesToCbz writes once via Bun.write at the end, so a failed download leaves no partial file and the didFinishDownload guard is near-dead	read of packages/downloader/src/index.ts	deferred
+2026-10-10	PR-02	scope	SourceAdapter stays Promise-based; converting it would cascade into 4 server services plus the test fake, so the Effect boundary sits inside adapters/shared	rg 'adapter\.' apps/server/src	bounded diff
