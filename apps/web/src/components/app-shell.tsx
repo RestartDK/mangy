@@ -13,36 +13,43 @@ import { ShellUserMenu } from "@/components/shell-user-menu";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useLiveUpdates } from "@/hooks/use-live-updates";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
-const primaryNavigationItems = [
-  { to: "/", label: "Discover", icon: Compass },
-  { to: "/search", label: "Search", icon: Search },
-  { to: "/library", label: "Library", icon: BookMarked },
-  { to: "/queue", label: "Queue", icon: Download },
-] as const;
-
-const secondaryNavigationItems = [
-  { to: "/notifications", label: "Notifications", icon: Bell },
-  { to: "/settings", label: "Settings", icon: Settings },
-] as const;
-
-const navigationItems = [
-  ...primaryNavigationItems,
-  ...secondaryNavigationItems,
+const navigationGroups = [
+  {
+    label: "Browse",
+    items: [
+      { to: "/", label: "Discover", icon: Compass },
+      { to: "/search", label: "Search", icon: Search },
+    ],
+  },
+  {
+    label: "Manage",
+    items: [
+      { to: "/library", label: "Library", icon: BookMarked },
+      { to: "/queue", label: "Queue", icon: Download },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { to: "/notifications", label: "Notifications", icon: Bell },
+      { to: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ] as const;
 
 interface AppShellProps extends PropsWithChildren {
@@ -67,60 +74,62 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
-      <Sidebar collapsible="offcanvas" variant="inset">
-        <SidebarHeader>
-          <Link className="flex items-center gap-2 rounded-md px-2 py-1" to="/">
+      <Sidebar collapsible="offcanvas">
+        <SidebarHeader className="px-3 py-4">
+          <Link className="flex items-center gap-2.5 px-1" to="/">
             <img
-              alt="Mangy Logo"
-              className="h-6 w-auto"
-              height="24"
-              src="/mangy.png"
-              width="24"
+              alt=""
+              className="size-7 rounded-md"
+              height="28"
+              src="/mangy-mark.png"
+              width="28"
             />
-            <span className="font-heading text-sidebar-foreground text-sm font-semibold">
+            <span className="font-heading text-sm font-semibold tracking-tight">
               Mangy
             </span>
           </Link>
         </SidebarHeader>
-        <SidebarSeparator />
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarMenu>
-              {navigationItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActiveRoute(pathname, item.to)}
-                    >
-                      <Link to={item.to}>
-                        <Icon className="size-4" />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
+        <SidebarContent className="gap-4">
+          {navigationGroups.map((group) => (
+            <SidebarGroup className="gap-1 py-0" key={group.label}>
+              <SidebarGroupLabel className="text-muted-foreground px-2 text-xs font-normal">
+                {group.label}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <SidebarMenuItem key={item.to}>
+                        <SidebarMenuButton
+                          asChild
+                          className="h-8 px-2 data-[active=true]:font-medium"
+                          isActive={isActiveRoute(pathname, item.to)}
+                        >
+                          <Link to={item.to}>
+                            <Icon className="size-4" />
+                            <span>{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
         </SidebarContent>
-        <SidebarFooter>
+      </Sidebar>
+      <SidebarInset className="min-h-0 overflow-hidden">
+        <header className="border-border flex h-14 shrink-0 items-center justify-between gap-2 border-b px-3 sm:px-4">
+          <SidebarTrigger className="-ml-1" />
           <ShellUserMenu
             email={session?.user.email}
             name={session?.user.name}
           />
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="min-h-0 overflow-hidden">
-        <div className="flex h-14 items-center px-4 sm:px-6 lg:px-8">
-          <SidebarTrigger className="-ml-1" />
-        </div>
+        </header>
         <div
-          className={cn(
-            "app-page min-h-0 overflow-y-auto pt-0",
-            contentClassName
-          )}
+          className={cn("app-page min-h-0 overflow-y-auto", contentClassName)}
         >
           {children}
         </div>

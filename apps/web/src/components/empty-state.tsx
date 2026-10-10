@@ -1,12 +1,12 @@
-import { BookOpen, Search } from "lucide-react";
+import { BookOpen, Download, Search } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const iconMap = {
   library: BookOpen,
   search: Search,
+  download: Download,
   default: BookOpen,
 } as const;
 
@@ -28,17 +28,20 @@ export const EmptyState = ({
   const Icon = iconMap[icon];
 
   return (
-    <Card className={cn("border-dashed", className)}>
-      <CardHeader className="gap-3">
-        <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full">
-          <Icon className="size-5" />
-        </div>
-        <div className="space-y-1">
-          <CardTitle>{title}</CardTitle>
-          <p className="text-muted-foreground text-sm">{description}</p>
-        </div>
-      </CardHeader>
-      {action ? <CardContent>{action}</CardContent> : null}
-    </Card>
+    <div
+      className={cn(
+        "panel flex flex-col items-center gap-4 px-6 py-14 text-center",
+        className
+      )}
+    >
+      <div className="bg-muted text-muted-foreground flex size-9 items-center justify-center rounded-full">
+        <Icon className="size-4" />
+      </div>
+      <div className="space-y-1">
+        <p className="font-heading text-sm font-medium">{title}</p>
+        <p className="meta mx-auto max-w-md">{description}</p>
+      </div>
+      {action ? <div>{action}</div> : null}
+    </div>
   );
 };

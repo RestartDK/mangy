@@ -1,5 +1,3 @@
-import { StatusBadge } from "@/components/status-badge";
-
 interface SeriesMetaProps {
   status?: string | null;
   latestChapter?: string | null;
@@ -25,10 +23,10 @@ export const SeriesMeta = ({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs [&>span]:capitalize">
       {items.map((item) => (
-        <StatusBadge key={item}>{item}</StatusBadge>
+        <span key={item}>{item}</span>
       ))}
-    </div>
+    </p>
   );
 };

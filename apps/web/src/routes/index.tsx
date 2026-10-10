@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight } from "lucide-react";
 import { useMemo } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -8,7 +7,6 @@ import { PageHeader } from "@/components/page-header";
 import { SectionShelf } from "@/components/section-shelf";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -39,7 +37,7 @@ function DiscoverRouteComponent() {
 
   const activeSource =
     enabledSources.find((source) => source.id === selectedSourceId) ?? null;
-  const discoverQuery = useSourceDiscover(activeSource?.id, 8);
+  const discoverQuery = useSourceDiscover(activeSource?.id, 10);
 
   const isLoading = sourcesQuery.isLoading || discoverQuery.isLoading;
   const hasError = sourcesQuery.error || discoverQuery.error;
@@ -48,32 +46,22 @@ function DiscoverRouteComponent() {
     <AppShell>
       <PageHeader
         action={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <Select
-              onValueChange={setSelectedSourceId}
-              value={activeSource?.id ?? undefined}
-            >
-              <SelectTrigger className="w-full min-w-44 sm:w-52">
-                <SelectValue placeholder="Choose a source" />
-              </SelectTrigger>
-              <SelectContent>
-                {enabledSources.map((source) => (
-                  <SelectItem key={source.id} value={source.id}>
-                    {source.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button asChild>
-              <Link to="/search">
-                Go to search
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </div>
+          <Select
+            onValueChange={setSelectedSourceId}
+            value={activeSource?.id ?? undefined}
+          >
+            <SelectTrigger aria-label="Source" className="h-8 w-full sm:w-48">
+              <SelectValue placeholder="Choose a source" />
+            </SelectTrigger>
+            <SelectContent>
+              {enabledSources.map((source) => (
+                <SelectItem key={source.id} value={source.id}>
+                  {source.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         }
-        description="Browse a quick snapshot from the source you want, then jump into search when you know what you want."
         title="Discover"
       />
 
@@ -90,7 +78,7 @@ function DiscoverRouteComponent() {
 
       {isLoading || activeSource ? null : (
         <EmptyState
-          description="No enabled sources are available right now, so there is nothing to browse yet."
+          description="No source is enabled right now."
           icon="library"
           title="No sources available"
         />
@@ -109,9 +97,9 @@ function DiscoverRouteComponent() {
                   <Link to="/search">Search this source</Link>
                 </Button>
               }
-              description="This source is connected, but it is not returning browse sections right now."
+              description="This source is connected but returned no browse sections."
               icon="search"
-              title="Nothing to browse yet"
+              title="Nothing to browse"
             />
           )}
         </div>
@@ -120,32 +108,21 @@ function DiscoverRouteComponent() {
   );
 }
 
-const DiscoverSkeleton = () => {
-  return (
-    <div className="page-grid">
-      <div className="grid gap-4 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <Card key={String(index)} size="sm">
-            <div className="space-y-3 px-4 py-4">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-7 w-32" />
-              <Skeleton className="h-4 w-full" />
+const DiscoverSkeleton = () => (
+  <div className="page-grid">
+    {Array.from({ length: 2 }).map((_, sectionIndex) => (
+      <div className="page-section" key={String(sectionIndex)}>
+        <Skeleton className="h-5 w-40" />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, cardIndex) => (
+            <div className="flex flex-col gap-3" key={String(cardIndex)}>
+              <Skeleton className="aspect-2/3 w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
             </div>
-          </Card>
-        ))}
+          ))}
+        </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, index) => (
-          <Card key={String(index)}>
-            <Skeleton className="aspect-[3/4] w-full" />
-            <div className="space-y-3 px-4 pb-4">
-              <Skeleton className="h-5 w-3/4" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-2/3" />
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-};
+    ))}
+  </div>
+);
