@@ -12,15 +12,15 @@ export const Route = createFileRoute("/login")({
 
 function LoginRouteComponent() {
   return (
-    <div className="min-h-svh bg-background text-foreground">
+    <div className="bg-background text-foreground min-h-svh">
       <div className="mx-auto grid min-h-svh w-full max-w-6xl items-center gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
         <section className="space-y-6">
           <div className="space-y-3">
-            <p className="font-medium text-muted-foreground text-sm">Mangy</p>
-            <h1 className="max-w-xl font-heading font-semibold text-4xl tracking-tight sm:text-5xl">
+            <p className="text-muted-foreground text-sm font-medium">Mangy</p>
+            <h1 className="font-heading max-w-xl text-4xl font-semibold tracking-tight sm:text-5xl">
               Search manga, queue chapters, and keep your library in sync.
             </h1>
-            <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
+            <p className="text-muted-foreground max-w-xl text-base sm:text-lg">
               A focused manga manager for finding titles, choosing destinations,
               and tracking new releases.
             </p>

@@ -60,7 +60,7 @@ function RootComponent() {
         enableSystem
       >
         <QueryClientProvider client={queryClient}>
-          <div className="min-h-svh bg-background text-foreground">
+          <div className="bg-background text-foreground min-h-svh">
             <Outlet />
           </div>
           <Toaster />

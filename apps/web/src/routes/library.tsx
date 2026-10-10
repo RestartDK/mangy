@@ -319,20 +319,20 @@ const LibraryList = ({ items, onRemove }: LibraryListProps) => {
                 <StatusBadge tone="destructive">Needs destination</StatusBadge>
               )}
             </div>
-            <div className="grid gap-3 text-muted-foreground text-sm sm:grid-cols-2">
+            <div className="text-muted-foreground grid gap-3 text-sm sm:grid-cols-2">
               <div>
-                <div className="text-xs uppercase tracking-wide">
+                <div className="text-xs tracking-wide uppercase">
                   Last checked
                 </div>
-                <div className="mt-1 text-foreground">
+                <div className="text-foreground mt-1">
                   {formatDateTime(item.trackingState?.lastCheckedAt)}
                 </div>
               </div>
               <div>
-                <div className="text-xs uppercase tracking-wide">
+                <div className="text-xs tracking-wide uppercase">
                   Next check
                 </div>
-                <div className="mt-1 text-foreground">
+                <div className="text-foreground mt-1">
                   {formatDateTime(item.trackingState?.nextCheckAt)}
                 </div>
               </div>

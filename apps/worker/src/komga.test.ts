@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+
 import { serve } from "bun";
 
 import { scanKomgaLibrary, setKomgaConfigForTests } from "./komga";

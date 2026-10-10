@@ -24,11 +24,11 @@ export const PageHeader = ({
       {breadcrumb ? <div>{breadcrumb}</div> : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1.5">
-          <h1 className="font-heading font-semibold text-2xl tracking-tight sm:text-3xl">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
             {title}
           </h1>
           {description ? (
-            <p className="max-w-3xl text-muted-foreground text-sm sm:text-base">
+            <p className="text-muted-foreground max-w-3xl text-sm sm:text-base">
               {description}
             </p>
           ) : null}

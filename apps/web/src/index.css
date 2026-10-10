@@ -127,7 +127,7 @@
     @apply font-sans;
   }
   body {
-    @apply bg-background font-sans text-foreground antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
     min-height: 100vh;
   }
 }

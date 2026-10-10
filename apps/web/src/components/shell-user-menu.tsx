@@ -30,10 +30,10 @@ export const ShellUserMenu = ({ email, name }: ShellUserMenuProps) => {
             <AvatarFallback>{getInitials(name ?? email)}</AvatarFallback>
           </Avatar>
           <span className="grid text-left">
-            <span className="truncate font-medium text-sidebar-foreground text-sm">
+            <span className="text-sidebar-foreground truncate text-sm font-medium">
               {name ?? "Signed in"}
             </span>
-            <span className="truncate text-sidebar-foreground/70 text-xs">
+            <span className="text-sidebar-foreground/70 truncate text-xs">
               {email ?? "Manage account"}
             </span>
           </span>
@@ -42,7 +42,7 @@ export const ShellUserMenu = ({ email, name }: ShellUserMenuProps) => {
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="grid gap-1">
           <span>{name ?? "Signed in"}</span>
-          <span className="font-normal text-muted-foreground text-xs">
+          <span className="text-muted-foreground text-xs font-normal">
             {email ?? "Manage your account"}
           </span>
         </DropdownMenuLabel>

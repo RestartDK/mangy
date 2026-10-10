@@ -238,7 +238,7 @@ const QueueList = ({
                     item.chapterId ??
                     "Chapter details pending"}
                 </p>
-                <div className="flex flex-wrap gap-4 text-muted-foreground text-xs">
+                <div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
                   <span>
                     Destination: {item.destinationName ?? "Not assigned"}
                   </span>

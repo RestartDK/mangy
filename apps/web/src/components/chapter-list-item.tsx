@@ -49,7 +49,7 @@ export const ChapterListItem = ({
             <CardTitle>
               {chapter.title ? `${title}: ${chapter.title}` : title}
             </CardTitle>
-            <div className="flex flex-wrap gap-3 text-muted-foreground text-xs">
+            <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="size-3.5" />
                 {formatDate(chapter.publishedAt)}

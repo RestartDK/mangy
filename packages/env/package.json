@@ -13,7 +13,7 @@
     "check-types": "tsc -b"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "@mangy/config": "workspace:*"
+    "@mangy/config": "workspace:*",
+    "typescript": "catalog:"
   }
 }

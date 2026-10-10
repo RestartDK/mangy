@@ -83,7 +83,7 @@ export const AuthPanel = () => {
   }
 
   return (
-    <Card className="w-full max-w-md border-border/70 shadow-sm">
+    <Card className="border-border/70 w-full max-w-md shadow-sm">
       <CardHeader className="gap-3">
         <div className="space-y-1">
           <CardTitle className="text-xl sm:text-2xl">

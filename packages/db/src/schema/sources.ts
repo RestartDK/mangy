@@ -71,7 +71,10 @@ export const series = pgTable(
       .array()
       .default(sql`'{}'::text[]`)
       .notNull(),
-    tags: text("tags").array().default(sql`'{}'::text[]`).notNull(),
+    tags: text("tags")
+      .array()
+      .default(sql`'{}'::text[]`)
+      .notNull(),
     availableTranslatedLanguages: text("available_translated_languages")
       .array()
       .default(sql`'{}'::text[]`)

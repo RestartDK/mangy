@@ -215,7 +215,7 @@ function SearchRouteComponent() {
                       : "Showing the latest search for the selected source."}
                   </p>
                 </div>
-                <div className="text-right text-muted-foreground text-sm">
+                <div className="text-muted-foreground text-right text-sm">
                   <div>{selectedSource.name}</div>
                   <div>{resultCount} items</div>
                 </div>

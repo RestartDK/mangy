@@ -14,11 +14,11 @@ interface SeriesCardProps {
 export const SeriesCard = ({ item }: SeriesCardProps) => {
   return (
     <Link
-      className="group flex h-full flex-col overflow-hidden rounded-lg border bg-card text-card-foreground transition-colors hover:border-primary/40"
+      className="group bg-card text-card-foreground hover:border-primary/40 flex h-full flex-col overflow-hidden rounded-lg border transition-colors"
       params={{ sourceId: item.sourceId, seriesId: item.seriesId }}
       to="/series/$sourceId/$seriesId"
     >
-      <div className="aspect-[3/4] overflow-hidden border-b bg-muted">
+      <div className="bg-muted aspect-[3/4] overflow-hidden border-b">
         {item.coverImageUrl ? (
           <img
             alt={item.title}
@@ -28,7 +28,7 @@ export const SeriesCard = ({ item }: SeriesCardProps) => {
             width={720}
           />
         ) : (
-          <div className="flex size-full items-center justify-center px-6 text-center font-heading text-lg text-muted-foreground">
+          <div className="font-heading text-muted-foreground flex size-full items-center justify-center px-6 text-center text-lg">
             {item.title}
           </div>
         )}
@@ -36,10 +36,10 @@ export const SeriesCard = ({ item }: SeriesCardProps) => {
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="space-y-2">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="line-clamp-2 font-medium leading-snug">
+            <h3 className="line-clamp-2 leading-snug font-medium">
               {item.title}
             </h3>
-            <ArrowUpRight className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+            <ArrowUpRight className="text-muted-foreground group-hover:text-foreground mt-0.5 size-4 shrink-0 transition-colors" />
           </div>
           <SeriesMeta
             contentRating={item.contentRating}
@@ -47,7 +47,7 @@ export const SeriesCard = ({ item }: SeriesCardProps) => {
             latestChapter={item.latestChapter}
             status={item.status}
           />
-          <p className="line-clamp-3 text-muted-foreground text-sm">
+          <p className="text-muted-foreground line-clamp-3 text-sm">
             {item.description ??
               "Open this series to see chapters, metadata, and queue options."}
           </p>

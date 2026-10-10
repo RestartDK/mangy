@@ -21,7 +21,9 @@ export const useSendBrowserPushTest = () => {
           ? "Test notification sent"
           : `Test notification sent to ${data?.deliveredCount ?? 0} browsers`
       );
-      await queryClient.invalidateQueries({ queryKey: ["browserPushSettings"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["browserPushSettings"],
+      });
     },
     onError: (error) => {
       toast.error(

@@ -6,10 +6,10 @@
 - **Dev**: `bun dev` (all), `bun dev:web`, `bun dev:server`
 - **Build**: `bun build`
 - **Type check**: `bun check-types`
-- **Lint/Format**: `bun check` (auto-fix), `bun lint` (check only)
+- **Lint/Format**: `bun check` (format and report), `bun lint` (check only), `bun lint:fix` (apply Oxlint fixes)
 - **Database**: `bun db:start`, `bun db:migrate`, `bun db:generate`, `bun db:studio`
 
-## Code Style (Ultracite/Biome)
+## Code Style (Ultracite/Oxc)
 
 - Use `const` by default, `let` when needed, never `var`
 - Arrow functions for callbacks; `for...of` over `.forEach()`
@@ -128,7 +128,8 @@ Copy `.env.example` to `.env` at the repo root if it doesn't exist. The only val
 
 ### Lint & tests
 
-- `bun lint` — Biome/Ultracite check (pre-existing warnings exist in the codebase; these are not regressions).
+- `bun lint` — Oxfmt format check plus Oxlint (the Ultracite preset reports about 850 pre-existing violations; clearing them is separate work).
+- `bun lint:fix` — applies Oxlint's fixes. Some of them are unsafe on this codebase: `unicorn/no-useless-undefined` deletes required call arguments and `unicorn/prefer-spread` spreads array-likes. Run `bun check-types` after it.
 - `bun check-types` — TypeScript strict-mode type check across all packages.
 - `bun test:integration` — runs the server integration test suite; requires PostgreSQL running and migrated.
 
@@ -136,3 +137,14 @@ Copy `.env.example` to `.env` at the repo root if it doesn't exist. The only val
 
 - `bun db:start` initializes `.mangy-postgres` on first run and starts PostgreSQL with trust auth on localhost; `bun db:stop` stops it.
 - Turbo `dev` task runs migrations automatically before starting `server` and `worker` (defined in `turbo.json` via `dependsOn`).
+
+<!-- BEGIN:turborepo-agent-rules -->
+
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->

@@ -69,12 +69,15 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
     <SidebarProvider className="h-svh overflow-hidden">
       <Sidebar collapsible="offcanvas" variant="inset">
         <SidebarHeader>
-          <Link
-            className="flex items-center gap-2 rounded-md px-2 py-1"
-            to="/"
-          >
-            <img alt="Mangy Logo" className="h-6 w-auto" height="24" src="/mangy.png" width="24" />
-            <span className="font-heading font-semibold text-sidebar-foreground text-sm">
+          <Link className="flex items-center gap-2 rounded-md px-2 py-1" to="/">
+            <img
+              alt="Mangy Logo"
+              className="h-6 w-auto"
+              height="24"
+              src="/mangy.png"
+              width="24"
+            />
+            <span className="font-heading text-sidebar-foreground text-sm font-semibold">
               Mangy
             </span>
           </Link>
