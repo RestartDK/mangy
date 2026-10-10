@@ -1,0 +1,12 @@
+when	unit	kind	decision	evidence	status
+2026-10-10	PR-01	baseline	test:integration is the harness; no parallel route-contract harness will be built because the suite drives the app through app.handle (Web Standard fetch), which is the same seam HttpEffect.fromWebHandler provides	cd apps/server && bun --env-file=../../.env test tests/integration.test.ts	9 pass 0 fail 129 expects 2.61s
+2026-10-10	PR-01	baseline	uncached type-check cost recorded as the number the Effect dependency must be judged against	bunx turbo check-types --force --ui=stream	10/10 successful 2.087s
+2026-10-10	PR-01	baseline	oxlint is not a CI gate; AGENTS.md records the pre-existing violations as separate work	bunx oxlint .	854 errors
+2026-10-10	PR-01	decision	effect pinned exactly at 4.0.2 rather than caret; @effect/platform-bun@4.0.3 peers effect@^4.0.3 which does not exist	npm view effect versions	exact pins
+2026-10-10	PR-01	decision	override @effect/platform-node-shared to 4.0.2; ^4.0.2 resolved to 4.0.3 which peers effect@^4.0.3 and warned against the installed effect@4.0.2	rm -rf node_modules && bun install	no peer warnings
+2026-10-10	PR-01	decision	Config replacement moved out of PR-01 to PR-02; its payoff needs call sites that are Effect programs, so doing it now builds a snapshot bridge later PRs delete	bunx turbo check-types --force	deferred
+2026-10-10	PR-01	decision	removed dead `declare const Bun` from the worker entry; @types/bun already supplies the global and the declare caused every import(first) violation	bunx oxlint apps/worker	31 to 24 errors
+2026-10-10	PR-01	change	worker entry runs under BunRuntime.runMain with Effect.logInfo; gives SIGTERM graceful shutdown and structured failure reporting	timeout 8 bun --env-file=../../.env run src/index.ts	exit 124, log line emitted
+2026-10-10	PR-01	hazard	port 3000 is shared with the taste-ui worktree dev stack and Bun binds both via SO_REUSEPORT; isolated to 3100 to avoid a contaminated baseline	ss -ltnp | grep :3000	isolated
+2026-10-10	PR-01	hazard	taste-ui runs a worker polling the same database; bootstrapped an isolated postgres on 5544 to stop test races	initdb && pg_ctl start	5544, gitignored
+2026-10-10	PR-01	change	gitignore the index.js.map files bun emits next to the compiled binaries	git status --short	no stray artifacts
