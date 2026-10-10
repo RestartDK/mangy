@@ -12,7 +12,8 @@
       "@types/bun": "^1.4.2",
       "better-auth": "^1.7.7",
       "effect": "4.0.2",
-      "@effect/platform-bun": "4.0.2"
+      "@effect/platform-bun": "4.0.2",
+      "@effect/sql-pg": "4.0.2"
     }
   },
   "type": "module",
@@ -35,6 +36,7 @@
     "db:studio": "turbo -F @mangy/db db:studio",
     "db:generate": "turbo -F @mangy/db db:generate",
     "db:migrate": "turbo -F @mangy/db db:migrate",
+    "db:adopt": "turbo -F @mangy/db db:adopt",
     "db:start": "bash scripts/dev-db.sh start",
     "db:stop": "bash scripts/dev-db.sh stop",
     "postinstall": "bunx bun2nix -o bun.nix"

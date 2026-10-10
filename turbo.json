@@ -48,6 +48,10 @@
       "cache": false,
       "env": ["DATABASE_URL"]
     },
+    "db:adopt": {
+      "cache": false,
+      "env": ["DATABASE_URL"]
+    },
     "start": {
       "cache": false,
       "persistent": true
