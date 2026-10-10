@@ -203,7 +203,7 @@
                 User = cfg.user;
                 Group = cfg.group;
                 WorkingDirectory = "${app}/packages/db";
-                ExecStart = "${bun}/bin/bun ${app}/packages/db/node_modules/drizzle-kit/bin.cjs migrate";
+                ExecStart = "${bun}/bin/bun ${app}/packages/db/src/migrate.ts";
                 EnvironmentFile = environmentFile;
                 Environment = "NODE_ENV=production";
               };
