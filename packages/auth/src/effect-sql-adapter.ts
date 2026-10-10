@@ -1,5 +1,5 @@
 import { PgClient } from "@effect/sql-pg";
-import * as authSchema from "@mangy/db/schema/auth";
+import { columnsByModel } from "@mangy/db/model";
 import { env } from "@mangy/env";
 import { createAdapterFactory } from "better-auth/adapters";
 import type {
@@ -9,35 +9,12 @@ import type {
   JoinConfig,
   ModelTarget,
 } from "better-auth/adapters";
-import { getTableColumns } from "drizzle-orm";
 import { Effect, ManagedRuntime, Redacted } from "effect";
 import { SqlClient, Statement } from "effect/sql";
 import type { SqlError } from "effect/sql/SqlError";
 import type { Fragment } from "effect/sql/Statement";
 
 type AdapterHelpers = Parameters<AdapterFactoryCustomizeAdapterCreator>[0];
-
-const authTables = {
-  account: authSchema.account,
-  session: authSchema.session,
-  user: authSchema.user,
-  verification: authSchema.verification,
-} as const;
-
-const columnsByModel: Record<
-  string,
-  Record<string, string>
-> = Object.fromEntries(
-  Object.entries(authTables).map(([model, table]) => [
-    model,
-    Object.fromEntries(
-      Object.entries(getTableColumns(table)).map(([field, column]) => [
-        field,
-        column.name,
-      ])
-    ),
-  ])
-);
 
 const resolveColumn = (model: string, field: string): string =>
   columnsByModel[model]?.[field] ?? field;

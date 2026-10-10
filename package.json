@@ -24,6 +24,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
+    "test:db": "bun --cwd packages/db test",
     "test:sources": "bun --cwd packages/source-sdk test",
     "test:sources:live": "LIVE_SOURCE_TESTS=1 bun --cwd packages/source-sdk test:live",
     "test:routes:live": "LIVE_SOURCE_TESTS=1 bun --cwd apps/server test:live-routes",
