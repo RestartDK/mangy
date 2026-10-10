@@ -36,7 +36,6 @@
     "db:studio": "turbo -F @mangy/db db:studio",
     "db:generate": "turbo -F @mangy/db db:generate",
     "db:migrate": "turbo -F @mangy/db db:migrate",
-    "db:adopt": "turbo -F @mangy/db db:adopt",
     "db:start": "bash scripts/dev-db.sh start",
     "db:stop": "bash scripts/dev-db.sh stop",
     "postinstall": "bunx bun2nix -o bun.nix"

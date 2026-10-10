@@ -23,3 +23,5 @@ when	unit	kind	decision	evidence	status
 2026-10-10	PR-03	change	added db:adopt to seed effect_sql_migrations for a database that already has drizzle history; ids 1..5 named after the source files	bun db:adopt && bun db:migrate	No pending migrations
 2026-10-10	PR-03	proof	replaying all five migrations on an empty database produces a schema byte-identical to the drizzle-built one	diff of pg_dump --schema-only --schema=public	0 differences, 17 tables
 2026-10-10	PR-03	change	db:migrate no longer uses drizzle-kit; drizzle-kit remains only for db:generate until drizzle is removed	turbo.json db:adopt task added	runner swapped
+2026-10-10	PR-03	defect	PR-03 left the NixOS module running drizzle-kit migrate directly, so the deployed migration path never used the new runner	grep migrate flake.nix	ExecStart now runs src/migrate.ts
+2026-10-10	PR-03	scope	deleted db:adopt and adopt-drizzle-history.ts; CI uses a fresh postgres service container and deployment is disposable, so no database anywhere carries a drizzle-applied schema that the new migrator needs told about	grep postgres .github/workflows/ci.yml	removed, one-time drop and recreate instead
