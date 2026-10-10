@@ -223,17 +223,3 @@ export const withBrowserPage = async <TResult>(
     releasePageSlot();
   }
 };
-
-export const fetchRenderedHtml = (
-  url: string,
-  options: BrowserPageOptions = {}
-): Promise<{ html: string; url: string }> => {
-  return withBrowserPage(
-    url,
-    async (page) => ({
-      html: await page.content(),
-      url: page.url(),
-    }),
-    options
-  );
-};

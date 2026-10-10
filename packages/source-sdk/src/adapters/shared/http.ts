@@ -145,26 +145,6 @@ const fetchText = (
   );
 };
 
-const fetchJsonBody = <TResponse>(
-  input: string | URL,
-  options: FetchRequestOptions
-): Effect.Effect<TResponse, HttpError> => {
-  const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
-
-  return withAttemptTimeout(
-    request(input, options).pipe(
-      Effect.flatMap((response) =>
-        Effect.tryPromise({
-          catch: (cause) => toHttpError(input, cause),
-          try: () => response.json() as Promise<TResponse>,
-        })
-      )
-    ),
-    input,
-    timeoutMs
-  );
-};
-
 export const fetchHtmlPage = (
   input: string | URL,
   options: FetchRequestOptions = {}
@@ -175,20 +155,6 @@ export const fetchHtmlPage = (
         accept:
           options.accept ??
           "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        ...options,
-      }),
-      options.retries ?? defaultRetryCount
-    )
-  );
-
-export const fetchJson = <TResponse>(
-  input: string | URL,
-  options: FetchRequestOptions = {}
-): Promise<TResponse> =>
-  Effect.runPromise(
-    retryTransient(
-      fetchJsonBody<TResponse>(input, {
-        accept: options.accept ?? "application/json",
         ...options,
       }),
       options.retries ?? defaultRetryCount
