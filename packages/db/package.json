@@ -11,21 +11,28 @@
     "./schema/*": {
       "default": "./src/schema/*.ts"
     },
+    "./model": {
+      "default": "./src/model/index.ts"
+    },
+    "./model/*": {
+      "default": "./src/model/*.ts"
+    },
     "./*": {
       "default": "./src/*.ts"
     }
   },
   "scripts": {
     "check-types": "tsc -b",
+    "test": "bun test ./src",
     "db:push": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit push\"",
     "db:generate": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit generate\"",
     "db:studio": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit studio\"",
     "db:migrate": "bun --env-file=../../.env --env-file=../../.env.local run src/migrate.ts"
   },
   "dependencies": {
-    "@mangy/env": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "@effect/sql-pg": "catalog:",
+    "@mangy/env": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "effect": "catalog:",
     "pg": "^8.23.1",
