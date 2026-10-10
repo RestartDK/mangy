@@ -1844,10 +1844,6 @@
     url = "https://registry.npmjs.org/drizzle-orm/-/drizzle-orm-0.45.4.tgz";
     hash = "sha512-NiM1YZpJ2UxyeE67DpDDZ+Tsw4YLX3trSlkNT7Tm9eKoUNb1LvaAaQzXgYQsWs+AQ9TUmmwMmBOCXuqqxUWKKQ==";
   };
-  "drizzle-zod@0.8.3" = fetchurl {
-    url = "https://registry.npmjs.org/drizzle-zod/-/drizzle-zod-0.8.3.tgz";
-    hash = "sha512-66yVOuvGhKJnTdiqj1/Xaaz9/qzOdRJADpDa68enqS6g3t0kpNkwNYjUuaeXgZfO/UWuIM9HIhSlJ6C5ZraMww==";
-  };
   "dunder-proto@1.0.1" = fetchurl {
     url = "https://registry.npmjs.org/dunder-proto/-/dunder-proto-1.0.1.tgz";
     hash = "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==";

@@ -1,5 +1,5 @@
-import { db } from "@mangy/db";
-import { source } from "@mangy/db/schema";
+import { column, decodeRows, runSql, table } from "@mangy/db";
+import { sourceColumns, sourceRow } from "@mangy/db/model";
 import type {
   SourceFilterDefinition,
   SourceListResponse,
@@ -7,7 +7,8 @@ import type {
   SourceSeries,
 } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
-import { asc } from "drizzle-orm";
+import { Effect } from "effect";
+import { SqlClient } from "effect/sql";
 
 import { SourcesStorage } from "./storage";
 
@@ -55,32 +56,40 @@ const normalizeLimit = (limit: number | undefined): number => {
   return Math.min(limit, 24);
 };
 
+const list = Effect.gen(function* listEffect() {
+  const sql = yield* SqlClient.SqlClient;
+  const rows = yield* decodeRows(
+    sourceRow,
+    yield* sql`SELECT * FROM ${table("source")} ORDER BY ${column(sourceColumns, "name")} ASC`
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    websiteUrl: row.website_url,
+    iconUrl: row.icon_url,
+    languageCode: row.language_code,
+    supportedLanguages: row.supported_languages,
+    isEnabled: row.is_enabled,
+    capabilities: {
+      supportsPopular: row.supports_popular,
+      supportsLatest: row.supports_latest,
+      supportsTrending: row.supports_trending,
+      supportsSearch: row.supports_search,
+      supportsFilters: row.supports_filters,
+      supportsSeriesDetails: row.supports_series_details,
+      supportsChapterFeed: row.supports_chapter_feed,
+      supportsPageFetch: row.supports_page_fetch,
+    },
+  }));
+});
+
 export const SourcesService = {
   async list() {
     await SourcesStorage.syncSources(sourceRegistry.list());
 
-    const rows = await db.select().from(source).orderBy(asc(source.name));
-
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      websiteUrl: row.websiteUrl,
-      iconUrl: row.iconUrl,
-      languageCode: row.languageCode,
-      supportedLanguages: row.supportedLanguages,
-      isEnabled: row.isEnabled,
-      capabilities: {
-        supportsPopular: row.supportsPopular,
-        supportsLatest: row.supportsLatest,
-        supportsTrending: row.supportsTrending,
-        supportsSearch: row.supportsSearch,
-        supportsFilters: row.supportsFilters,
-        supportsSeriesDetails: row.supportsSeriesDetails,
-        supportsChapterFeed: row.supportsChapterFeed,
-        supportsPageFetch: row.supportsPageFetch,
-      },
-    }));
+    return runSql(list);
   },
 
   getSourceOrThrow(sourceId: string) {

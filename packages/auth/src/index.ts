@@ -1,8 +1,5 @@
-import { db } from "@mangy/db";
-import * as schema from "@mangy/db/schema/auth";
 import { env } from "@mangy/env";
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { effectSqlAdapter } from "./effect-sql-adapter";
 
@@ -28,19 +25,10 @@ const getTrustedOrigins = (): string[] => {
   return [...new Set([...configuredOrigins, ...trustedDevOrigins])];
 };
 
-const database =
-  env.AUTH_ADAPTER === "effect-sql"
-    ? effectSqlAdapter()
-    : drizzleAdapter(db, {
-        provider: "pg",
-
-        schema,
-      });
-
 export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
-  database,
+  database: effectSqlAdapter(),
   trustedOrigins: () => getTrustedOrigins(),
   emailAndPassword: {
     enabled: true,

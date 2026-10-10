@@ -3,15 +3,20 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { db } from "@mangy/db";
+import { column, decodeRows, insertRow, runSql, table } from "@mangy/db";
 import {
-  downloadArtifact,
-  notification,
-  notificationDelivery,
-  pushSubscription,
-  source,
-  user,
-} from "@mangy/db/schema";
+  downloadArtifactColumns,
+  downloadArtifactRow,
+  notificationColumns,
+  notificationDeliveryColumns,
+  notificationDeliveryRow,
+  notificationRow,
+  pushSubscriptionColumns,
+  pushSubscriptionRow,
+  sourceColumns,
+  userColumns,
+  userRow,
+} from "@mangy/db/model";
 import { setBrowserPushSenderForTests } from "@mangy/push";
 import type {
   SourceAdapter,
@@ -21,7 +26,8 @@ import type {
 } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { serve } from "bun";
-import { and, eq } from "drizzle-orm";
+import { Effect, Schema } from "effect";
+import { SqlClient } from "effect/sql";
 import { unzipSync } from "fflate";
 
 import { claimNextDownloadJob } from "../../worker/src/jobs";
@@ -52,6 +58,52 @@ const extractSessionCookie = (header: string | null): string | null => {
   const match = sessionCookieRegex.exec(header);
   return match?.[1] ?? null;
 };
+
+const deleteSource = (sourceId: string) =>
+  runSql(
+    Effect.gen(function* deleteSourceEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`DELETE FROM ${table("source")} WHERE ${column(sourceColumns, "id")} = ${sourceId}`;
+    })
+  );
+
+const deleteUser = (userId: string) =>
+  runSql(
+    Effect.gen(function* deleteUserEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`DELETE FROM ${table("user")} WHERE ${column(userColumns, "id")} = ${userId}`;
+    })
+  );
+
+const insertNotification = (input: {
+  body: string;
+  title: string;
+  type: string;
+  userId: string;
+}) =>
+  runSql(
+    Effect.gen(function* insertNotificationEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`INSERT INTO ${table("notification")} ${insertRow(
+        sql,
+        notificationColumns,
+        { id: crypto.randomUUID(), ...input }
+      )}`;
+    })
+  );
+
+const query = <A, I>(
+  schema: Schema.Codec<A, I>,
+  build: (
+    sql: SqlClient.SqlClient
+  ) => Effect.Effect<readonly unknown[], unknown, never>
+): Promise<readonly A[]> =>
+  runSql(
+    Effect.gen(function* queryEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      return yield* decodeRows(schema, yield* build(sql));
+    })
+  );
 
 const createFakeAdapter = (config: {
   adapterId: string;
@@ -231,11 +283,13 @@ const createApiClient = async (
     );
   };
 
-  const [createdUser] = await db
-    .select({ id: user.id })
-    .from(user)
-    .where(eq(user.email, email))
-    .limit(1);
+  const [createdUser] = await query(
+    Schema.Struct({ id: userRow.fields.id }),
+    (sql) =>
+      sql`SELECT ${column(userColumns, "id")} FROM ${table("user")}
+        WHERE ${column(userColumns, "email")} = ${email}
+        LIMIT 1`
+  );
 
   return {
     apiFetch,
@@ -287,11 +341,11 @@ const cleanupState = {
 
 afterEach(async () => {
   for (const sourceId of cleanupState.sourceIds) {
-    await db.delete(source).where(eq(source.id, sourceId));
+    await deleteSource(sourceId);
   }
 
   for (const userId of cleanupState.userIds) {
-    await db.delete(user).where(eq(user.id, userId));
+    await deleteUser(userId);
   }
 
   for (const tempPath of cleanupState.tempPaths) {
@@ -769,20 +823,25 @@ describe("server and worker integration", () => {
         },
       ]);
 
-      const [artifact] = await db
-        .select({
-          importedToKomgaAt: downloadArtifact.importedToKomgaAt,
-          outputPath: downloadArtifact.outputPath,
-          packageFormat: downloadArtifact.packageFormat,
-        })
-        .from(downloadArtifact)
-        .where(eq(downloadArtifact.downloadJobId, queuedJob.id))
-        .limit(1);
+      const [artifact] = await query(
+        Schema.Struct({
+          imported_to_komga_at: downloadArtifactRow.fields.imported_to_komga_at,
+          output_path: downloadArtifactRow.fields.output_path,
+          package_format: downloadArtifactRow.fields.package_format,
+        }),
+        (sql) =>
+          sql`SELECT ${column(downloadArtifactColumns, "importedToKomgaAt")},
+              ${column(downloadArtifactColumns, "outputPath")},
+              ${column(downloadArtifactColumns, "packageFormat")}
+            FROM ${table("downloadArtifact")}
+            WHERE ${column(downloadArtifactColumns, "downloadJobId")} = ${queuedJob.id}
+            LIMIT 1`
+      );
 
-      expect(artifact?.outputPath).toContain(tempDirectory);
-      expect(artifact?.outputPath.endsWith(".cbz")).toBe(true);
-      expect(artifact?.packageFormat).toBe("cbz");
-      expect(artifact?.importedToKomgaAt).toBeInstanceOf(Date);
+      expect(artifact?.output_path).toContain(tempDirectory);
+      expect(artifact?.output_path.endsWith(".cbz")).toBe(true);
+      expect(artifact?.package_format).toBe("cbz");
+      expect(artifact?.imported_to_komga_at).toBeInstanceOf(Date);
     } finally {
       komgaServer.stop(true);
     }
@@ -964,17 +1023,18 @@ describe("server and worker integration", () => {
     expect(claimedJob?.id).toBe(queuedJob.id);
     await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
 
-    const queuedDeliveries = await db
-      .select({
-        id: notificationDelivery.id,
-        status: notificationDelivery.status,
-      })
-      .from(notificationDelivery)
-      .innerJoin(
-        notification,
-        eq(notificationDelivery.notificationId, notification.id)
-      )
-      .where(eq(notification.userId, userId as string));
+    const queuedDeliveries = await query(
+      Schema.Struct({
+        id: notificationDeliveryRow.fields.id,
+        status: notificationDeliveryRow.fields.status,
+      }),
+      (sql) =>
+        sql`SELECT ${table("notificationDelivery")}.${column(notificationDeliveryColumns, "id")},
+            ${table("notificationDelivery")}.${column(notificationDeliveryColumns, "status")}
+          FROM ${table("notificationDelivery")}
+          INNER JOIN ${table("notification")} ON ${table("notificationDelivery")}.${column(notificationDeliveryColumns, "notificationId")} = ${table("notification")}.${column(notificationColumns, "id")}
+          WHERE ${table("notification")}.${column(notificationColumns, "userId")} = ${userId as string}`
+    );
 
     expect(queuedDeliveries).toHaveLength(1);
     expect(queuedDeliveries[0]?.status).toBe("queued");
@@ -990,15 +1050,19 @@ describe("server and worker integration", () => {
     expect(sentPushes[1]?.payload.title).toBe(series.title);
     expect(sentPushes[1]?.payload.body).toContain("finished");
 
-    const savedSubscriptions = await db
-      .select({
-        endpoint: pushSubscription.endpoint,
-        isActive: pushSubscription.isActive,
-      })
-      .from(pushSubscription)
-      .where(eq(pushSubscription.userId, userId as string));
+    const savedSubscriptions = await query(
+      Schema.Struct({
+        endpoint: pushSubscriptionRow.fields.endpoint,
+        is_active: pushSubscriptionRow.fields.is_active,
+      }),
+      (sql) =>
+        sql`SELECT ${column(pushSubscriptionColumns, "endpoint")},
+            ${column(pushSubscriptionColumns, "isActive")}
+          FROM ${table("pushSubscription")}
+          WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId as string}`
+    );
     expect(savedSubscriptions).toHaveLength(1);
-    expect(savedSubscriptions[0]?.isActive).toBe(true);
+    expect(savedSubscriptions[0]?.is_active).toBe(true);
 
     const unsubscribeResponse = await apiFetch(
       "/api/settings/push/subscriptions/remove",
@@ -1017,11 +1081,13 @@ describe("server and worker integration", () => {
     expect(unsubscribeSettings.activeSubscriptionCount).toBe(0);
     expect(unsubscribeSettings.isEnabled).toBe(false);
 
-    const inactiveSubscriptions = await db
-      .select({ isActive: pushSubscription.isActive })
-      .from(pushSubscription)
-      .where(eq(pushSubscription.userId, userId as string));
-    expect(inactiveSubscriptions[0]?.isActive).toBe(false);
+    const inactiveSubscriptions = await query(
+      Schema.Struct({ is_active: pushSubscriptionRow.fields.is_active }),
+      (sql) =>
+        sql`SELECT ${column(pushSubscriptionColumns, "isActive")} FROM ${table("pushSubscription")}
+          WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId as string}`
+    );
+    expect(inactiveSubscriptions[0]?.is_active).toBe(false);
   });
 
   test("destinations can be removed and tracked auto-download is turned off safely", async () => {
@@ -1660,7 +1726,7 @@ describe("server and worker integration", () => {
     );
     expect(connectedChunk).toContain("event: connected");
 
-    await db.insert(notification).values({
+    await insertNotification({
       body: "SSE notification body",
       title: "SSE notification",
       type: "systemWarning",
@@ -1675,16 +1741,14 @@ describe("server and worker integration", () => {
 
     abortController.abort();
 
-    const [storedNotification] = await db
-      .select({ id: notification.id })
-      .from(notification)
-      .where(
-        and(
-          eq(notification.userId, userId as string),
-          eq(notification.title, "SSE notification")
-        )
-      )
-      .limit(1);
+    const [storedNotification] = await query(
+      Schema.Struct({ id: notificationRow.fields.id }),
+      (sql) =>
+        sql`SELECT ${column(notificationColumns, "id")} FROM ${table("notification")}
+          WHERE ${column(notificationColumns, "userId")} = ${userId as string}
+            AND ${column(notificationColumns, "title")} = ${"SSE notification"}
+          LIMIT 1`
+    );
 
     expect(storedNotification?.id).toBeString();
   });

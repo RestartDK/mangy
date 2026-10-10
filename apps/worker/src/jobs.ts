@@ -1,14 +1,26 @@
-import { db } from "@mangy/db";
 import {
-  chapter,
-  downloadArtifact,
-  downloadDestination,
-  downloadJob,
-  series,
-} from "@mangy/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+  column,
+  decodeRows,
+  insertRow,
+  runSql,
+  table,
+  updateRow,
+} from "@mangy/db";
+import {
+  chapterColumns,
+  chapterRow,
+  downloadArtifactColumns,
+  downloadDestinationColumns,
+  downloadDestinationRow,
+  downloadJobColumns,
+  downloadJobRow,
+  seriesColumns,
+  seriesRow,
+} from "@mangy/db/model";
+import { Effect, Schema } from "effect";
+import { SqlClient } from "effect/sql";
 
-import { queueNotificationForTransaction } from "./notifications";
+import { queueNotification } from "./notifications";
 
 export interface ClaimedDownloadJob {
   attempts: number;
@@ -35,6 +47,24 @@ interface CompletedArtifact {
   packageFormat: ArtifactPackageFormat;
 }
 
+const claimedJobProjection = Schema.Struct({
+  attempts: downloadJobRow.fields.attempts,
+  chapterExternalId: Schema.NullOr(chapterRow.fields.external_id),
+  chapterNumber: Schema.NullOr(chapterRow.fields.chapter_number),
+  chapterRecordId: Schema.NullOr(chapterRow.fields.id),
+  chapterTitle: Schema.NullOr(chapterRow.fields.title),
+  destinationKomgaLibraryId: Schema.NullOr(
+    downloadDestinationRow.fields.komga_library_id
+  ),
+  destinationName: Schema.NullOr(downloadDestinationRow.fields.name),
+  destinationPath: Schema.NullOr(downloadDestinationRow.fields.absolute_path),
+  id: downloadJobRow.fields.id,
+  maxAttempts: downloadJobRow.fields.max_attempts,
+  seriesSourceId: Schema.NullOr(seriesRow.fields.source_id),
+  seriesTitle: Schema.NullOr(seriesRow.fields.title),
+  userId: downloadJobRow.fields.user_id,
+});
+
 const buildChapterLabel = (job: ClaimedDownloadJob): string => {
   if (job.chapterNumber && job.chapterTitle) {
     return `Chapter ${job.chapterNumber} - ${job.chapterTitle}`;
@@ -53,69 +83,79 @@ const buildDownloadTitle = (job: ClaimedDownloadJob): string =>
 export const claimNextDownloadJob = async (
   workerId: string
 ): Promise<ClaimedDownloadJob | null> => {
-  const result = await db.execute(sql<{ id: string }>`
-    update "download_job"
-    set
-      "status" = 'running',
-      "lease_owner" = ${workerId},
-      "leased_at" = now(),
-      "started_at" = coalesce("started_at", now()),
-      "attempts" = "attempts" + 1,
-      "error_message" = null,
-      "updated_at" = now()
-    where "id" = (
-      select "id"
-      from "download_job"
-      where (
-        "status" = 'queued'
-        or (
-          "status" = 'retryableFailed'
-          and "attempts" < "max_attempts"
-          and "updated_at" <= now() - (interval '15 seconds' * power(2, greatest("attempts", 0)))
+  const claimedJobId = await runSql(
+    Effect.gen(function* claimDownloadJob() {
+      const sql = yield* SqlClient.SqlClient;
+      const rows = yield* sql<{ id: string }>`
+        update "download_job"
+        set
+          "status" = 'running',
+          "lease_owner" = ${workerId},
+          "leased_at" = now(),
+          "started_at" = coalesce("started_at", now()),
+          "attempts" = "attempts" + 1,
+          "error_message" = null,
+          "updated_at" = now()
+        where "id" = (
+          select "id"
+          from "download_job"
+          where (
+            "status" = 'queued'
+            or (
+              "status" = 'retryableFailed'
+              and "attempts" < "max_attempts"
+              and "updated_at" <= now() - (interval '15 seconds' * power(2, greatest("attempts", 0)))
+            )
+          )
+          and (
+            "lease_owner" is null
+            or "leased_at" is null
+            or "leased_at" <= now() - interval '10 minutes'
+          )
+          order by "created_at" asc
+          for update skip locked
+          limit 1
         )
-      )
-      and (
-        "lease_owner" is null
-        or "leased_at" is null
-        or "leased_at" <= now() - interval '10 minutes'
-      )
-      order by "created_at" asc
-      for update skip locked
-      limit 1
-    )
-    returning "id";
-  `);
+        returning "id";
+      `;
 
-  const claimedJobId = result.rows[0]?.id as string | undefined;
+      return rows[0]?.id ?? null;
+    })
+  );
+
   if (!claimedJobId) {
     return null;
   }
 
-  const [job] = await db
-    .select({
-      attempts: downloadJob.attempts,
-      chapterExternalId: chapter.externalId,
-      chapterNumber: chapter.chapterNumber,
-      chapterRecordId: chapter.id,
-      chapterTitle: chapter.title,
-      destinationKomgaLibraryId: downloadDestination.komgaLibraryId,
-      destinationName: downloadDestination.name,
-      destinationPath: downloadDestination.absolutePath,
-      id: downloadJob.id,
-      maxAttempts: downloadJob.maxAttempts,
-      seriesSourceId: series.sourceId,
-      seriesTitle: series.title,
-      userId: downloadJob.userId,
+  const job = await runSql(
+    Effect.gen(function* loadClaimedJob() {
+      const sql = yield* SqlClient.SqlClient;
+      const rows = yield* decodeRows(
+        claimedJobProjection,
+        yield* sql`SELECT ${table("downloadJob")}.${column(downloadJobColumns, "attempts")} AS ${sql("attempts")},
+            ${table("chapter")}.${column(chapterColumns, "externalId")} AS ${sql("chapterExternalId")},
+            ${table("chapter")}.${column(chapterColumns, "chapterNumber")} AS ${sql("chapterNumber")},
+            ${table("chapter")}.${column(chapterColumns, "id")} AS ${sql("chapterRecordId")},
+            ${table("chapter")}.${column(chapterColumns, "title")} AS ${sql("chapterTitle")},
+            ${table("downloadDestination")}.${column(downloadDestinationColumns, "komgaLibraryId")} AS ${sql("destinationKomgaLibraryId")},
+            ${table("downloadDestination")}.${column(downloadDestinationColumns, "name")} AS ${sql("destinationName")},
+            ${table("downloadDestination")}.${column(downloadDestinationColumns, "absolutePath")} AS ${sql("destinationPath")},
+            ${table("downloadJob")}.${column(downloadJobColumns, "id")} AS ${sql("id")},
+            ${table("downloadJob")}.${column(downloadJobColumns, "maxAttempts")} AS ${sql("maxAttempts")},
+            ${table("series")}.${column(seriesColumns, "sourceId")} AS ${sql("seriesSourceId")},
+            ${table("series")}.${column(seriesColumns, "title")} AS ${sql("seriesTitle")},
+            ${table("downloadJob")}.${column(downloadJobColumns, "userId")} AS ${sql("userId")}
+          FROM ${table("downloadJob")}
+          LEFT JOIN ${table("series")} ON ${table("downloadJob")}.${column(downloadJobColumns, "seriesId")} = ${table("series")}.${column(seriesColumns, "id")}
+          LEFT JOIN ${table("chapter")} ON ${table("downloadJob")}.${column(downloadJobColumns, "chapterId")} = ${table("chapter")}.${column(chapterColumns, "id")}
+          LEFT JOIN ${table("downloadDestination")} ON ${table("downloadJob")}.${column(downloadJobColumns, "downloadDestinationId")} = ${table("downloadDestination")}.${column(downloadDestinationColumns, "id")}
+          WHERE ${table("downloadJob")}.${column(downloadJobColumns, "id")} = ${claimedJobId}
+          LIMIT 1`
+      );
+
+      return rows[0] ?? null;
     })
-    .from(downloadJob)
-    .leftJoin(series, eq(downloadJob.seriesId, series.id))
-    .leftJoin(chapter, eq(downloadJob.chapterId, chapter.id))
-    .leftJoin(
-      downloadDestination,
-      eq(downloadJob.downloadDestinationId, downloadDestination.id)
-    )
-    .where(eq(downloadJob.id, claimedJobId))
-    .limit(1);
+  );
 
   return job ?? null;
 };
@@ -124,40 +164,63 @@ export const updateDownloadJobProgress = async (
   jobId: string,
   progressPercent: number
 ): Promise<void> => {
-  await db
-    .update(downloadJob)
-    .set({
-      progressPercent: Math.max(0, Math.min(100, progressPercent)),
-      updatedAt: new Date(),
+  await runSql(
+    Effect.gen(function* updateJobProgressEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`UPDATE ${table("downloadJob")} SET ${updateRow(
+        sql,
+        downloadJobColumns,
+        {
+          progressPercent: Math.max(0, Math.min(100, progressPercent)),
+          updatedAt: new Date(),
+        }
+      )}
+        WHERE ${column(downloadJobColumns, "id")} = ${jobId}`;
     })
-    .where(eq(downloadJob.id, jobId));
+  );
 };
 
 export const isDownloadJobCancelled = async (
   jobId: string
 ): Promise<boolean> => {
-  const [job] = await db
-    .select({ status: downloadJob.status })
-    .from(downloadJob)
-    .where(eq(downloadJob.id, jobId))
-    .limit(1);
+  const status = await runSql(
+    Effect.gen(function* checkJobCancelledEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      const rows = yield* decodeRows(
+        Schema.Struct({ status: downloadJobRow.fields.status }),
+        yield* sql`SELECT ${column(downloadJobColumns, "status")} FROM ${table("downloadJob")}
+          WHERE ${column(downloadJobColumns, "id")} = ${jobId}
+          LIMIT 1`
+      );
 
-  return job?.status === "cancelled";
+      return rows[0]?.status ?? null;
+    })
+  );
+
+  return status === "cancelled";
 };
 
 export const cancelRunningDownloadJob = async (
   jobId: string
 ): Promise<void> => {
-  await db
-    .update(downloadJob)
-    .set({
-      completedAt: null,
-      errorMessage: null,
-      leaseOwner: null,
-      leasedAt: null,
-      updatedAt: new Date(),
+  await runSql(
+    Effect.gen(function* cancelJobLeaseEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`UPDATE ${table("downloadJob")} SET ${updateRow(
+        sql,
+        downloadJobColumns,
+        {
+          completedAt: null,
+          errorMessage: null,
+          leaseOwner: null,
+          leasedAt: null,
+          updatedAt: new Date(),
+        }
+      )}
+        WHERE ${column(downloadJobColumns, "id")} = ${jobId}
+          AND ${column(downloadJobColumns, "status")} = ${"cancelled"}`;
     })
-    .where(and(eq(downloadJob.id, jobId), eq(downloadJob.status, "cancelled")));
+  );
 };
 
 export const completeDownloadJob = async (
@@ -167,46 +230,62 @@ export const completeDownloadJob = async (
   const now = new Date();
   const chapterLabel = buildChapterLabel(job);
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(downloadJob)
-      .set({
-        completedAt: now,
-        errorMessage: null,
-        leaseOwner: null,
-        leasedAt: null,
-        progressPercent: 100,
-        status: "completed",
-        updatedAt: now,
-      })
-      .where(eq(downloadJob.id, job.id));
+  await runSql(
+    Effect.gen(function* completeDownloadJobEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql.withTransaction(
+        Effect.gen(function* completeJob() {
+          yield* sql`UPDATE ${table("downloadJob")} SET ${updateRow(
+            sql,
+            downloadJobColumns,
+            {
+              completedAt: now,
+              errorMessage: null,
+              leaseOwner: null,
+              leasedAt: null,
+              progressPercent: 100,
+              status: "completed",
+              updatedAt: now,
+            }
+          )}
+            WHERE ${column(downloadJobColumns, "id")} = ${job.id}`;
 
-    if (job.chapterRecordId) {
-      await tx
-        .update(chapter)
-        .set({
-          isDownloaded: true,
-          updatedAt: now,
+          if (job.chapterRecordId) {
+            yield* sql`UPDATE ${table("chapter")} SET ${updateRow(
+              sql,
+              chapterColumns,
+              {
+                isDownloaded: true,
+                updatedAt: now,
+              }
+            )}
+              WHERE ${column(chapterColumns, "id")} = ${job.chapterRecordId}`;
+
+            yield* sql`INSERT INTO ${table("downloadArtifact")} ${insertRow(
+              sql,
+              downloadArtifactColumns,
+              {
+                chapterId: job.chapterRecordId,
+                downloadJobId: job.id,
+                fileSizeBytes: artifact.fileSizeBytes,
+                id: crypto.randomUUID(),
+                importedToKomgaAt: artifact.importedToKomgaAt ?? null,
+                outputPath: artifact.outputPath,
+                packageFormat: artifact.packageFormat,
+              }
+            )}`;
+          }
+
+          yield* queueNotification({
+            body: `${chapterLabel} finished and was written to ${job.destinationName ?? "your destination"}.`,
+            title: buildDownloadTitle(job),
+            type: "downloadCompleted",
+            userId: job.userId,
+          });
         })
-        .where(eq(chapter.id, job.chapterRecordId));
-
-      await tx.insert(downloadArtifact).values({
-        chapterId: job.chapterRecordId,
-        downloadJobId: job.id,
-        fileSizeBytes: artifact.fileSizeBytes,
-        importedToKomgaAt: artifact.importedToKomgaAt ?? null,
-        outputPath: artifact.outputPath,
-        packageFormat: artifact.packageFormat,
-      });
-    }
-
-    await queueNotificationForTransaction(tx, {
-      body: `${chapterLabel} finished and was written to ${job.destinationName ?? "your destination"}.`,
-      title: buildDownloadTitle(job),
-      type: "downloadCompleted",
-      userId: job.userId,
-    });
-  });
+      );
+    })
+  );
 };
 
 export const failDownloadJob = async (
@@ -219,26 +298,35 @@ export const failDownloadJob = async (
       : "Unexpected download worker error.";
   const shouldNotify = job.attempts >= job.maxAttempts;
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(downloadJob)
-      .set({
-        errorMessage: message,
-        leaseOwner: null,
-        leasedAt: null,
-        progressPercent: 0,
-        status: "retryableFailed",
-        updatedAt: new Date(),
-      })
-      .where(eq(downloadJob.id, job.id));
+  await runSql(
+    Effect.gen(function* failDownloadJobEffect() {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql.withTransaction(
+        Effect.gen(function* failJob() {
+          yield* sql`UPDATE ${table("downloadJob")} SET ${updateRow(
+            sql,
+            downloadJobColumns,
+            {
+              errorMessage: message,
+              leaseOwner: null,
+              leasedAt: null,
+              progressPercent: 0,
+              status: "retryableFailed",
+              updatedAt: new Date(),
+            }
+          )}
+            WHERE ${column(downloadJobColumns, "id")} = ${job.id}`;
 
-    if (shouldNotify) {
-      await queueNotificationForTransaction(tx, {
-        body: `${buildChapterLabel(job)} failed after ${job.attempts} attempts. ${message}`,
-        title: buildDownloadTitle(job),
-        type: "downloadFailed",
-        userId: job.userId,
-      });
-    }
-  });
+          if (shouldNotify) {
+            yield* queueNotification({
+              body: `${buildChapterLabel(job)} failed after ${job.attempts} attempts. ${message}`,
+              title: buildDownloadTitle(job),
+              type: "downloadFailed",
+              userId: job.userId,
+            });
+          }
+        })
+      );
+    })
+  );
 };

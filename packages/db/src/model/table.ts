@@ -37,7 +37,11 @@ const buildColumns = <const D extends Columns>(
     Object.entries(declaration).map(([field, { column }]) => [field, column])
   ) as FieldColumns<D>;
 
-export const defineTable = <const D extends Columns>(declaration: D) => ({
+export const defineTable = <const N extends string, const D extends Columns>(
+  table: N,
+  declaration: D
+) => ({
   columns: buildColumns(declaration),
   row: Schema.Struct(buildRowFields(declaration)),
+  table,
 });
