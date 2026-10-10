@@ -1,6 +1,6 @@
-declare const Bun: typeof import("bun");
-
+import { BunRuntime } from "@effect/platform-bun";
 import { env } from "@mangy/env";
+import { Effect } from "effect";
 
 import { claimNextDownloadJob, failDownloadJob } from "./jobs";
 import {
@@ -67,14 +67,10 @@ const runWorkerLoop = async (): Promise<never> => {
   }
 };
 
-const main = async (): Promise<void> => {
-  await runWorkerLoop();
-};
+const program = Effect.gen(function* () {
+  yield* Effect.logInfo(`worker ${workerId} started`);
 
-main().catch((error) => {
-  const message =
-    error instanceof Error ? (error.stack ?? error.message) : String(error);
-
-  console.error(message);
-  process.exit(1);
+  yield* Effect.promise(() => runWorkerLoop());
 });
+
+BunRuntime.runMain(program);

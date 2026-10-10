@@ -15,7 +15,9 @@
     "@mangy/env": "workspace:*",
     "@mangy/push": "workspace:*",
     "@mangy/source-sdk": "workspace:*",
-    "drizzle-orm": "^0.45.4"
+    "@effect/platform-bun": "catalog:",
+    "drizzle-orm": "^0.45.4",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@mangy/config": "workspace:*",

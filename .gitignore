@@ -8,7 +8,9 @@ dist
 build
 *.tsbuildinfo
 /apps/server/server
+/apps/server/index.js.map
 /apps/worker/worker
+/apps/worker/index.js.map
 
 # Environment variables
 .env*
