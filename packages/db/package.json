@@ -24,14 +24,14 @@
   },
   "dependencies": {
     "@mangy/env": "workspace:*",
-    "drizzle-orm": "^0.45.1",
-    "pg": "^8.16.3",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@mangy/config": "workspace:*",
-    "@types/pg": "^8.15.6",
-    "drizzle-kit": "^0.31.8",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
     "typescript": "catalog:"
   }
 }

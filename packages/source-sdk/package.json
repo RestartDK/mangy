@@ -15,8 +15,8 @@
     "test:live": "LIVE_SOURCE_TESTS=1 bun test --timeout 30000 tests/*.live.test.ts"
   },
   "dependencies": {
-    "cheerio": "^1.1.2",
-    "playwright": "^1.53.2",
+    "cheerio": "^1.2.0",
+    "playwright": "^1.64.0",
     "zod": "catalog:"
   },
   "devDependencies": {

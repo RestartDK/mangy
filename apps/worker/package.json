@@ -15,7 +15,7 @@
     "@mangy/env": "workspace:*",
     "@mangy/push": "workspace:*",
     "@mangy/source-sdk": "workspace:*",
-    "drizzle-orm": "^0.45.1"
+    "drizzle-orm": "^0.45.4"
   },
   "devDependencies": {
     "@mangy/config": "workspace:*",
