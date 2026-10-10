@@ -8,6 +8,7 @@ import {
   VerificationIdSchema,
 } from "./ids";
 
+export const userTable = "user";
 export const userRow = Schema.Struct({
   createdAt: Schema.Date,
   email: Schema.String,
@@ -25,6 +26,7 @@ export const userRow = Schema.Struct({
 );
 export const userColumns = fieldColumns(userRow);
 
+export const sessionTable = "session";
 export const sessionRow = Schema.Struct({
   createdAt: Schema.Date,
   expiresAt: Schema.Date,
@@ -46,6 +48,7 @@ export const sessionRow = Schema.Struct({
 );
 export const sessionColumns = fieldColumns(sessionRow);
 
+export const accountTable = "account";
 export const accountRow = Schema.Struct({
   accessToken: Schema.NullOr(Schema.String),
   accessTokenExpiresAt: Schema.NullOr(Schema.Date),
@@ -76,6 +79,7 @@ export const accountRow = Schema.Struct({
 );
 export const accountColumns = fieldColumns(accountRow);
 
+export const verificationTable = "verification";
 export const verificationRow = Schema.Struct({
   createdAt: Schema.Date,
   expiresAt: Schema.Date,

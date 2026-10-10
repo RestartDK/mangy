@@ -17,7 +17,6 @@
     "@mangy/db": "workspace:*",
     "@mangy/env": "workspace:*",
     "better-auth": "catalog:",
-    "drizzle-orm": "^0.45.4",
     "effect": "catalog:",
     "zod": "catalog:"
   },

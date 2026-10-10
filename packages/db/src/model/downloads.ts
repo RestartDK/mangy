@@ -10,6 +10,7 @@ import {
   UserIdSchema,
 } from "./ids";
 
+export const downloadJobTable = "download_job";
 export const downloadJobRow = Schema.Struct({
   attempts: Schema.Int,
   chapterId: Schema.NullOr(ChapterIdSchema),
@@ -24,7 +25,13 @@ export const downloadJobRow = Schema.Struct({
   progressPercent: Schema.Int,
   seriesId: Schema.NullOr(SeriesIdSchema),
   startedAt: Schema.NullOr(Schema.Date),
-  status: Schema.String,
+  status: Schema.Literals([
+    "queued",
+    "running",
+    "retryableFailed",
+    "completed",
+    "cancelled",
+  ]),
   updatedAt: Schema.Date,
   userId: UserIdSchema,
 }).pipe(
@@ -46,6 +53,7 @@ export const downloadJobRow = Schema.Struct({
 );
 export const downloadJobColumns = fieldColumns(downloadJobRow);
 
+export const downloadArtifactTable = "download_artifact";
 export const downloadArtifactRow = Schema.Struct({
   chapterId: Schema.NullOr(ChapterIdSchema),
   createdAt: Schema.Date,

@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { fieldColumns } from "./columns";
 import { ChapterIdSchema, SeriesIdSchema, SourceIdSchema } from "./ids";
 
+export const sourceTable = "source";
 export const sourceRow = Schema.Struct({
   createdAt: Schema.Date,
   description: Schema.String,
@@ -11,7 +12,7 @@ export const sourceRow = Schema.Struct({
   isEnabled: Schema.Boolean,
   languageCode: Schema.String,
   name: Schema.String,
-  supportedLanguages: Schema.Array(Schema.String),
+  supportedLanguages: Schema.mutable(Schema.Array(Schema.String)),
   supportsChapterFeed: Schema.Boolean,
   supportsFilters: Schema.Boolean,
   supportsLatest: Schema.Boolean,
@@ -43,10 +44,11 @@ export const sourceRow = Schema.Struct({
 );
 export const sourceColumns = fieldColumns(sourceRow);
 
+export const seriesTable = "series";
 export const seriesRow = Schema.Struct({
-  artistNames: Schema.Array(Schema.String),
-  authorNames: Schema.Array(Schema.String),
-  availableTranslatedLanguages: Schema.Array(Schema.String),
+  artistNames: Schema.mutable(Schema.Array(Schema.String)),
+  authorNames: Schema.mutable(Schema.Array(Schema.String)),
+  availableTranslatedLanguages: Schema.mutable(Schema.Array(Schema.String)),
   canonicalUrl: Schema.NullOr(Schema.String),
   contentRating: Schema.NullOr(Schema.String),
   coverImageUrl: Schema.NullOr(Schema.String),
@@ -60,7 +62,7 @@ export const seriesRow = Schema.Struct({
   publicationDemographic: Schema.NullOr(Schema.String),
   sourceId: SourceIdSchema,
   status: Schema.String,
-  tags: Schema.Array(Schema.String),
+  tags: Schema.mutable(Schema.Array(Schema.String)),
   title: Schema.String,
   updatedAt: Schema.Date,
 }).pipe(
@@ -83,6 +85,7 @@ export const seriesRow = Schema.Struct({
 );
 export const seriesColumns = fieldColumns(seriesRow);
 
+export const chapterTable = "chapter";
 export const chapterRow = Schema.Struct({
   chapterNumber: Schema.NullOr(Schema.String),
   createdAt: Schema.Date,

@@ -9,6 +9,7 @@ import {
   UserIdSchema,
 } from "./ids";
 
+export const notificationEndpointTable = "notification_endpoint";
 export const notificationEndpointRow = Schema.Struct({
   createdAt: Schema.Date,
   id: NotificationEndpointIdSchema,
@@ -21,7 +22,7 @@ export const notificationEndpointRow = Schema.Struct({
   notifyOnDownloadFailed: Schema.Boolean,
   notifyOnSystemWarning: Schema.Boolean,
   notifyOnTrackedSeriesUpdate: Schema.Boolean,
-  type: Schema.String,
+  type: Schema.Literals(["inApp", "slack", "browserPush"]),
   updatedAt: Schema.Date,
   userId: UserIdSchema,
 }).pipe(
@@ -44,6 +45,7 @@ export const notificationEndpointColumns = fieldColumns(
   notificationEndpointRow
 );
 
+export const pushSubscriptionTable = "push_subscription";
 export const pushSubscriptionRow = Schema.Struct({
   auth: Schema.String,
   createdAt: Schema.Date,
@@ -71,13 +73,19 @@ export const pushSubscriptionRow = Schema.Struct({
 );
 export const pushSubscriptionColumns = fieldColumns(pushSubscriptionRow);
 
+export const notificationTable = "notification";
 export const notificationRow = Schema.Struct({
   body: Schema.String,
   createdAt: Schema.Date,
   id: NotificationIdSchema,
   isRead: Schema.Boolean,
   title: Schema.String,
-  type: Schema.String,
+  type: Schema.Literals([
+    "downloadCompleted",
+    "downloadFailed",
+    "trackedSeriesUpdated",
+    "systemWarning",
+  ]),
   updatedAt: Schema.Date,
   userId: UserIdSchema,
 }).pipe(
@@ -90,9 +98,10 @@ export const notificationRow = Schema.Struct({
 );
 export const notificationColumns = fieldColumns(notificationRow);
 
+export const notificationDeliveryTable = "notification_delivery";
 export const notificationDeliveryRow = Schema.Struct({
   attempts: Schema.Int,
-  channel: Schema.String,
+  channel: Schema.Literals(["browserPush", "slack"]),
   createdAt: Schema.Date,
   deliveredAt: Schema.NullOr(Schema.Date),
   id: NotificationDeliveryIdSchema,
@@ -104,7 +113,13 @@ export const notificationDeliveryRow = Schema.Struct({
   notificationEndpointId: Schema.NullOr(NotificationEndpointIdSchema),
   notificationId: NotificationIdSchema,
   pushSubscriptionId: Schema.NullOr(PushSubscriptionIdSchema),
-  status: Schema.String,
+  status: Schema.Literals([
+    "queued",
+    "running",
+    "retryableFailed",
+    "delivered",
+    "permanentFailed",
+  ]),
   updatedAt: Schema.Date,
 }).pipe(
   Schema.encodeKeys({
