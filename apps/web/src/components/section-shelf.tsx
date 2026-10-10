@@ -19,7 +19,7 @@ export const SectionShelf = ({ section }: SectionShelfProps) => (
         <p className="text-muted-foreground text-sm">
           {sectionLabelMap[section.type]}
         </p>
-        <h2 className="font-heading font-semibold text-xl tracking-tight sm:text-2xl">
+        <h2 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
           {section.title}
         </h2>
       </div>

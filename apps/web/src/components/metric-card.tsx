@@ -22,14 +22,14 @@ export const MetricCard = ({
     <Card className={cn(className)} size="sm">
       <CardHeader className="gap-2">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+          <CardTitle className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
             {label}
           </CardTitle>
           {icon ? <div className="text-muted-foreground">{icon}</div> : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-1">
-        <div className="font-heading font-semibold text-2xl tracking-tight">
+        <div className="font-heading text-2xl font-semibold tracking-tight">
           {value}
         </div>
         {helper ? (

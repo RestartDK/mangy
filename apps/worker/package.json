@@ -10,16 +10,16 @@
     "start": "./worker"
   },
   "dependencies": {
-    "@mangy/downloader": "workspace:*",
     "@mangy/db": "workspace:*",
+    "@mangy/downloader": "workspace:*",
     "@mangy/env": "workspace:*",
     "@mangy/push": "workspace:*",
     "@mangy/source-sdk": "workspace:*",
     "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {
+    "@mangy/config": "workspace:*",
     "@types/bun": "catalog:",
-    "typescript": "catalog:",
-    "@mangy/config": "workspace:*"
+    "typescript": "catalog:"
   }
 }

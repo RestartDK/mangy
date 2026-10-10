@@ -2,6 +2,7 @@ import { cors } from "@elysiajs/cors";
 import { auth } from "@mangy/auth";
 import { env } from "@mangy/env";
 import { Elysia } from "elysia";
+
 import { downloads } from "./modules/downloads";
 import { library } from "./modules/library";
 import { live } from "./modules/live";

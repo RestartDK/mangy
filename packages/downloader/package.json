@@ -12,11 +12,11 @@
   "scripts": {
     "check-types": "tsc -b"
   },
-  "devDependencies": {
-    "typescript": "catalog:",
-    "@mangy/config": "workspace:*"
-  },
   "dependencies": {
     "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@mangy/config": "workspace:*",
+    "typescript": "catalog:"
   }
 }

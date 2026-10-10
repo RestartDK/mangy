@@ -11,12 +11,12 @@
     "test:live-routes": "bun --env-file=../../.env --env-file=../../.env.local run tests/live-routes.ts"
   },
   "dependencies": {
+    "@elysiajs/cors": "^1.3.3",
     "@mangy/auth": "workspace:*",
     "@mangy/db": "workspace:*",
     "@mangy/env": "workspace:*",
     "@mangy/push": "workspace:*",
     "@mangy/source-sdk": "workspace:*",
-    "@elysiajs/cors": "^1.3.3",
     "better-auth": "catalog:",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",

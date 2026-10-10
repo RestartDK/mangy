@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 
 import { getSessionUser } from "@/lib/auth";
+
 import {
   badRequestResponseSchema,
   browserPushSettingsSchema,

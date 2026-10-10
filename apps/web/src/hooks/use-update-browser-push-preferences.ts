@@ -12,7 +12,8 @@ export const useUpdateBrowserPushPreferences = () => {
 
   return useMutation({
     mutationFn: async (body: UpdateBrowserPushPreferencesPayload) => {
-      const { data, error } = await api.api.settings.push.preferences.patch(body);
+      const { data, error } =
+        await api.api.settings.push.preferences.patch(body);
       if (error) {
         throw new Error(error.value.message);
       }
@@ -21,7 +22,9 @@ export const useUpdateBrowserPushPreferences = () => {
     },
     onSuccess: async () => {
       toast.success("Browser notification settings updated");
-      await queryClient.invalidateQueries({ queryKey: ["browserPushSettings"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["browserPushSettings"],
+      });
     },
     onError: (error) => {
       toast.error(

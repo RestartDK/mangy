@@ -30,7 +30,7 @@ export const EmptyState = ({
   return (
     <Card className={cn("border-dashed", className)}>
       <CardHeader className="gap-3">
-        <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full">
           <Icon className="size-5" />
         </div>
         <div className="space-y-1">

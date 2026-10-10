@@ -27,17 +27,19 @@ self.addEventListener("notificationclick", (event) => {
   ).toString();
 
   event.waitUntil(
-    self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then((clients) => {
-      const existingClient = clients.find((client) => {
-        return "focus" in client;
-      });
+    self.clients
+      .matchAll({ includeUncontrolled: true, type: "window" })
+      .then((clients) => {
+        const existingClient = clients.find((client) => {
+          return "focus" in client;
+        });
 
-      if (existingClient) {
-        existingClient.navigate(targetUrl);
-        return existingClient.focus();
-      }
+        if (existingClient) {
+          existingClient.navigate(targetUrl);
+          return existingClient.focus();
+        }
 
-      return self.clients.openWindow(targetUrl);
-    })
+        return self.clients.openWindow(targetUrl);
+      })
   );
 });

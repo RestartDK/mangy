@@ -127,7 +127,7 @@ function ReaderRouteComponent() {
                   <div className="space-y-5">
                     {pagesQuery.data.map((page) => (
                       <figure
-                        className="overflow-hidden rounded-2xl border bg-linear-to-b from-muted/80 to-background shadow-sm"
+                        className="from-muted/80 to-background overflow-hidden rounded-2xl border bg-linear-to-b shadow-sm"
                         key={page.index}
                       >
                         <img
@@ -139,7 +139,7 @@ function ReaderRouteComponent() {
                           src={page.imageUrl}
                           width={1600}
                         />
-                        <figcaption className="border-t px-4 py-2 text-center text-muted-foreground text-xs uppercase tracking-[0.2em]">
+                        <figcaption className="text-muted-foreground border-t px-4 py-2 text-center text-xs tracking-[0.2em] uppercase">
                           Page {page.index + 1}
                         </figcaption>
                       </figure>
@@ -236,8 +236,8 @@ function ReaderRouteComponent() {
                     label="Order"
                     value={chapter?.sourceOrder ?? "Not available"}
                   />
-                  <div className="rounded-xl border bg-muted/40 p-4 text-muted-foreground">
-                    <div className="mb-2 inline-flex items-center gap-2 font-medium text-foreground text-xs uppercase tracking-[0.18em]">
+                  <div className="bg-muted/40 text-muted-foreground rounded-xl border p-4">
+                    <div className="text-foreground mb-2 inline-flex items-center gap-2 text-xs font-medium tracking-[0.18em] uppercase">
                       <Layers3 className="size-3.5" />
                       Proxy reader
                     </div>
@@ -258,7 +258,7 @@ function ReaderRouteComponent() {
 
 const ReaderMetaItem = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-xl border p-3">
-    <div className="text-muted-foreground text-xs uppercase tracking-[0.16em]">
+    <div className="text-muted-foreground text-xs tracking-[0.16em] uppercase">
       {label}
     </div>
     <div className="mt-1 font-medium">{value}</div>

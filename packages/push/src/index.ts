@@ -30,7 +30,10 @@ export class BrowserPushError extends Error {
   permanent: boolean;
   statusCode: number | null;
 
-  constructor(message: string, options?: { permanent?: boolean; statusCode?: number | null }) {
+  constructor(
+    message: string,
+    options?: { permanent?: boolean; statusCode?: number | null }
+  ) {
     super(message);
     this.name = "BrowserPushError";
     this.permanent = options?.permanent ?? false;

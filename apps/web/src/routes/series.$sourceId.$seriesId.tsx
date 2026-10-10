@@ -155,7 +155,7 @@ function SeriesDetailRouteComponent() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
             <Card>
               <CardContent className="grid gap-6 p-4 md:grid-cols-[220px_minmax(0,1fr)] md:p-6">
-                <div className="overflow-hidden rounded-lg border bg-muted">
+                <div className="bg-muted overflow-hidden rounded-lg border">
                   {series.coverImageUrl ? (
                     <img
                       alt={series.title}
@@ -165,7 +165,7 @@ function SeriesDetailRouteComponent() {
                       width={720}
                     />
                   ) : (
-                    <div className="flex aspect-[3/4] items-center justify-center px-6 text-center font-heading text-lg text-muted-foreground">
+                    <div className="font-heading text-muted-foreground flex aspect-[3/4] items-center justify-center px-6 text-center text-lg">
                       {series.title}
                     </div>
                   )}
@@ -318,7 +318,7 @@ function SeriesDetailRouteComponent() {
                   </div>
                 </Field>
 
-                <div className="grid gap-3 rounded-lg border p-4 text-muted-foreground text-sm">
+                <div className="text-muted-foreground grid gap-3 rounded-lg border p-4 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span>Tracking status</span>
                     <StatusBadge tone={trackingState ? "secondary" : "outline"}>
@@ -565,7 +565,7 @@ function SeriesDetailRouteComponent() {
 const MetadataItem = ({ label, value }: { label: string; value: string }) => {
   return (
     <div className="rounded-lg border p-3">
-      <div className="text-muted-foreground text-xs uppercase tracking-wide">
+      <div className="text-muted-foreground text-xs tracking-wide uppercase">
         {label}
       </div>
       <div className="mt-1 text-sm">{value}</div>

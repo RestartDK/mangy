@@ -22,16 +22,16 @@
     "db:studio": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit studio\"",
     "db:migrate": "bun --env-file=../../.env --env-file=../../.env.local exec \"./node_modules/.bin/drizzle-kit migrate\""
   },
-  "devDependencies": {
-    "drizzle-kit": "^0.31.8",
-    "@types/pg": "^8.15.6",
-    "typescript": "catalog:",
-    "@mangy/config": "workspace:*"
-  },
   "dependencies": {
+    "@mangy/env": "workspace:*",
     "drizzle-orm": "^0.45.1",
     "pg": "^8.16.3",
-    "zod": "catalog:",
-    "@mangy/env": "workspace:*"
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@mangy/config": "workspace:*",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.8",
+    "typescript": "catalog:"
   }
 }

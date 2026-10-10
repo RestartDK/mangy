@@ -152,8 +152,8 @@ function SettingsRouteComponent() {
 
   const isCurrentBrowserPushEnabled = Boolean(
     pushSettingsQuery.data?.isEnabled &&
-      browserPushClientStateQuery.data?.isSubscribed &&
-      browserPushClientStateQuery.data?.permission === "granted"
+    browserPushClientStateQuery.data?.isSubscribed &&
+    browserPushClientStateQuery.data?.permission === "granted"
   );
 
   const browserPushPermissionLabel =
@@ -647,7 +647,7 @@ function SettingsRouteComponent() {
                             <div className="font-medium">
                               {destination.name}
                             </div>
-                            <div className="break-all text-muted-foreground text-sm">
+                            <div className="text-muted-foreground text-sm break-all">
                               {destination.absolutePath}
                             </div>
                           </div>
@@ -756,7 +756,7 @@ function SettingsRouteComponent() {
 const ProfileField = ({ label, value }: { label: string; value: string }) => {
   return (
     <div className="rounded-lg border p-4">
-      <div className="text-muted-foreground text-xs uppercase tracking-wide">
+      <div className="text-muted-foreground text-xs tracking-wide uppercase">
         {label}
       </div>
       <div className="mt-1 text-sm">{value}</div>

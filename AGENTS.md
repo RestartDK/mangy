@@ -6,10 +6,10 @@
 - **Dev**: `bun dev` (all), `bun dev:web`, `bun dev:server`
 - **Build**: `bun build`
 - **Type check**: `bun check-types`
-- **Lint/Format**: `bun check` (auto-fix), `bun lint` (check only)
+- **Lint/Format**: `bun check` (format and report), `bun lint` (check only), `bun lint:fix` (apply Oxlint fixes)
 - **Database**: `bun db:start`, `bun db:migrate`, `bun db:generate`, `bun db:studio`
 
-## Code Style (Ultracite/Biome)
+## Code Style (Ultracite/Oxc)
 
 - Use `const` by default, `let` when needed, never `var`
 - Arrow functions for callbacks; `for...of` over `.forEach()`
@@ -128,7 +128,8 @@ Copy `.env.example` to `.env` at the repo root if it doesn't exist. The only val
 
 ### Lint & tests
 
-- `bun lint` — Biome/Ultracite check (pre-existing warnings exist in the codebase; these are not regressions).
+- `bun lint` — Oxfmt format check plus Oxlint (the Ultracite preset reports about 850 pre-existing violations; clearing them is separate work).
+- `bun lint:fix` — applies Oxlint's fixes. Some of them are unsafe on this codebase: `unicorn/no-useless-undefined` deletes required call arguments and `unicorn/prefer-spread` spreads array-likes. Run `bun check-types` after it.
 - `bun check-types` — TypeScript strict-mode type check across all packages.
 - `bun test:integration` — runs the server integration test suite; requires PostgreSQL running and migrated.
 
