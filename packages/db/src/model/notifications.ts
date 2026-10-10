@@ -5,7 +5,8 @@ import { defineTable } from "./table";
 export const {
   row: notificationEndpointRow,
   columns: notificationEndpointColumns,
-} = defineTable({
+  table: notificationEndpointTable,
+} = defineTable("notification_endpoint", {
   createdAt: { column: "created_at", schema: Schema.Date },
   id: { column: "id", schema: Schema.String },
   isEnabled: { column: "is_enabled", schema: Schema.Boolean },
@@ -37,49 +38,70 @@ export const {
     column: "notify_on_tracked_series_update",
     schema: Schema.Boolean,
   },
-  type: { column: "type", schema: Schema.String },
+  type: {
+    column: "type",
+    schema: Schema.Literals(["inApp", "slack", "browserPush"]),
+  },
   updatedAt: { column: "updated_at", schema: Schema.Date },
   userId: { column: "user_id", schema: Schema.String },
 });
 
-export const { row: pushSubscriptionRow, columns: pushSubscriptionColumns } =
-  defineTable({
-    auth: { column: "auth", schema: Schema.String },
-    createdAt: { column: "created_at", schema: Schema.Date },
-    endpoint: { column: "endpoint", schema: Schema.String },
-    expirationTime: {
-      column: "expiration_time",
-      nullable: true,
-      schema: Schema.Date,
-    },
-    id: { column: "id", schema: Schema.String },
-    isActive: { column: "is_active", schema: Schema.Boolean },
-    lastError: { column: "last_error", nullable: true, schema: Schema.String },
-    lastSeenAt: { column: "last_seen_at", schema: Schema.Date },
-    p256dh: { column: "p256dh", schema: Schema.String },
-    updatedAt: { column: "updated_at", schema: Schema.Date },
-    userAgent: { column: "user_agent", nullable: true, schema: Schema.String },
-    userId: { column: "user_id", schema: Schema.String },
-  });
+export const {
+  row: pushSubscriptionRow,
+  columns: pushSubscriptionColumns,
+  table: pushSubscriptionTable,
+} = defineTable("push_subscription", {
+  auth: { column: "auth", schema: Schema.String },
+  createdAt: { column: "created_at", schema: Schema.Date },
+  endpoint: { column: "endpoint", schema: Schema.String },
+  expirationTime: {
+    column: "expiration_time",
+    nullable: true,
+    schema: Schema.Date,
+  },
+  id: { column: "id", schema: Schema.String },
+  isActive: { column: "is_active", schema: Schema.Boolean },
+  lastError: { column: "last_error", nullable: true, schema: Schema.String },
+  lastSeenAt: { column: "last_seen_at", schema: Schema.Date },
+  p256dh: { column: "p256dh", schema: Schema.String },
+  updatedAt: { column: "updated_at", schema: Schema.Date },
+  userAgent: { column: "user_agent", nullable: true, schema: Schema.String },
+  userId: { column: "user_id", schema: Schema.String },
+});
 
-export const { row: notificationRow, columns: notificationColumns } =
-  defineTable({
-    body: { column: "body", schema: Schema.String },
-    createdAt: { column: "created_at", schema: Schema.Date },
-    id: { column: "id", schema: Schema.String },
-    isRead: { column: "is_read", schema: Schema.Boolean },
-    title: { column: "title", schema: Schema.String },
-    type: { column: "type", schema: Schema.String },
-    updatedAt: { column: "updated_at", schema: Schema.Date },
-    userId: { column: "user_id", schema: Schema.String },
-  });
+export const {
+  row: notificationRow,
+  columns: notificationColumns,
+  table: notificationTable,
+} = defineTable("notification", {
+  body: { column: "body", schema: Schema.String },
+  createdAt: { column: "created_at", schema: Schema.Date },
+  id: { column: "id", schema: Schema.String },
+  isRead: { column: "is_read", schema: Schema.Boolean },
+  title: { column: "title", schema: Schema.String },
+  type: {
+    column: "type",
+    schema: Schema.Literals([
+      "downloadCompleted",
+      "downloadFailed",
+      "trackedSeriesUpdated",
+      "systemWarning",
+    ]),
+  },
+  updatedAt: { column: "updated_at", schema: Schema.Date },
+  userId: { column: "user_id", schema: Schema.String },
+});
 
 export const {
   row: notificationDeliveryRow,
   columns: notificationDeliveryColumns,
-} = defineTable({
+  table: notificationDeliveryTable,
+} = defineTable("notification_delivery", {
   attempts: { column: "attempts", schema: Schema.Int },
-  channel: { column: "channel", schema: Schema.String },
+  channel: {
+    column: "channel",
+    schema: Schema.Literals(["browserPush", "slack"]),
+  },
   createdAt: { column: "created_at", schema: Schema.Date },
   deliveredAt: { column: "delivered_at", nullable: true, schema: Schema.Date },
   id: { column: "id", schema: Schema.String },
@@ -99,6 +121,15 @@ export const {
     nullable: true,
     schema: Schema.String,
   },
-  status: { column: "status", schema: Schema.String },
+  status: {
+    column: "status",
+    schema: Schema.Literals([
+      "queued",
+      "running",
+      "retryableFailed",
+      "delivered",
+      "permanentFailed",
+    ]),
+  },
   updatedAt: { column: "updated_at", schema: Schema.Date },
 });

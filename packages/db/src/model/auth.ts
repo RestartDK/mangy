@@ -2,7 +2,11 @@ import { Schema } from "effect";
 
 import { defineTable } from "./table";
 
-export const { row: userRow, columns: userColumns } = defineTable({
+export const {
+  row: userRow,
+  columns: userColumns,
+  table: userTable,
+} = defineTable("user", {
   createdAt: { column: "created_at", schema: Schema.Date },
   email: { column: "email", schema: Schema.String },
   emailVerified: { column: "email_verified", schema: Schema.Boolean },
@@ -12,7 +16,11 @@ export const { row: userRow, columns: userColumns } = defineTable({
   updatedAt: { column: "updated_at", schema: Schema.Date },
 });
 
-export const { row: sessionRow, columns: sessionColumns } = defineTable({
+export const {
+  row: sessionRow,
+  columns: sessionColumns,
+  table: sessionTable,
+} = defineTable("session", {
   createdAt: { column: "created_at", schema: Schema.Date },
   expiresAt: { column: "expires_at", schema: Schema.Date },
   id: { column: "id", schema: Schema.String },
@@ -23,7 +31,11 @@ export const { row: sessionRow, columns: sessionColumns } = defineTable({
   userId: { column: "user_id", schema: Schema.String },
 });
 
-export const { row: accountRow, columns: accountColumns } = defineTable({
+export const {
+  row: accountRow,
+  columns: accountColumns,
+  table: accountTable,
+} = defineTable("account", {
   accessToken: {
     column: "access_token",
     nullable: true,
@@ -55,12 +67,15 @@ export const { row: accountRow, columns: accountColumns } = defineTable({
   userId: { column: "user_id", schema: Schema.String },
 });
 
-export const { row: verificationRow, columns: verificationColumns } =
-  defineTable({
-    createdAt: { column: "created_at", schema: Schema.Date },
-    expiresAt: { column: "expires_at", schema: Schema.Date },
-    id: { column: "id", schema: Schema.String },
-    identifier: { column: "identifier", schema: Schema.String },
-    updatedAt: { column: "updated_at", schema: Schema.Date },
-    value: { column: "value", schema: Schema.String },
-  });
+export const {
+  row: verificationRow,
+  columns: verificationColumns,
+  table: verificationTable,
+} = defineTable("verification", {
+  createdAt: { column: "created_at", schema: Schema.Date },
+  expiresAt: { column: "expires_at", schema: Schema.Date },
+  id: { column: "id", schema: Schema.String },
+  identifier: { column: "identifier", schema: Schema.String },
+  updatedAt: { column: "updated_at", schema: Schema.Date },
+  value: { column: "value", schema: Schema.String },
+});

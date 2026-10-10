@@ -1,11 +1,15 @@
-import { db } from "@mangy/db";
+import { column, decodeRows, runSql, table } from "@mangy/db";
 import {
-  downloadJob,
-  libraryEntry,
-  notification,
-  trackedSeriesState,
-} from "@mangy/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+  downloadJobColumns,
+  downloadJobRow,
+  libraryEntryColumns,
+  notificationColumns,
+  notificationRow,
+  trackedSeriesStateColumns,
+  trackedSeriesStateRow,
+} from "@mangy/db/model";
+import { Effect, Schema } from "effect";
+import { SqlClient } from "effect/sql";
 import { Elysia } from "elysia";
 
 import { getSessionUser } from "@/lib/auth";
@@ -17,51 +21,77 @@ interface LiveSnapshot {
   trackingUpdatedAt: string | null;
 }
 
-const getSnapshot = async (userId: string): Promise<LiveSnapshot> => {
-  const [downloadRecord, notificationRecord, unreadRecord, trackingRecord] =
-    await Promise.all([
-      db
-        .select({ updatedAt: downloadJob.updatedAt })
-        .from(downloadJob)
-        .where(eq(downloadJob.userId, userId))
-        .orderBy(desc(downloadJob.updatedAt))
-        .limit(1)
-        .then((rows) => rows[0] ?? null),
-      db
-        .select({ updatedAt: notification.updatedAt })
-        .from(notification)
-        .where(eq(notification.userId, userId))
-        .orderBy(desc(notification.updatedAt))
-        .limit(1)
-        .then((rows) => rows[0] ?? null),
-      db
-        .select({ id: notification.id })
-        .from(notification)
-        .where(
-          and(eq(notification.userId, userId), eq(notification.isRead, false))
-        )
-        .then((rows) => rows.length),
-      db
-        .select({ updatedAt: trackedSeriesState.updatedAt })
-        .from(trackedSeriesState)
-        .innerJoin(
-          libraryEntry,
-          eq(trackedSeriesState.libraryEntryId, libraryEntry.id)
-        )
-        .where(eq(libraryEntry.userId, userId))
-        .orderBy(desc(trackedSeriesState.updatedAt))
-        .limit(1)
-        .then((rows) => rows[0] ?? null),
-    ]);
+const getSnapshot = (
+  userId: string
+): Effect.Effect<LiveSnapshot, unknown, SqlClient.SqlClient> =>
+  Effect.gen(function* getSnapshotEffect() {
+    const sql = yield* SqlClient.SqlClient;
+    const [downloadRecord, notificationRecord, unreadRecord, trackingRecord] =
+      yield* Effect.all(
+        [
+          Effect.gen(function* downloads() {
+            const rows = yield* decodeRows(
+              Schema.Struct({
+                updated_at: downloadJobRow.fields.updated_at,
+              }),
+              yield* sql`SELECT ${column(downloadJobColumns, "updatedAt")} FROM ${table("downloadJob")}
+                WHERE ${column(downloadJobColumns, "userId")} = ${userId}
+                ORDER BY ${column(downloadJobColumns, "updatedAt")} DESC
+                LIMIT 1`
+            );
 
-  return {
-    downloadsUpdatedAt: downloadRecord?.updatedAt?.toISOString() ?? null,
-    notificationsUpdatedAt:
-      notificationRecord?.updatedAt?.toISOString() ?? null,
-    notificationsUnreadCount: unreadRecord,
-    trackingUpdatedAt: trackingRecord?.updatedAt?.toISOString() ?? null,
-  };
-};
+            return rows[0] ?? null;
+          }),
+          Effect.gen(function* notifications() {
+            const rows = yield* decodeRows(
+              Schema.Struct({ updated_at: notificationRow.fields.updated_at }),
+              yield* sql`SELECT ${column(notificationColumns, "updatedAt")} FROM ${table("notification")}
+                WHERE ${column(notificationColumns, "userId")} = ${userId}
+                ORDER BY ${column(notificationColumns, "updatedAt")} DESC
+                LIMIT 1`
+            );
+
+            return rows[0] ?? null;
+          }),
+          Effect.gen(function* unread() {
+            const rows = yield* decodeRows(
+              Schema.Struct({ id: notificationRow.fields.id }),
+              yield* sql`SELECT ${column(notificationColumns, "id")} FROM ${table("notification")}
+                WHERE ${column(notificationColumns, "userId")} = ${userId}
+                  AND ${column(notificationColumns, "isRead")} = ${false}`
+            );
+
+            return rows.length;
+          }),
+          Effect.gen(function* tracking() {
+            const rows = yield* decodeRows(
+              Schema.Struct({
+                updated_at: trackedSeriesStateRow.fields.updated_at,
+              }),
+              yield* sql`SELECT ${table("trackedSeriesState")}.${column(trackedSeriesStateColumns, "updatedAt")}
+                FROM ${table("trackedSeriesState")}
+                INNER JOIN ${table("libraryEntry")} ON ${table("trackedSeriesState")}.${column(trackedSeriesStateColumns, "libraryEntryId")} = ${table("libraryEntry")}.${column(libraryEntryColumns, "id")}
+                WHERE ${table("libraryEntry")}.${column(libraryEntryColumns, "userId")} = ${userId}
+                ORDER BY ${table("trackedSeriesState")}.${column(trackedSeriesStateColumns, "updatedAt")} DESC
+                LIMIT 1`
+            );
+
+            return rows[0] ?? null;
+          }),
+        ],
+        { concurrency: "unbounded" }
+      );
+
+    return {
+      downloadsUpdatedAt: downloadRecord?.updated_at?.toISOString() ?? null,
+      notificationsUpdatedAt:
+        notificationRecord?.updated_at?.toISOString() ?? null,
+      notificationsUnreadCount: unreadRecord,
+      trackingUpdatedAt: trackingRecord?.updated_at?.toISOString() ?? null,
+    };
+  });
+
+const loadSnapshot = (userId: string) => runSql(getSnapshot(userId));
 
 const hasSnapshotChanged = (left: LiveSnapshot, right: LiveSnapshot): boolean =>
   left.downloadsUpdatedAt !== right.downloadsUpdatedAt ||
@@ -82,7 +112,7 @@ export const live = new Elysia({ prefix: "/api/live" }).get(
     }
 
     const encoder = new TextEncoder();
-    const initialSnapshot = await getSnapshot(user.id);
+    const initialSnapshot = await loadSnapshot(user.id);
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -117,7 +147,7 @@ export const live = new Elysia({ prefix: "/api/live" }).get(
           isPolling = true;
 
           try {
-            const nextSnapshot = await getSnapshot(user.id);
+            const nextSnapshot = await loadSnapshot(user.id);
             if (hasSnapshotChanged(lastSnapshot, nextSnapshot)) {
               send("state", {
                 downloadsChanged:

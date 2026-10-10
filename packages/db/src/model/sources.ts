@@ -2,7 +2,11 @@ import { Schema } from "effect";
 
 import { defineTable } from "./table";
 
-export const { row: sourceRow, columns: sourceColumns } = defineTable({
+export const {
+  row: sourceRow,
+  columns: sourceColumns,
+  table: sourceTable,
+} = defineTable("source", {
   createdAt: { column: "created_at", schema: Schema.Date },
   description: { column: "description", schema: Schema.String },
   iconUrl: { column: "icon_url", nullable: true, schema: Schema.String },
@@ -12,7 +16,7 @@ export const { row: sourceRow, columns: sourceColumns } = defineTable({
   name: { column: "name", schema: Schema.String },
   supportedLanguages: {
     column: "supported_languages",
-    schema: Schema.Array(Schema.String),
+    schema: Schema.mutable(Schema.Array(Schema.String)),
   },
   supportsChapterFeed: {
     column: "supports_chapter_feed",
@@ -32,12 +36,22 @@ export const { row: sourceRow, columns: sourceColumns } = defineTable({
   websiteUrl: { column: "website_url", schema: Schema.String },
 });
 
-export const { row: seriesRow, columns: seriesColumns } = defineTable({
-  artistNames: { column: "artist_names", schema: Schema.Array(Schema.String) },
-  authorNames: { column: "author_names", schema: Schema.Array(Schema.String) },
+export const {
+  row: seriesRow,
+  columns: seriesColumns,
+  table: seriesTable,
+} = defineTable("series", {
+  artistNames: {
+    column: "artist_names",
+    schema: Schema.mutable(Schema.Array(Schema.String)),
+  },
+  authorNames: {
+    column: "author_names",
+    schema: Schema.mutable(Schema.Array(Schema.String)),
+  },
   availableTranslatedLanguages: {
     column: "available_translated_languages",
-    schema: Schema.Array(Schema.String),
+    schema: Schema.mutable(Schema.Array(Schema.String)),
   },
   canonicalUrl: {
     column: "canonical_url",
@@ -76,12 +90,16 @@ export const { row: seriesRow, columns: seriesColumns } = defineTable({
   },
   sourceId: { column: "source_id", schema: Schema.String },
   status: { column: "status", schema: Schema.String },
-  tags: { column: "tags", schema: Schema.Array(Schema.String) },
+  tags: { column: "tags", schema: Schema.mutable(Schema.Array(Schema.String)) },
   title: { column: "title", schema: Schema.String },
   updatedAt: { column: "updated_at", schema: Schema.Date },
 });
 
-export const { row: chapterRow, columns: chapterColumns } = defineTable({
+export const {
+  row: chapterRow,
+  columns: chapterColumns,
+  table: chapterTable,
+} = defineTable("chapter", {
   chapterNumber: {
     column: "chapter_number",
     nullable: true,
