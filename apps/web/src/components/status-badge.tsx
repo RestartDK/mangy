@@ -1,9 +1,24 @@
 import type { ReactNode } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-type StatusTone = "default" | "secondary" | "outline" | "destructive";
+export type StatusTone = "neutral" | "success" | "warning" | "danger" | "brand";
+
+const toneClasses: Record<StatusTone, string> = {
+  neutral: "text-muted-foreground",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-destructive",
+  brand: "text-brand-strong",
+};
+
+const dotClasses: Record<StatusTone, string> = {
+  neutral: "bg-muted-foreground/60",
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-destructive",
+  brand: "bg-brand",
+};
 
 interface StatusBadgeProps {
   children: ReactNode;
@@ -14,11 +29,21 @@ interface StatusBadgeProps {
 export const StatusBadge = ({
   children,
   className,
-  tone = "outline",
+  tone = "neutral",
 }: StatusBadgeProps) => {
   return (
-    <Badge className={cn("capitalize", className)} variant={tone}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs font-medium capitalize",
+        toneClasses[tone],
+        className
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn("size-1.5 shrink-0 rounded-full", dotClasses[tone])}
+      />
       {children}
-    </Badge>
+    </span>
   );
 };

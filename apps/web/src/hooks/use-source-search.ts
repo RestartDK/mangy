@@ -1,39 +1,75 @@
-import { useMutation } from "@tanstack/react-query";
+import type { InfiniteData, QueryKey } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-type SearchBody = Parameters<
-  ReturnType<typeof api.api.sources>["search"]["post"]
->[0];
-type SearchResponse = Awaited<
-  ReturnType<ReturnType<typeof api.api.sources>["search"]["post"]>
->["data"];
+type SearchResponse = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof api.api.sources>["search"]["post"]>
+  >["data"]
+>;
 
-export type SourceSearchInput = SearchBody;
-export type SourceSearchResult = NonNullable<SearchResponse>;
+export type SourceSearchPage = SearchResponse;
 
-export const useSourceSearch = (sourceId: string | undefined) =>
-  useMutation({
-    mutationFn: async (input: SourceSearchInput) => {
-      if (!sourceId) {
+export interface SourceSearchParams {
+  enabled?: boolean;
+  sourceId: string | undefined;
+  query: string;
+  filters: Record<string, unknown>;
+  pageSize?: number;
+}
+
+const fetchSearchPage = async (
+  sourceId: string,
+  params: SourceSearchParams,
+  page: number
+): Promise<SourceSearchPage> => {
+  const { data, error } = await api.api.sources({ sourceId }).search.post({
+    filters: params.filters,
+    page,
+    pageSize: params.pageSize,
+    query: params.query,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (
+    data ?? {
+      items: [],
+      page,
+      pageSize: params.pageSize ?? 20,
+      total: null,
+      hasNextPage: false,
+    }
+  );
+};
+
+export const useSourceSearch = (params: SourceSearchParams) =>
+  useInfiniteQuery<
+    SourceSearchPage,
+    Error,
+    InfiniteData<SourceSearchPage>,
+    QueryKey,
+    number
+  >({
+    enabled: Boolean(params.sourceId) && (params.enabled ?? true),
+    getNextPageParam: (last) => (last.hasNextPage ? last.page + 1 : undefined),
+    initialPageParam: 1,
+    placeholderData: keepPreviousData,
+    queryFn: ({ pageParam }) => {
+      if (!params.sourceId) {
         throw new Error("A source must be selected before searching.");
       }
 
-      const { data, error } = await api.api
-        .sources({ sourceId })
-        .search.post(input);
-      if (error) {
-        throw error;
-      }
-
-      return (
-        data ?? {
-          items: [],
-          page: 1,
-          pageSize: 12,
-          total: null,
-          hasNextPage: false,
-        }
-      );
+      return fetchSearchPage(params.sourceId, params, pageParam);
     },
+    queryKey: [
+      "sourceSearch",
+      params.sourceId,
+      params.query,
+      params.filters,
+      params.pageSize,
+    ],
   });

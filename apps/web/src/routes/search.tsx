@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Filter, RotateCcw, Search as SearchIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Filter,
+  Loader2,
+  Search as SearchIcon,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -8,7 +15,6 @@ import { PageHeader } from "@/components/page-header";
 import { SeriesCard } from "@/components/series-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
@@ -17,7 +23,6 @@ import {
   FieldLabel,
   FieldTitle,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,9 +34,9 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePreferredSource } from "@/hooks/use-preferred-source";
@@ -39,29 +44,52 @@ import type { SourceFilterDefinition } from "@/hooks/use-source-filters";
 import { useSourceFilters } from "@/hooks/use-source-filters";
 import { useSourceSearch } from "@/hooks/use-source-search";
 import { useSources } from "@/hooks/use-sources";
-import { getErrorMessage } from "@/lib/format";
+import { getErrorMessage, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
+import {
+  findSelectFilter,
+  getActiveFilters,
+  TOOLBAR_FILTER_KEYS,
+  withoutFilter,
+} from "@/lib/search-filters";
 
 export const Route = createFileRoute("/search")({
   beforeLoad: requireAuth,
   component: SearchRouteComponent,
 });
 
-const searchFieldIds = {
-  query: "search-query",
-} as const;
+const SEARCH_DEBOUNCE_MS = 350;
+const ASCENDING_VALUE_PATTERN = /^asc/i;
+const DESCENDING_VALUE_PATTERN = /^desc/i;
 
-const getEmptySelectValue = (key: string): string => `__empty__:${key}`;
-
-const normalizeSelectValue = (
-  key: string,
-  value: string | undefined
-): string | undefined => {
-  if (!value || value === getEmptySelectValue(key)) {
-    return undefined;
+const setFilterValue = (
+  definition: SourceFilterDefinition,
+  value: string | string[] | boolean | undefined
+): Record<string, unknown> | null => {
+  if (value === undefined) {
+    return null;
   }
 
-  return value;
+  if (typeof value === "boolean") {
+    return { [definition.key]: value };
+  }
+
+  if (Array.isArray(value)) {
+    const defaults =
+      definition.type === "multiSelect" ? (definition.defaultValue ?? []) : [];
+
+    if (value.length === 0 && defaults.length === 0) {
+      return null;
+    }
+
+    return { [definition.key]: value };
+  }
+
+  if (value === definition.defaultValue) {
+    return null;
+  }
+
+  return { [definition.key]: value };
 };
 
 function SearchRouteComponent() {
@@ -72,101 +100,110 @@ function SearchRouteComponent() {
   );
   const { selectedSourceId: sourceId, setSelectedSourceId: setSourceId } =
     usePreferredSource(enabledSources);
+
+  const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Record<string, unknown>>({});
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+
   const filtersQuery = useSourceFilters(sourceId);
-  const searchMutation = useSourceSearch(sourceId);
 
-  const selectedSource =
-    enabledSources.find((source) => source.id === sourceId) ?? null;
-  const activeFilterCount = useMemo(() => {
-    return Object.values(filters).filter((value) => {
-      if (Array.isArray(value)) {
-        return value.length > 0;
-      }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(queryInput.trim());
+    }, SEARCH_DEBOUNCE_MS);
 
-      if (typeof value === "boolean") {
-        return value;
-      }
+    return () => clearTimeout(timer);
+  }, [queryInput]);
 
-      return typeof value === "string" ? value.length > 0 : Boolean(value);
-    }).length;
-  }, [filters]);
-
-  const hasSearched = searchMutation.data !== undefined;
-  const resultCount =
-    searchMutation.data?.total ?? searchMutation.data?.items.length ?? 0;
-  const shouldShowResults =
-    hasSearched && (searchMutation.data?.items.length ?? 0) > 0;
-  const shouldShowEmptyResults =
-    hasSearched && (searchMutation.data?.items.length ?? 0) === 0;
-  const filtersError = filtersQuery.error;
-  const searchError = searchMutation.error;
-
-  const runSearch = () => {
-    searchMutation.mutate({
-      filters,
-      page: 1,
-      pageSize: 12,
-      query,
-    });
-    setIsMobileFiltersOpen(false);
-  };
-
-  const resetFilters = () => {
-    setFilters({});
-    setQuery("");
-  };
-
-  const filterPanel = (
-    <SearchFiltersPanel
-      activeFilterCount={activeFilterCount}
-      filters={filters}
-      filtersQuery={filtersQuery.data ?? []}
-      isSearching={searchMutation.isPending}
-      onFiltersChange={setFilters}
-      onQueryChange={setQuery}
-      onReset={resetFilters}
-      onSearch={runSearch}
-      onSourceChange={(nextSourceId) => {
-        setSourceId(nextSourceId);
-        setFilters({});
-      }}
-      query={query}
-      selectedSourceId={sourceId ?? ""}
-      sources={enabledSources}
-    />
+  const definitions = useMemo(
+    () => filtersQuery.data ?? [],
+    [filtersQuery.data]
   );
+  const drawerDefinitions = definitions.filter(
+    (definition) => !TOOLBAR_FILTER_KEYS.has(definition.key)
+  );
+  const sortDefinition = findSelectFilter(definitions, "sort");
+  const orderDefinition = findSelectFilter(definitions, "order");
+  const activeFilters = getActiveFilters(filters, definitions);
+  const sourceName =
+    enabledSources.find((source) => source.id === sourceId)?.name ??
+    "this source";
+  const orderAscendingValue =
+    orderDefinition?.options.find(
+      (option) =>
+        ASCENDING_VALUE_PATTERN.test(option.value) ||
+        ASCENDING_VALUE_PATTERN.test(option.label)
+    )?.value ?? orderDefinition?.options.at(0)?.value;
+  const orderDescendingValue =
+    orderDefinition?.options.find(
+      (option) =>
+        DESCENDING_VALUE_PATTERN.test(option.value) ||
+        DESCENDING_VALUE_PATTERN.test(option.label)
+    )?.value ?? orderDefinition?.options.at(1)?.value;
+  const toolbarDefaults = useMemo(() => {
+    const defaults: Record<string, unknown> = {};
+
+    for (const definition of definitions) {
+      if (!TOOLBAR_FILTER_KEYS.has(definition.key)) {
+        continue;
+      }
+      if (typeof definition.defaultValue === "string") {
+        defaults[definition.key] = definition.defaultValue;
+      }
+    }
+
+    return defaults;
+  }, [definitions]);
+  const effectiveFilters = useMemo(
+    () => ({ ...toolbarDefaults, ...filters }),
+    [filters, toolbarDefaults]
+  );
+  const searchQuery = useSourceSearch({
+    enabled: !filtersQuery.isLoading,
+    filters: effectiveFilters,
+    query,
+    sourceId,
+  });
+  const isOrderAscending = Boolean(
+    orderAscendingValue && effectiveFilters.order === orderAscendingValue
+  );
+  const results = searchQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const total = searchQuery.data?.pages.at(0)?.total ?? null;
+
+  const applyFilterValue = (
+    definition: SourceFilterDefinition,
+    value: string | string[] | boolean | undefined
+  ) => {
+    setFilters((current) => {
+      const patch = setFilterValue(definition, value);
+
+      if (!patch) {
+        const next = { ...current };
+        delete next[definition.key];
+        return next;
+      }
+
+      return { ...current, ...patch };
+    });
+  };
+
+  let resultsLabel = pluralize(results.length, "series", "series");
+
+  if (query) {
+    resultsLabel = `${pluralize(total ?? results.length, "result")} for “${query}”`;
+  }
+
+  const showSkeleton = Boolean(sourceId) && searchQuery.isLoading;
+  const showError = Boolean(searchQuery.error);
+
+  if (!showSkeleton && searchQuery.isFetching) {
+    resultsLabel = "Searching…";
+  }
 
   return (
     <AppShell>
-      <PageHeader
-        action={
-          <Sheet
-            onOpenChange={setIsMobileFiltersOpen}
-            open={isMobileFiltersOpen}
-          >
-            <SheetTrigger asChild>
-              <Button className="md:hidden" variant="outline">
-                <Filter className="size-4" />
-                Filters
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left">
-              <SheetHeader>
-                <SheetTitle>Search filters</SheetTitle>
-                <SheetDescription>
-                  Choose a source, refine your query, and run a search.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="p-6 pt-0">{filterPanel}</div>
-            </SheetContent>
-          </Sheet>
-        }
-        description="Choose a source, refine the results if needed, and jump straight into a series to queue chapters."
-        title="Search"
-      />
+      <PageHeader title="Search" />
 
       {sourcesQuery.error ? (
         <Alert variant="destructive">
@@ -177,342 +214,398 @@ function SearchRouteComponent() {
         </Alert>
       ) : null}
 
-      {filtersError ? (
+      {filtersQuery.error ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load filters</AlertTitle>
           <AlertDescription>
             {getErrorMessage(
-              filtersError,
+              filtersQuery.error,
               "Try another source or reload the page."
             )}
           </AlertDescription>
         </Alert>
       ) : null}
 
-      {searchError ? (
+      <div className="panel focus-within:ring-ring/25 flex items-center gap-1 p-1.5 pl-3 focus-within:ring-2">
+        <SearchIcon className="text-muted-foreground size-4 shrink-0" />
+        <input
+          aria-label="Search titles"
+          autoComplete="off"
+          className="placeholder:text-muted-foreground h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
+          onChange={(event) => setQueryInput(event.target.value)}
+          placeholder={`Search ${sourceName}`}
+          value={queryInput}
+        />
+        {queryInput ? (
+          <Button
+            aria-label="Clear search"
+            onClick={() => {
+              setQueryInput("");
+              setQuery("");
+            }}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <X className="size-3.5" />
+          </Button>
+        ) : null}
+        <Button
+          className="h-8"
+          onClick={() => setIsFiltersOpen(true)}
+          type="button"
+          variant="outline"
+        >
+          <Filter className="size-3.5" />
+          Filters
+          {activeFilters.length > 0 ? (
+            <span className="bg-brand text-brand-foreground ml-0.5 rounded-full px-1.5 text-xs font-medium">
+              {activeFilters.length}
+            </span>
+          ) : null}
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          onValueChange={(value) => {
+            setSourceId(value);
+            setFilters({});
+          }}
+          value={sourceId ?? ""}
+        >
+          <SelectTrigger
+            aria-label="Source"
+            className="h-8 w-auto min-w-32 border-0 bg-transparent px-2 text-xs dark:bg-transparent"
+          >
+            <SelectValue placeholder="Choose a source" />
+          </SelectTrigger>
+          <SelectContent>
+            {enabledSources.map((source) => (
+              <SelectItem key={source.id} value={source.id}>
+                {source.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {sortDefinition ? (
+          <Select
+            onValueChange={(value) => applyFilterValue(sortDefinition, value)}
+            value={
+              (effectiveFilters[sortDefinition.key] as string | undefined) ??
+              sortDefinition.defaultValue ??
+              ""
+            }
+          >
+            <SelectTrigger
+              aria-label={sortDefinition.label}
+              className="h-8 w-auto min-w-32 border-0 bg-transparent px-2 text-xs dark:bg-transparent"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sortDefinition.options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+
+        {orderDefinition ? (
+          <Button
+            aria-label={isOrderAscending ? "Sort descending" : "Sort ascending"}
+            className="h-8"
+            onClick={() => {
+              const nextValue = isOrderAscending
+                ? orderDescendingValue
+                : orderAscendingValue;
+              if (nextValue) {
+                applyFilterValue(orderDefinition, nextValue);
+              }
+            }}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            {isOrderAscending ? (
+              <ArrowUp className="size-3.5" />
+            ) : (
+              <ArrowDown className="size-3.5" />
+            )}
+          </Button>
+        ) : null}
+
+        <div className="ml-auto flex items-center gap-2">
+          {searchQuery.isFetching && !showSkeleton ? (
+            <Loader2 className="text-muted-foreground size-3.5 animate-spin" />
+          ) : null}
+          <span className="meta">{resultsLabel}</span>
+        </div>
+      </div>
+
+      {activeFilters.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {activeFilters.map((active) => (
+            <button
+              className="border-border bg-card hover:bg-muted inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors"
+              key={`${active.key}:${active.value}`}
+              onClick={() =>
+                setFilters((current) => withoutFilter(current, active))
+              }
+              type="button"
+            >
+              {active.label}
+              <X className="text-muted-foreground size-3" />
+            </button>
+          ))}
+          <Button
+            className="h-6"
+            onClick={() => setFilters({})}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            Clear all
+          </Button>
+        </div>
+      ) : null}
+
+      {showError ? (
         <Alert variant="destructive">
           <AlertTitle>Search failed</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(searchError, "Try another search in a moment.")}
+            {getErrorMessage(searchQuery.error, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-20">{filterPanel}</div>
-        </aside>
+      {showSkeleton ? <ResultGridSkeleton /> : null}
 
-        <section className="page-section min-w-0">
-          {selectedSource ? (
-            <Card size="sm">
-              <CardHeader className="gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <CardTitle>Results</CardTitle>
-                  <p className="text-muted-foreground text-sm">
-                    {query
-                      ? `Showing matches for "${query}"`
-                      : "Showing the latest search for the selected source."}
-                  </p>
-                </div>
-                <div className="text-muted-foreground text-right text-sm">
-                  <div>{selectedSource.name}</div>
-                  <div>{resultCount} items</div>
-                </div>
-              </CardHeader>
-            </Card>
-          ) : null}
+      {showSkeleton ||
+      showError ||
+      sourcesQuery.isLoading ||
+      sourceId ? null : (
+        <EmptyState
+          description="No enabled sources are connected yet."
+          icon="search"
+          title="No source available"
+        />
+      )}
 
-          {sourcesQuery.isLoading || filtersQuery.isLoading ? (
-            <SearchSkeleton />
-          ) : null}
+      {sourceId &&
+      !(showSkeleton || showError || searchQuery.isFetching) &&
+      results.length === 0 ? (
+        <EmptyState
+          action={
+            activeFilters.length > 0 ? (
+              <Button
+                onClick={() => setFilters({})}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Clear filters
+              </Button>
+            ) : undefined
+          }
+          description={
+            query
+              ? "Try a shorter title, a different spelling, or another source."
+              : "This source returned nothing for the current filters."
+          }
+          icon="search"
+          title={query ? `No matches for “${query}”` : "No series found"}
+        />
+      ) : null}
 
-          {sourcesQuery.isLoading || sourceId ? null : (
-            <EmptyState
-              description="No source is selected yet. Choose one to start searching."
-              icon="search"
-              title="Choose a source"
-            />
-          )}
-
-          {!(
-            hasSearched ||
-            searchMutation.isPending ||
-            sourcesQuery.isLoading
-          ) && sourceId ? (
-            <EmptyState
-              description="Choose a source and search to see matching series here."
-              icon="search"
-              title="Ready to search"
-            />
-          ) : null}
-
-          {searchMutation.isPending ? <ResultGridSkeleton /> : null}
-
-          {shouldShowEmptyResults ? (
-            <EmptyState
-              description="No series matched this search. Try a broader title, a different source, or fewer filters."
-              icon="search"
-              title="No results found"
-            />
-          ) : null}
-
-          {shouldShowResults ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {searchMutation.data?.items.map((item) => (
-                <SeriesCard
-                  item={item}
-                  key={`${item.sourceId}:${item.seriesId}`}
-                />
-              ))}
+      {results.length > 0 ? (
+        <>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {results.map((item) => (
+              <SeriesCard
+                item={item}
+                key={`${item.sourceId}:${item.seriesId}`}
+              />
+            ))}
+          </div>
+          {searchQuery.hasNextPage ? (
+            <div className="flex justify-center">
+              <Button
+                disabled={searchQuery.isFetchingNextPage}
+                onClick={() => searchQuery.fetchNextPage()}
+                size="lg"
+                type="button"
+                variant="outline"
+              >
+                {searchQuery.isFetchingNextPage ? "Loading..." : "Load more"}
+              </Button>
             </div>
           ) : null}
-        </section>
-      </div>
+        </>
+      ) : null}
+
+      <Sheet onOpenChange={setIsFiltersOpen} open={isFiltersOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Filters</SheetTitle>
+            <SheetDescription>
+              Narrow results before opening a series.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6">
+            {filtersQuery.error ? (
+              <p className="meta pb-4">Filters are unavailable right now.</p>
+            ) : (
+              <FieldGroup className="gap-5 pb-4">
+                {drawerDefinitions.map((definition) => (
+                  <FilterField
+                    definition={definition}
+                    filters={filters}
+                    key={definition.key}
+                    onValueChange={applyFilterValue}
+                  />
+                ))}
+                {drawerDefinitions.length === 0 ? (
+                  <p className="meta">This source has no extra filters.</p>
+                ) : null}
+              </FieldGroup>
+            )}
+          </div>
+          <SheetFooter className="flex-row justify-between gap-2">
+            <Button
+              disabled={activeFilters.length === 0}
+              onClick={() => setFilters({})}
+              type="button"
+              variant="ghost"
+            >
+              Clear all
+            </Button>
+            <Button onClick={() => setIsFiltersOpen(false)} type="button">
+              Done
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </AppShell>
   );
 }
 
-interface SearchFiltersPanelProps {
-  activeFilterCount: number;
+interface FilterFieldProps {
+  definition: SourceFilterDefinition;
   filters: Record<string, unknown>;
-  filtersQuery: SourceFilterDefinition[];
-  isSearching: boolean;
-  onFiltersChange: (value: Record<string, unknown>) => void;
-  onQueryChange: (value: string) => void;
-  onReset: () => void;
-  onSearch: () => void;
-  onSourceChange: (value: string) => void;
-  query: string;
-  selectedSourceId: string;
-  sources: Array<{ id: string; name: string }>;
+  onValueChange: (
+    definition: SourceFilterDefinition,
+    value: string | string[] | boolean | undefined
+  ) => void;
 }
 
-const SearchFiltersPanel = ({
-  activeFilterCount,
+const FilterField = ({
+  definition,
   filters,
-  filtersQuery,
-  isSearching,
-  onFiltersChange,
-  onQueryChange,
-  onReset,
-  onSearch,
-  onSourceChange,
-  query,
-  selectedSourceId,
-  sources,
-}: SearchFiltersPanelProps) => {
-  return (
-    <Card>
-      <CardHeader className="gap-2">
-        <CardTitle>Filters</CardTitle>
-        <p className="text-muted-foreground text-sm">
-          Narrow the catalog before you open a series.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="search-source">Source</FieldLabel>
-            <Select
-              onValueChange={onSourceChange}
-              value={selectedSourceId || undefined}
+  onValueChange,
+}: FilterFieldProps) => {
+  if (definition.type === "multiSelect") {
+    const selected = new Set(
+      Array.isArray(filters[definition.key])
+        ? (filters[definition.key] as string[])
+        : (definition.defaultValue ?? [])
+    );
+
+    return (
+      <Field className="gap-2">
+        <FieldTitle id={`${definition.key}-label`}>
+          {definition.label}
+        </FieldTitle>
+        <fieldset
+          aria-labelledby={`${definition.key}-label`}
+          className="flex flex-col gap-2 border-0 p-0"
+        >
+          {definition.options.map((option) => (
+            <label
+              className="flex cursor-pointer items-center gap-2.5 text-sm"
+              htmlFor={`${definition.key}-${option.value}`}
+              key={option.value}
             >
-              <SelectTrigger className="w-full" id="search-source">
-                <SelectValue placeholder="Choose a source" />
-              </SelectTrigger>
-              <SelectContent>
-                {sources.map((source) => (
-                  <SelectItem key={source.id} value={source.id}>
-                    {source.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+              <Checkbox
+                checked={selected.has(option.value)}
+                id={`${definition.key}-${option.value}`}
+                onCheckedChange={(checked) => {
+                  const next = new Set(selected);
+                  if (checked === true) {
+                    next.add(option.value);
+                  } else {
+                    next.delete(option.value);
+                  }
+                  onValueChange(definition, Array.from(next));
+                }}
+              />
+              {option.label}
+            </label>
+          ))}
+        </fieldset>
+      </Field>
+    );
+  }
 
-          <Field>
-            <FieldLabel htmlFor={searchFieldIds.query}>
-              Title or keyword
-            </FieldLabel>
-            <Input
-              id={searchFieldIds.query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="One Piece, dungeon, romance..."
-              value={query}
-            />
-            <FieldDescription>
-              Search by title, keyword, or whatever the source supports.
-            </FieldDescription>
-          </Field>
+  if (definition.type === "toggle") {
+    return (
+      <Field orientation="horizontal">
+        <Checkbox
+          checked={
+            filters[definition.key] === true ||
+            (filters[definition.key] === undefined &&
+              definition.defaultValue === true)
+          }
+          id={definition.key}
+          onCheckedChange={(checked) =>
+            onValueChange(definition, checked === true)
+          }
+        />
+        <FieldLabel htmlFor={definition.key}>{definition.label}</FieldLabel>
+      </Field>
+    );
+  }
 
-          {filtersQuery.map((filter) => {
-            if (filter.type === "select") {
-              const currentValue = normalizeSelectValue(
-                filter.key,
-                (filters[filter.key] as string | undefined) ??
-                  filter.defaultValue ??
-                  undefined
-              );
-
-              return (
-                <Field key={filter.key}>
-                  <FieldLabel htmlFor={filter.key}>{filter.label}</FieldLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      const nextValue = normalizeSelectValue(filter.key, value);
-                      const nextFilters = { ...filters };
-
-                      if (nextValue === undefined) {
-                        delete nextFilters[filter.key];
-                      } else {
-                        nextFilters[filter.key] = nextValue;
-                      }
-
-                      onFiltersChange({
-                        ...nextFilters,
-                      });
-                    }}
-                    value={currentValue}
-                  >
-                    <SelectTrigger className="w-full" id={filter.key}>
-                      <SelectValue
-                        placeholder={`Choose ${filter.label.toLowerCase()}`}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filter.options.map((option) => (
-                        <SelectItem
-                          key={`${filter.key}:${option.label}:${option.value}`}
-                          value={
-                            option.value || getEmptySelectValue(filter.key)
-                          }
-                        >
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              );
-            }
-
-            if (filter.type === "multiSelect") {
-              const selectedValues = new Set(
-                Array.isArray(filters[filter.key])
-                  ? (filters[filter.key] as string[])
-                  : (filter.defaultValue ?? [])
-              );
-
-              return (
-                <Field key={filter.key}>
-                  <FieldTitle>{filter.label}</FieldTitle>
-                  <div className="grid gap-2 rounded-lg border p-3">
-                    {filter.options.map((option) => (
-                      <div
-                        className="flex items-center gap-3 text-sm"
-                        key={option.value}
-                      >
-                        <Checkbox
-                          checked={selectedValues.has(option.value)}
-                          onCheckedChange={(checked) => {
-                            const nextValues = new Set(selectedValues);
-                            if (checked === true) {
-                              nextValues.add(option.value);
-                            } else {
-                              nextValues.delete(option.value);
-                            }
-
-                            onFiltersChange({
-                              ...filters,
-                              [filter.key]: Array.from(nextValues),
-                            });
-                          }}
-                        />
-                        <span>{option.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Field>
-              );
-            }
-
-            return (
-              <Field
-                className="rounded-lg border p-3"
-                key={filter.key}
-                orientation="horizontal"
-              >
-                <Checkbox
-                  checked={Boolean(
-                    filters[filter.key] ?? filter.defaultValue ?? false
-                  )}
-                  onCheckedChange={(checked) => {
-                    onFiltersChange({
-                      ...filters,
-                      [filter.key]: checked === true,
-                    });
-                  }}
-                />
-                <div className="space-y-1">
-                  <FieldTitle>{filter.label}</FieldTitle>
-                  <FieldDescription>
-                    Turn this on to narrow the results.
-                  </FieldDescription>
-                </div>
-              </Field>
-            );
-          })}
-        </FieldGroup>
-
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            className="flex-1"
-            disabled={!selectedSourceId || isSearching}
-            onClick={onSearch}
-            type="button"
-          >
-            <SearchIcon className="size-4" />
-            {isSearching ? "Searching..." : "Search"}
-          </Button>
-          <Button onClick={onReset} type="button" variant="outline">
-            <RotateCcw className="size-4" />
-            Reset
-          </Button>
-        </div>
-
-        <p className="text-muted-foreground text-sm">
-          {activeFilterCount > 0
-            ? `${activeFilterCount} filters applied`
-            : "No extra filters applied"}
-        </p>
-      </CardContent>
-    </Card>
+  return (
+    <Field className="gap-2">
+      <FieldLabel htmlFor={definition.key}>{definition.label}</FieldLabel>
+      <Select
+        onValueChange={(value) => onValueChange(definition, value)}
+        value={
+          (filters[definition.key] as string | undefined) ??
+          definition.defaultValue ??
+          ""
+        }
+      >
+        <SelectTrigger className="h-8 w-full" id={definition.key}>
+          <SelectValue placeholder="Any" />
+        </SelectTrigger>
+        <SelectContent>
+          {definition.options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <FieldDescription className="text-xs">
+        Defaults to {definition.defaultValue ?? "Any"}.
+      </FieldDescription>
+    </Field>
   );
 };
 
-const SearchSkeleton = () => (
-  <Card>
-    <CardContent className="space-y-4 py-4">
-      <Skeleton className="h-9 w-full" />
-      <Skeleton className="h-9 w-full" />
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-9 w-32" />
-    </CardContent>
-  </Card>
-);
-
 const ResultGridSkeleton = () => (
-  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-    {Array.from({ length: 6 }).map((_, index) => (
-      <Card key={String(index)}>
-        <Skeleton className="aspect-[3/4] w-full" />
-        <div className="space-y-3 p-4">
-          <Skeleton className="h-5 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-2/3" />
-        </div>
-      </Card>
+  <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    {Array.from({ length: 10 }).map((_, index) => (
+      <div className="flex flex-col gap-3" key={String(index)}>
+        <Skeleton className="aspect-2/3 w-full rounded-lg" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
     ))}
   </div>
 );

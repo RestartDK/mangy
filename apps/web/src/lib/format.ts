@@ -58,3 +58,9 @@ export const getInitials = (value: string | null | undefined): string => {
 
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 };
+
+export const pluralize = (
+  count: number,
+  singular: string,
+  plural = `${singular}s`
+): string => `${count} ${count === 1 ? singular : plural}`;

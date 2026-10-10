@@ -1,7 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { ChevronsUpDown, LogOut } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
 import { getInitials } from "@/lib/format";
 
@@ -25,21 +25,19 @@ export const ShellUserMenu = ({ email, name }: ShellUserMenuProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <SidebarMenuButton className="h-12" size="lg">
-          <Avatar className="size-8">
-            <AvatarFallback>{getInitials(name ?? email)}</AvatarFallback>
+        <Button className="h-8 gap-2 pr-2 pl-1" variant="ghost">
+          <Avatar className="size-6">
+            <AvatarFallback className="text-xs">
+              {getInitials(name ?? email)}
+            </AvatarFallback>
           </Avatar>
-          <span className="grid text-left">
-            <span className="text-sidebar-foreground truncate text-sm font-medium">
-              {name ?? "Signed in"}
-            </span>
-            <span className="text-sidebar-foreground/70 truncate text-xs">
-              {email ?? "Manage account"}
-            </span>
+          <span className="hidden max-w-40 truncate text-sm font-normal sm:inline">
+            {name ?? "Signed in"}
           </span>
-        </SidebarMenuButton>
+          <ChevronsUpDown className="text-muted-foreground size-3.5" />
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="grid gap-1">
           <span>{name ?? "Signed in"}</span>
           <span className="text-muted-foreground text-xs font-normal">
