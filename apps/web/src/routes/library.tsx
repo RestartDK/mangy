@@ -4,12 +4,10 @@ import { useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
-import { MetricCard } from "@/components/metric-card";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -90,13 +88,33 @@ function LibraryRouteComponent() {
   const trackedItems = items.filter((item) => item.isTracked);
   const autoDownloadItems = items.filter((item) => item.autoDownload);
   const needsDestinationItems = items.filter((item) => !item.destinationName);
+  const isLoading = libraryQuery.isLoading || trackingQuery.isLoading;
+
+  const views = [
+    { count: items.length, items, label: "All", value: "all" },
+    {
+      count: trackedItems.length,
+      items: trackedItems,
+      label: "Tracked",
+      value: "tracked",
+    },
+    {
+      count: autoDownloadItems.length,
+      items: autoDownloadItems,
+      label: "Auto-download",
+      value: "auto",
+    },
+    {
+      count: needsDestinationItems.length,
+      items: needsDestinationItems,
+      label: "Needs destination",
+      value: "needs-destination",
+    },
+  ];
 
   return (
     <AppShell>
-      <PageHeader
-        description="See every series you are managing, check tracking status, and spot anything missing a destination."
-        title="Library"
-      />
+      <PageHeader title="Library" />
 
       {libraryQuery.error || trackingQuery.error ? (
         <Alert variant="destructive">
@@ -110,92 +128,39 @@ function LibraryRouteComponent() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          helper="Saved or tracked series"
-          label="All series"
-          value={items.length}
-        />
-        <MetricCard
-          helper="Checking for new chapters"
-          label="Tracked"
-          value={trackedItems.length}
-        />
-        <MetricCard
-          helper="New releases queue automatically"
-          label="Auto-download"
-          value={autoDownloadItems.length}
-        />
-        <MetricCard
-          helper="Needs a destination before queueing"
-          label="Needs destination"
-          value={needsDestinationItems.length}
-        />
-      </div>
+      {isLoading ? <LibrarySkeleton /> : null}
 
-      {libraryQuery.isLoading || trackingQuery.isLoading ? (
-        <LibrarySkeleton />
-      ) : null}
-
-      {!(libraryQuery.isLoading || trackingQuery.isLoading) &&
-      items.length === 0 ? (
+      {!isLoading && items.length === 0 ? (
         <EmptyState
           action={
             <Button asChild variant="outline">
               <Link to="/search">Search for a series</Link>
             </Button>
           }
-          description="Save a series from its detail page or start tracking a title to manage it here."
+          description="Save a series from its page or start tracking it to manage it here."
           title="Your library is empty"
         />
       ) : null}
 
       {items.length ? (
         <Tabs className="page-section" defaultValue="all">
-          <TabsList>
-            <TabsTrigger value="all">All ({items.length})</TabsTrigger>
-            <TabsTrigger value="tracked">
-              Tracked ({trackedItems.length})
-            </TabsTrigger>
-            <TabsTrigger value="auto">
-              Auto-download ({autoDownloadItems.length})
-            </TabsTrigger>
-            <TabsTrigger value="needs-destination">
-              Needs destination ({needsDestinationItems.length})
-            </TabsTrigger>
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [&>*]:shrink-0">
+            {views.map((view) => (
+              <TabsTrigger key={view.value} value={view.value}>
+                {view.label} ({view.count})
+              </TabsTrigger>
+            ))}
           </TabsList>
-          <TabsContent value="all">
-            <LibraryList
-              items={items}
-              onRemove={(item) => {
-                setSeriesPendingRemoval(item);
-              }}
-            />
-          </TabsContent>
-          <TabsContent value="tracked">
-            <LibraryList
-              items={trackedItems}
-              onRemove={(item) => {
-                setSeriesPendingRemoval(item);
-              }}
-            />
-          </TabsContent>
-          <TabsContent value="auto">
-            <LibraryList
-              items={autoDownloadItems}
-              onRemove={(item) => {
-                setSeriesPendingRemoval(item);
-              }}
-            />
-          </TabsContent>
-          <TabsContent value="needs-destination">
-            <LibraryList
-              items={needsDestinationItems}
-              onRemove={(item) => {
-                setSeriesPendingRemoval(item);
-              }}
-            />
-          </TabsContent>
+          {views.map((view) => (
+            <TabsContent key={view.value} value={view.value}>
+              <LibraryList
+                items={view.items}
+                onRemove={(item) => {
+                  setSeriesPendingRemoval(item);
+                }}
+              />
+            </TabsContent>
+          ))}
         </Tabs>
       ) : null}
 
@@ -212,7 +177,7 @@ function LibraryRouteComponent() {
             <DialogTitle>Remove series</DialogTitle>
             <DialogDescription>
               {seriesPendingRemoval
-                ? `Remove ${seriesPendingRemoval.title} from your library? This also stops tracking for this series, but it does not delete files already on disk or cancel existing download jobs.`
+                ? `Remove ${seriesPendingRemoval.title}? Tracking stops, but files on disk stay and running downloads keep going.`
                 : "Remove this series from your library?"}
             </DialogDescription>
           </DialogHeader>
@@ -262,98 +227,95 @@ interface LibraryListProps {
 
 const LibraryList = ({ items, onRemove }: LibraryListProps) => {
   if (items.length === 0) {
-    return (
-      <EmptyState
-        description="There are no series in this view right now."
-        title="Nothing to show"
-      />
-    );
+    return <EmptyState description="Nothing in this view." title="Empty" />;
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {items.map((item) => (
-        <Card key={item.id}>
-          <CardHeader className="gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1">
-                <CardTitle>{item.title}</CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  Destination: {item.destinationName ?? "Not set"}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline">
-                  <Link
-                    params={{
-                      seriesId: item.seriesId,
-                      sourceId: item.sourceId,
-                    }}
-                    to="/series/$sourceId/$seriesId"
-                  >
-                    Manage
-                  </Link>
-                </Button>
-                <Button
-                  onClick={() => {
-                    onRemove(item);
+    <div className="panel rows">
+      {items.map((item) => {
+        const lastCheckedAt = item.trackingState?.lastCheckedAt ?? null;
+        const nextCheckAt = item.trackingState?.nextCheckAt ?? null;
+        const state = [
+          item.isTracked ? "Tracked" : "Saved",
+          item.autoDownload ? "Auto-download on" : "Manual",
+        ].join(" · ");
+
+        return (
+          <div className="row" key={item.id}>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Link
+                  className="max-w-full truncate text-sm font-medium hover:underline"
+                  params={{
+                    seriesId: item.seriesId,
+                    sourceId: item.sourceId,
                   }}
-                  type="button"
-                  variant="destructive"
+                  title={item.title}
+                  to="/series/$sourceId/$seriesId"
                 >
-                  <Trash2 className="size-4" />
-                  Remove
-                </Button>
+                  {item.title}
+                </Link>
+                {item.destinationName ? null : (
+                  <StatusBadge tone="warning">Needs destination</StatusBadge>
+                )}
               </div>
+              <p className="meta truncate">
+                {state} · {item.destinationName ?? "No destination"}
+              </p>
+              {lastCheckedAt || nextCheckAt ? (
+                <p className="meta truncate">
+                  {[
+                    lastCheckedAt
+                      ? `Last checked ${formatDateTime(lastCheckedAt)}`
+                      : null,
+                    nextCheckAt ? `Next ${formatDateTime(nextCheckAt)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge tone={item.isTracked ? "secondary" : "outline"}>
-                {item.isTracked ? "Tracked" : "Saved"}
-              </StatusBadge>
-              <StatusBadge tone={item.autoDownload ? "secondary" : "outline"}>
-                {item.autoDownload ? "Auto-download on" : "Auto-download off"}
-              </StatusBadge>
-              {item.destinationName ? null : (
-                <StatusBadge tone="destructive">Needs destination</StatusBadge>
-              )}
+            <div className="flex shrink-0 items-center gap-1">
+              <Button asChild size="sm" variant="ghost">
+                <Link
+                  params={{
+                    seriesId: item.seriesId,
+                    sourceId: item.sourceId,
+                  }}
+                  to="/series/$sourceId/$seriesId"
+                >
+                  Manage
+                </Link>
+              </Button>
+              <Button
+                aria-label={`Remove ${item.title}`}
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => {
+                  onRemove(item);
+                }}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
             </div>
-            <div className="text-muted-foreground grid gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <div className="text-xs tracking-wide uppercase">
-                  Last checked
-                </div>
-                <div className="text-foreground mt-1">
-                  {formatDateTime(item.trackingState?.lastCheckedAt)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs tracking-wide uppercase">
-                  Next check
-                </div>
-                <div className="text-foreground mt-1">
-                  {formatDateTime(item.trackingState?.nextCheckAt)}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 };
 
 const LibrarySkeleton = () => (
-  <div className="grid gap-4 xl:grid-cols-2">
-    {Array.from({ length: 4 }).map((_, index) => (
-      <Card key={String(index)}>
-        <CardContent className="space-y-4 p-4">
-          <Skeleton className="h-5 w-1/2" />
+  <div className="panel rows">
+    {Array.from({ length: 5 }).map((_, index) => (
+      <div className="row" key={String(index)}>
+        <div className="w-full space-y-2">
           <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-16 w-full" />
-        </CardContent>
-      </Card>
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      </div>
     ))}
   </div>
 );

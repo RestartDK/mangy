@@ -6,10 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -158,7 +157,7 @@ function SettingsRouteComponent() {
 
   const browserPushPermissionLabel =
     browserPushClientStateQuery.data?.permission === "secureContextRequired"
-      ? "requires HTTPS or localhost"
+      ? "requires HTTPS"
       : (browserPushClientStateQuery.data?.permission ?? "unknown");
 
   const isBrowserPushTogglePending =
@@ -188,12 +187,19 @@ function SettingsRouteComponent() {
     await disconnectCurrentBrowserPush.mutateAsync().catch(() => undefined);
   };
 
+  const unreadCount = settingsQuery.data?.notifications.unreadCount ?? 0;
+  const permission = browserPushClientStateQuery.data?.permission;
+  let permissionTone: StatusTone = "neutral";
+  if (permission === "granted") {
+    permissionTone = "success";
+  }
+  if (permission === "denied") {
+    permissionTone = "danger";
+  }
+
   return (
     <AppShell>
-      <PageHeader
-        description="Update your profile details, choose how notifications work, and manage download destinations."
-        title="Settings"
-      />
+      <PageHeader title="Settings" />
 
       {pageError ? (
         <Alert variant="destructive">
@@ -207,36 +213,33 @@ function SettingsRouteComponent() {
       {isLoading ? <SettingsSkeleton /> : null}
 
       {isLoading ? null : (
-        <div className="page-grid lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile</CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  Your account details for this workspace.
-                </p>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2">
-                <ProfileField
-                  label="Name"
-                  value={settingsQuery.data?.profile.name ?? "Not available"}
-                />
-                <ProfileField
-                  label="Email"
-                  value={settingsQuery.data?.profile.email ?? "Not available"}
-                />
-              </CardContent>
-            </Card>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+          <div className="flex flex-col gap-6">
+            <section className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">Account</h2>
+              </div>
+              <dl className="rows">
+                <div className="row">
+                  <dt className="meta">Name</dt>
+                  <dd className="text-sm">
+                    {settingsQuery.data?.profile.name ?? "Not set"}
+                  </dd>
+                </div>
+                <div className="row">
+                  <dt className="meta">Email</dt>
+                  <dd className="text-sm">
+                    {settingsQuery.data?.profile.email ?? "Not set"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  Choose whether Mangy follows your system theme or forces a
-                  light or dark surface.
-                </p>
-              </CardHeader>
-              <CardContent>
+            <section className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">Appearance</h2>
+              </div>
+              <div className="p-4">
                 <FieldGroup>
                   <Field>
                     <FieldLabel htmlFor="theme-preference">Theme</FieldLabel>
@@ -244,7 +247,10 @@ function SettingsRouteComponent() {
                       onValueChange={setTheme}
                       value={hasMounted ? (theme ?? "system") : "system"}
                     >
-                      <SelectTrigger className="w-full" id="theme-preference">
+                      <SelectTrigger
+                        className="h-8 w-full sm:w-52"
+                        id="theme-preference"
+                      >
                         <SelectValue placeholder="Choose a theme" />
                       </SelectTrigger>
                       <SelectContent>
@@ -253,129 +259,131 @@ function SettingsRouteComponent() {
                         <SelectItem value="dark">Dark</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FieldDescription>
-                      System matches your OS preference automatically.
+                    <FieldDescription className="text-xs">
+                      System follows your OS preference.
                     </FieldDescription>
                   </Field>
                 </FieldGroup>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications</CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  Decide whether in-app notifications stay active.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                  <div className="space-y-1">
-                    <div className="font-medium">In-app notifications</div>
-                    <p className="text-muted-foreground text-sm">
-                      Show updates for completed downloads, failures, and
-                      tracked-series changes.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={inAppEnabled}
-                    onCheckedChange={setInAppEnabled}
-                  />
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">
-                    {settingsQuery.data?.notifications.unreadCount ?? 0} unread
-                    notifications
-                  </span>
-                  <Button
-                    disabled={
-                      updateNotificationPreferences.isPending ||
-                      inAppEnabled ===
-                        (settingsQuery.data?.notifications.inAppEnabled ?? true)
-                    }
-                    onClick={() => {
-                      updateNotificationPreferences.mutate({ inAppEnabled });
-                    }}
-                    type="button"
-                    variant="outline"
-                  >
-                    {updateNotificationPreferences.isPending
-                      ? "Saving..."
-                      : "Save notification settings"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <section className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">Notifications</h2>
+                <span className="meta">
+                  {unreadCount === 0 ? "No unread" : `${unreadCount} unread`}
+                </span>
+              </div>
+              <div className="rows">
+                <ToggleRow
+                  checked={inAppEnabled}
+                  description="Completed downloads, failures, tracked-series changes."
+                  label="In-app notifications"
+                  onCheckedChange={setInAppEnabled}
+                />
+              </div>
+              <div className="border-border flex justify-end border-t px-4 py-3">
+                <Button
+                  disabled={
+                    updateNotificationPreferences.isPending ||
+                    inAppEnabled ===
+                      (settingsQuery.data?.notifications.inAppEnabled ?? true)
+                  }
+                  onClick={() => {
+                    updateNotificationPreferences.mutate({ inAppEnabled });
+                  }}
+                  size="lg"
+                  type="button"
+                  variant="outline"
+                >
+                  {updateNotificationPreferences.isPending
+                    ? "Saving..."
+                    : "Save"}
+                </Button>
+              </div>
+            </section>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Browser notifications</CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  Turning this on should immediately ask the browser whether
-                  this site can show notifications.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                  <div className="space-y-1">
-                    <div className="font-medium">
-                      Allow notifications on this browser
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      This requests browser permission right away and registers
-                      this browser for push delivery.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={isCurrentBrowserPushEnabled}
-                    disabled={
-                      isBrowserPushTogglePending ||
-                      !pushSettingsQuery.data?.isConfigured ||
-                      !browserPushClientStateQuery.data?.isSupported ||
-                      !browserPushClientStateQuery.data?.isSecureContext
-                    }
-                    onCheckedChange={(checked) => {
-                      void handleBrowserPushToggle(checked);
-                    }}
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
+            <section className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">Browser notifications</h2>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <StatusBadge
                     tone={
                       browserPushClientStateQuery.data?.isSupported
-                        ? "secondary"
-                        : "outline"
+                        ? "success"
+                        : "neutral"
                     }
                   >
                     {browserPushClientStateQuery.data?.isSupported
                       ? "Supported"
                       : "Not supported"}
                   </StatusBadge>
-                  <StatusBadge
-                    tone={
-                      browserPushClientStateQuery.data?.permission === "granted"
-                        ? "secondary"
-                        : browserPushClientStateQuery.data?.permission ===
-                            "denied"
-                          ? "destructive"
-                          : "outline"
-                    }
-                  >
+                  <StatusBadge tone={permissionTone}>
                     Permission: {browserPushPermissionLabel}
                   </StatusBadge>
-                  <StatusBadge
-                    tone={isCurrentBrowserPushEnabled ? "secondary" : "outline"}
-                  >
-                    {isCurrentBrowserPushEnabled
-                      ? "Enabled on this browser"
-                      : "Disabled on this browser"}
-                  </StatusBadge>
                 </div>
+              </div>
+
+              <div className="rows">
+                <ToggleRow
+                  checked={isCurrentBrowserPushEnabled}
+                  description="Register this browser for push delivery."
+                  disabled={
+                    isBrowserPushTogglePending ||
+                    !pushSettingsQuery.data?.isConfigured ||
+                    !browserPushClientStateQuery.data?.isSupported ||
+                    !browserPushClientStateQuery.data?.isSecureContext
+                  }
+                  label="Enable on this browser"
+                  onCheckedChange={(checked) => {
+                    handleBrowserPushToggle(checked).catch(() => undefined);
+                  }}
+                />
+                <ToggleRow
+                  checked={notifyOnDownloadCompleted}
+                  description="A chapter finishes downloading."
+                  label="Download completed"
+                  onCheckedChange={setNotifyOnDownloadCompleted}
+                />
+                <ToggleRow
+                  checked={notifyOnDownloadFailed}
+                  description="Retries are exhausted and action is needed."
+                  label="Download failed"
+                  onCheckedChange={setNotifyOnDownloadFailed}
+                />
+                <ToggleRow
+                  checked={notifyOnTrackedSeriesUpdate}
+                  description="Tracked series queue new chapters."
+                  label="Tracked series updates"
+                  onCheckedChange={setNotifyOnTrackedSeriesUpdate}
+                />
+                <ToggleRow
+                  checked={notifyOnSystemWarning}
+                  description="Tracking or import issues need attention."
+                  label="System warnings"
+                  onCheckedChange={setNotifyOnSystemWarning}
+                />
+              </div>
+
+              <div className="space-y-4 px-4 py-4">
+                <dl className="space-y-1.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <dt className="meta">Last delivery</dt>
+                    <dd className="text-xs">
+                      {formatDateTime(pushSettingsQuery.data?.lastDeliveredAt)}
+                    </dd>
+                  </div>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <dt className="meta">Last error</dt>
+                    <dd className="text-xs">
+                      {pushSettingsQuery.data?.lastError ?? "None"}
+                    </dd>
+                  </div>
+                </dl>
 
                 {pushSettingsQuery.data?.isConfigured ? null : (
                   <Alert>
-                    <AlertTitle>Browser push is not configured yet</AlertTitle>
+                    <AlertTitle>Browser push is not configured</AlertTitle>
                     <AlertDescription>
                       Add VAPID keys on the server before enabling browser
                       notifications.
@@ -387,8 +395,7 @@ function SettingsRouteComponent() {
                   <Alert variant="destructive">
                     <AlertTitle>Browser permission is blocked</AlertTitle>
                     <AlertDescription>
-                      Re-enable notifications in your browser site settings,
-                      then turn the browser notifications switch on again.
+                      Re-enable notifications in your browser site settings.
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -396,306 +403,205 @@ function SettingsRouteComponent() {
                 {browserPushClientStateQuery.data?.isSupported &&
                 !browserPushClientStateQuery.data.isSecureContext ? (
                   <Alert variant="destructive">
-                    <AlertTitle>
-                      Browser notifications need HTTPS or localhost
-                    </AlertTitle>
+                    <AlertTitle>Needs HTTPS or localhost</AlertTitle>
                     <AlertDescription>
-                      Browsers do not show the native permission prompt on plain
-                      HTTP IP addresses like `100.91.192.69`. Use
-                      `http://localhost:3001` or serve the app over HTTPS.
+                      Browsers only allow notifications on HTTPS or localhost.
                     </AlertDescription>
                   </Alert>
                 ) : null}
+              </div>
 
-                <div className="rounded-lg border p-4">
-                  <div className="font-medium">Delivery status</div>
-                  <div className="mt-3 flex flex-wrap gap-4 text-sm">
-                    <span className="text-muted-foreground">
-                      Last delivery:{" "}
-                      {formatDateTime(pushSettingsQuery.data?.lastDeliveredAt)}
-                    </span>
-                    <span className="text-muted-foreground">
-                      Last error: {pushSettingsQuery.data?.lastError ?? "None"}
-                    </span>
-                  </div>
-                </div>
-
-                <FieldGroup>
-                  <Field>
-                    <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                      <div className="space-y-1">
-                        <FieldLabel>Download completed</FieldLabel>
-                        <FieldDescription>
-                          Notify when a chapter finishes downloading.
-                        </FieldDescription>
-                      </div>
-                      <Switch
-                        checked={notifyOnDownloadCompleted}
-                        onCheckedChange={setNotifyOnDownloadCompleted}
-                      />
-                    </div>
-                  </Field>
-
-                  <Field>
-                    <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                      <div className="space-y-1">
-                        <FieldLabel>Download failed</FieldLabel>
-                        <FieldDescription>
-                          Notify when retries are exhausted and action is
-                          needed.
-                        </FieldDescription>
-                      </div>
-                      <Switch
-                        checked={notifyOnDownloadFailed}
-                        onCheckedChange={setNotifyOnDownloadFailed}
-                      />
-                    </div>
-                  </Field>
-
-                  <Field>
-                    <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                      <div className="space-y-1">
-                        <FieldLabel>Tracked series updates</FieldLabel>
-                        <FieldDescription>
-                          Notify when tracked series queue new chapters.
-                        </FieldDescription>
-                      </div>
-                      <Switch
-                        checked={notifyOnTrackedSeriesUpdate}
-                        onCheckedChange={setNotifyOnTrackedSeriesUpdate}
-                      />
-                    </div>
-                  </Field>
-
-                  <Field>
-                    <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                      <div className="space-y-1">
-                        <FieldLabel>System warnings</FieldLabel>
-                        <FieldDescription>
-                          Notify when tracking or import issues need attention.
-                        </FieldDescription>
-                      </div>
-                      <Switch
-                        checked={notifyOnSystemWarning}
-                        onCheckedChange={setNotifyOnSystemWarning}
-                      />
-                    </div>
-                  </Field>
-                </FieldGroup>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Button
-                    disabled={
-                      updateBrowserPushPreferences.isPending ||
-                      !hasBrowserPushPreferenceChanges
-                    }
-                    onClick={() => {
-                      updateBrowserPushPreferences.mutate({
-                        isEnabled: pushSettingsQuery.data?.isEnabled ?? false,
-                        notifyOnDownloadCompleted,
-                        notifyOnDownloadFailed,
-                        notifyOnTrackedSeriesUpdate,
-                        notifyOnSystemWarning,
-                      });
-                    }}
-                    type="button"
-                    variant="outline"
-                  >
-                    {updateBrowserPushPreferences.isPending
-                      ? "Saving..."
-                      : "Save browser notification settings"}
-                  </Button>
-
-                  <Button
-                    disabled={
-                      sendBrowserPushTest.isPending ||
-                      !pushSettingsQuery.data?.isConfigured ||
-                      !isCurrentBrowserPushEnabled
-                    }
-                    onClick={() => {
-                      sendBrowserPushTest.mutate();
-                    }}
-                    type="button"
-                  >
-                    {sendBrowserPushTest.isPending
-                      ? "Sending..."
-                      : "Send test notification"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="border-border flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
+                <Button
+                  disabled={
+                    updateBrowserPushPreferences.isPending ||
+                    !hasBrowserPushPreferenceChanges
+                  }
+                  onClick={() => {
+                    updateBrowserPushPreferences.mutate({
+                      isEnabled: pushSettingsQuery.data?.isEnabled ?? false,
+                      notifyOnDownloadCompleted,
+                      notifyOnDownloadFailed,
+                      notifyOnTrackedSeriesUpdate,
+                      notifyOnSystemWarning,
+                    });
+                  }}
+                  size="lg"
+                  type="button"
+                  variant="outline"
+                >
+                  {updateBrowserPushPreferences.isPending
+                    ? "Saving..."
+                    : "Save"}
+                </Button>
+                <Button
+                  disabled={
+                    sendBrowserPushTest.isPending ||
+                    !pushSettingsQuery.data?.isConfigured ||
+                    !isCurrentBrowserPushEnabled
+                  }
+                  onClick={() => {
+                    sendBrowserPushTest.mutate();
+                  }}
+                  size="lg"
+                  type="button"
+                >
+                  {sendBrowserPushTest.isPending
+                    ? "Sending..."
+                    : "Send test notification"}
+                </Button>
+              </div>
+            </section>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Destinations</CardTitle>
-              <p className="text-muted-foreground text-sm">
-                Add folders where queued chapters should be saved.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <form
-                className="space-y-4 rounded-lg border p-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
+          <section className="panel h-fit">
+            <div className="panel-header">
+              <h2 className="panel-title">Destinations</h2>
+              <span className="meta">
+                {settingsQuery.data?.destinations.length ?? 0} saved
+              </span>
+            </div>
 
-                  createDestination
-                    .mutateAsync({
-                      absolutePath,
-                      isDefault,
-                      komgaLibraryId,
-                      name,
-                    })
-                    .then(() => {
-                      setAbsolutePath("");
-                      setIsDefault(false);
-                      setKomgaLibraryId("");
-                      setName("");
-                    })
-                    .catch(() => undefined);
-                }}
-              >
-                <div className="space-y-1">
-                  <h2 className="font-medium">Add destination</h2>
-                  <p className="text-muted-foreground text-sm">
-                    Save chapters to a folder that your reader or media server
-                    can access.
-                  </p>
-                </div>
-
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor={destinationFieldIds.name}>
-                      Name
-                    </FieldLabel>
-                    <Input
-                      id={destinationFieldIds.name}
-                      onChange={(event) => setName(event.target.value)}
-                      placeholder="Main library"
-                      value={name}
-                    />
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor={destinationFieldIds.absolutePath}>
-                      Absolute path
-                    </FieldLabel>
-                    <Input
-                      id={destinationFieldIds.absolutePath}
-                      onChange={(event) => setAbsolutePath(event.target.value)}
-                      placeholder="/srv/media/manga"
-                      value={absolutePath}
-                    />
-                    <FieldDescription>
-                      Use the full path where downloads should be written.
-                    </FieldDescription>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor={destinationFieldIds.komgaLibraryId}>
-                      Komga library ID
-                    </FieldLabel>
-                    <Input
-                      id={destinationFieldIds.komgaLibraryId}
-                      onChange={(event) =>
-                        setKomgaLibraryId(event.target.value)
-                      }
-                      placeholder="Optional"
-                      value={komgaLibraryId}
-                    />
-                    <FieldDescription>
-                      Add this if you want to tie the destination to a specific
-                      Komga library.
-                    </FieldDescription>
-                  </Field>
-                </FieldGroup>
-
-                <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                  <div className="space-y-1">
-                    <div className="font-medium">Default destination</div>
-                    <p className="text-muted-foreground text-sm">
-                      Use this folder automatically when a series does not have
-                      a destination saved yet.
-                    </p>
-                  </div>
-                  <Switch checked={isDefault} onCheckedChange={setIsDefault} />
-                </div>
-
-                <Button
-                  className="w-full"
-                  disabled={
-                    createDestination.isPending ||
-                    name.trim().length === 0 ||
-                    absolutePath.trim().length === 0
-                  }
-                  size="lg"
-                  type="submit"
-                >
-                  {createDestination.isPending
-                    ? "Saving..."
-                    : "Save destination"}
-                </Button>
-              </form>
-
-              {settingsQuery.data?.destinations.length ? (
-                <div className="grid gap-3">
-                  {settingsQuery.data.destinations.map((destination) => (
-                    <Card key={destination.id} size="sm">
-                      <CardContent className="space-y-3 py-3">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <div className="font-medium">
-                              {destination.name}
-                            </div>
-                            <div className="text-muted-foreground text-sm break-all">
-                              {destination.absolutePath}
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {destination.isDefault ? (
-                              <StatusBadge tone="secondary">
-                                Default
-                              </StatusBadge>
-                            ) : null}
-                            <StatusBadge
-                              tone={
-                                destination.isEnabled ? "secondary" : "outline"
-                              }
-                            >
-                              {destination.isEnabled ? "Enabled" : "Disabled"}
-                            </StatusBadge>
-                          </div>
-                        </div>
-                        {destination.komgaLibraryId ? (
-                          <div className="text-muted-foreground text-sm">
-                            Komga library ID: {destination.komgaLibraryId}
-                          </div>
+            {settingsQuery.data?.destinations.length ? (
+              <div className="rows">
+                {settingsQuery.data.destinations.map((destination) => (
+                  <div className="row" key={destination.id}>
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <h3 className="truncate text-sm font-medium">
+                          {destination.name}
+                        </h3>
+                        {destination.isDefault ? (
+                          <StatusBadge tone="brand">Default</StatusBadge>
                         ) : null}
-                        <div className="flex justify-end">
-                          <Button
-                            disabled={deleteDestination.isPending}
-                            onClick={() => {
-                              setDestinationPendingRemoval(destination);
-                            }}
-                            type="button"
-                            variant="destructive"
-                          >
-                            <Trash2 className="size-4" />
-                            Remove
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  description="Add your first destination so queued chapters know where to go."
-                  title="No destinations yet"
-                />
-              )}
-            </CardContent>
-          </Card>
+                        {destination.isEnabled ? null : (
+                          <StatusBadge tone="neutral">Disabled</StatusBadge>
+                        )}
+                      </div>
+                      <p className="meta break-all">
+                        {destination.absolutePath}
+                      </p>
+                      {destination.komgaLibraryId ? (
+                        <p className="meta break-all">
+                          Komga library {destination.komgaLibraryId}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Button
+                      aria-label={`Remove ${destination.name}`}
+                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
+                      disabled={deleteDestination.isPending}
+                      onClick={() => {
+                        setDestinationPendingRemoval(destination);
+                      }}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                className="border-border rounded-none border-0 border-b"
+                description="Add a folder so queued chapters know where to go."
+                title="No destinations yet"
+              />
+            )}
+
+            <form
+              className="space-y-4 p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+
+                createDestination
+                  .mutateAsync({
+                    absolutePath,
+                    isDefault,
+                    komgaLibraryId,
+                    name,
+                  })
+                  .then(() => {
+                    setAbsolutePath("");
+                    setIsDefault(false);
+                    setKomgaLibraryId("");
+                    setName("");
+                  })
+                  .catch(() => undefined);
+              }}
+            >
+              <h3 className="panel-title">Add destination</h3>
+
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor={destinationFieldIds.name}>
+                    Name
+                  </FieldLabel>
+                  <Input
+                    className="h-8"
+                    id={destinationFieldIds.name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Main library"
+                    value={name}
+                  />
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor={destinationFieldIds.absolutePath}>
+                    Absolute path
+                  </FieldLabel>
+                  <Input
+                    className="h-8"
+                    id={destinationFieldIds.absolutePath}
+                    onChange={(event) => setAbsolutePath(event.target.value)}
+                    placeholder="/srv/media/manga"
+                    value={absolutePath}
+                  />
+                  <FieldDescription className="text-xs">
+                    Folder where downloads are written.
+                  </FieldDescription>
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor={destinationFieldIds.komgaLibraryId}>
+                    Komga library ID
+                  </FieldLabel>
+                  <Input
+                    className="h-8"
+                    id={destinationFieldIds.komgaLibraryId}
+                    onChange={(event) => setKomgaLibraryId(event.target.value)}
+                    placeholder="Optional"
+                    value={komgaLibraryId}
+                  />
+                  <FieldDescription className="text-xs">
+                    Only needed to tie this folder to a Komga library.
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+
+              <ToggleRow
+                checked={isDefault}
+                description="Use this folder when a series has no destination."
+                label="Default destination"
+                onCheckedChange={setIsDefault}
+              />
+
+              <Button
+                className="w-full"
+                disabled={
+                  createDestination.isPending ||
+                  name.trim().length === 0 ||
+                  absolutePath.trim().length === 0
+                }
+                size="lg"
+                type="submit"
+              >
+                {createDestination.isPending ? "Saving..." : "Save destination"}
+              </Button>
+            </form>
+          </section>
         </div>
       )}
 
@@ -712,7 +618,7 @@ function SettingsRouteComponent() {
             <DialogTitle>Remove destination</DialogTitle>
             <DialogDescription>
               {destinationPendingRemoval
-                ? `Remove ${destinationPendingRemoval.name}? Any tracked series using this destination will keep tracking, but auto-download will be turned off.`
+                ? `Remove ${destinationPendingRemoval.name}? Series using it keep tracking, but auto-download turns off.`
                 : "Remove this destination?"}
             </DialogDescription>
           </DialogHeader>
@@ -753,47 +659,51 @@ function SettingsRouteComponent() {
   );
 }
 
-const ProfileField = ({ label, value }: { label: string; value: string }) => {
-  return (
-    <div className="rounded-lg border p-4">
-      <div className="text-muted-foreground text-xs tracking-wide uppercase">
-        {label}
-      </div>
-      <div className="mt-1 text-sm">{value}</div>
+interface ToggleRowProps {
+  checked: boolean;
+  description: string;
+  disabled?: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}
+
+const ToggleRow = ({
+  checked,
+  description,
+  disabled,
+  label,
+  onCheckedChange,
+}: ToggleRowProps) => (
+  <div className="row">
+    <div className="min-w-0 space-y-0.5">
+      <p className="text-sm font-medium">{label}</p>
+      <p className="meta">{description}</p>
     </div>
-  );
-};
+    <Switch
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={onCheckedChange}
+    />
+  </div>
+);
 
 const SettingsSkeleton = () => (
-  <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </CardContent>
-      </Card>
+  <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+    <div className="flex flex-col gap-6">
+      <div className="panel space-y-4 p-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+      <div className="panel space-y-4 p-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
     </div>
-    <Card>
-      <CardContent className="space-y-4 p-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </CardContent>
-    </Card>
+    <div className="panel space-y-4 p-4">
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-32 w-full" />
+    </div>
   </div>
 );

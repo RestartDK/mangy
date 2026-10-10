@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, BookOpen, Layers3 } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Breadcrumb,
@@ -15,11 +14,10 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChapterPages } from "@/hooks/use-chapter-pages";
 import { useSeriesDetail } from "@/hooks/use-series-detail";
-import { getErrorMessage } from "@/lib/format";
+import { getErrorMessage, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
 export const Route = createFileRoute(
@@ -52,10 +50,54 @@ function ReaderRouteComponent() {
   const chapterLabel = chapter?.chapterNumber
     ? `Chapter ${chapter.chapterNumber}`
     : (chapter?.title ?? "Chapter reader");
+  const pageCount = pagesQuery.data?.length ?? 0;
+
+  const readerMeta = [
+    series?.title,
+    pageCount ? pluralize(pageCount, "page") : null,
+    chapter?.translatedLanguage
+      ? chapter.translatedLanguage.toUpperCase()
+      : null,
+    chapter?.volumeNumber ? `Volume ${chapter.volumeNumber}` : null,
+  ].filter((item): item is string => Boolean(item));
 
   return (
     <AppShell>
       <PageHeader
+        action={
+          <div className="flex items-center gap-1">
+            {newerChapter ? (
+              <Button asChild size="sm" variant="ghost">
+                <Link
+                  params={{
+                    chapterId: newerChapter.chapterId,
+                    seriesId,
+                    sourceId,
+                  }}
+                  to="/series/$sourceId/$seriesId/read/$chapterId"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  Newer
+                </Link>
+              </Button>
+            ) : null}
+            {olderChapter ? (
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  params={{
+                    chapterId: olderChapter.chapterId,
+                    seriesId,
+                    sourceId,
+                  }}
+                  to="/series/$sourceId/$seriesId/read/$chapterId"
+                >
+                  Older
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+        }
         breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
@@ -82,8 +124,10 @@ function ReaderRouteComponent() {
             </BreadcrumbList>
           </Breadcrumb>
         }
-        description="Read normalized, server-proxied pages without relying on fragile client-side hotlinks."
-        title={chapterLabel}
+        description={readerMeta.join(" · ")}
+        title={
+          chapter?.title ? `${chapterLabel}: ${chapter.title}` : chapterLabel
+        }
       />
 
       {isSeriesLoading || pagesQuery.isLoading ? <ReaderSkeleton /> : null}
@@ -100,155 +144,57 @@ function ReaderRouteComponent() {
         </Alert>
       ) : null}
 
-      {series && !pagesQuery.isLoading ? (
-        <div className="page-grid">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <Card>
-              <CardHeader className="gap-3">
-                <CardTitle className="flex flex-wrap items-center gap-3">
-                  <span>
-                    {chapter?.title
-                      ? `${chapterLabel}: ${chapter.title}`
-                      : chapterLabel}
-                  </span>
-                  <StatusBadge tone="secondary">
-                    {pagesQuery.data?.length ?? 0} pages
-                  </StatusBadge>
-                </CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  {series.title}{" "}
-                  {chapter?.translatedLanguage
-                    ? `- ${chapter.translatedLanguage.toUpperCase()}`
-                    : ""}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {pagesQuery.data?.length ? (
-                  <div className="space-y-5">
-                    {pagesQuery.data.map((page) => (
-                      <figure
-                        className="from-muted/80 to-background overflow-hidden rounded-2xl border bg-linear-to-b shadow-sm"
-                        key={page.index}
-                      >
-                        <img
-                          alt={`${series.title} ${chapterLabel} page ${page.index + 1}`}
-                          className="mx-auto w-full max-w-5xl"
-                          decoding="async"
-                          height={2400}
-                          loading="lazy"
-                          src={page.imageUrl}
-                          width={1600}
-                        />
-                        <figcaption className="text-muted-foreground border-t px-4 py-2 text-center text-xs tracking-[0.2em] uppercase">
-                          Page {page.index + 1}
-                        </figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    description="This chapter returned no readable pages from the selected source."
-                    icon="library"
-                    title="No pages found"
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Reader controls</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button
-                    asChild
-                    className="w-full justify-between"
-                    variant="outline"
-                  >
-                    <Link
-                      params={{ seriesId, sourceId }}
-                      to="/series/$sourceId/$seriesId"
-                    >
-                      Back to series
-                      <BookOpen className="size-4" />
-                    </Link>
-                  </Button>
-
-                  {newerChapter ? (
-                    <Button
-                      asChild
-                      className="w-full justify-between"
-                      variant="outline"
-                    >
-                      <Link
-                        params={{
-                          chapterId: newerChapter.chapterId,
-                          seriesId,
-                          sourceId,
-                        }}
-                        to="/series/$sourceId/$seriesId/read/$chapterId"
-                      >
-                        Newer chapter
-                        <ArrowLeft className="size-4" />
-                      </Link>
-                    </Button>
-                  ) : null}
-
-                  {olderChapter ? (
-                    <Button
-                      asChild
-                      className="w-full justify-between"
-                      variant="outline"
-                    >
-                      <Link
-                        params={{
-                          chapterId: olderChapter.chapterId,
-                          seriesId,
-                          sourceId,
-                        }}
-                        to="/series/$sourceId/$seriesId/read/$chapterId"
-                      >
-                        Older chapter
-                        <ArrowRight className="size-4" />
-                      </Link>
-                    </Button>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Chapter info</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  <ReaderMetaItem label="Series" value={series.title} />
-                  <ReaderMetaItem label="Chapter" value={chapterLabel} />
-                  <ReaderMetaItem
-                    label="Pages"
-                    value={String(pagesQuery.data?.length ?? 0)}
-                  />
-                  <ReaderMetaItem
-                    label="Volume"
-                    value={chapter?.volumeNumber ?? "Not available"}
-                  />
-                  <ReaderMetaItem
-                    label="Order"
-                    value={chapter?.sourceOrder ?? "Not available"}
-                  />
-                  <div className="bg-muted/40 text-muted-foreground rounded-xl border p-4">
-                    <div className="text-foreground mb-2 inline-flex items-center gap-2 text-xs font-medium tracking-[0.18em] uppercase">
-                      <Layers3 className="size-3.5" />
-                      Proxy reader
-                    </div>
-                    <p>
-                      Every image is requested through the server page proxy so
-                      source-specific headers and referers stay intact.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+      {series && !pagesQuery.isLoading && !pagesQuery.error ? (
+        <div className="flex flex-col items-center gap-6">
+          {pagesQuery.data?.length ? (
+            <div className="w-full max-w-4xl space-y-2">
+              {pagesQuery.data.map((page) => (
+                <img
+                  alt={`${series.title} ${chapterLabel} page ${page.index + 1}`}
+                  className="bg-muted w-full"
+                  decoding="async"
+                  height={2400}
+                  key={page.index}
+                  loading="lazy"
+                  src={page.imageUrl}
+                  width={1600}
+                />
+              ))}
             </div>
+          ) : (
+            <EmptyState
+              className="w-full"
+              description="This chapter returned no readable pages from the source."
+              icon="library"
+              title="No pages found"
+            />
+          )}
+
+          <div className="flex w-full max-w-4xl items-center justify-between gap-3">
+            <Button asChild size="lg" variant="outline">
+              <Link
+                params={{ seriesId, sourceId }}
+                to="/series/$sourceId/$seriesId"
+              >
+                <ArrowLeft className="size-3.5" />
+                Back to series
+              </Link>
+            </Button>
+            {olderChapter ? (
+              <Button asChild size="lg">
+                <Link
+                  params={{
+                    chapterId: olderChapter.chapterId,
+                    seriesId,
+                    sourceId,
+                  }}
+                  to="/series/$sourceId/$seriesId/read/$chapterId"
+                >
+                  Next chapter
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -256,41 +202,9 @@ function ReaderRouteComponent() {
   );
 }
 
-const ReaderMetaItem = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-xl border p-3">
-    <div className="text-muted-foreground text-xs tracking-[0.16em] uppercase">
-      {label}
-    </div>
-    <div className="mt-1 font-medium">{value}</div>
-  </div>
-);
-
 const ReaderSkeleton = () => (
-  <div className="page-grid">
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <Card>
-        <CardContent className="space-y-5 p-4 md:p-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-[60vh] w-full rounded-2xl" />
-          <Skeleton className="h-[60vh] w-full rounded-2xl" />
-        </CardContent>
-      </Card>
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+  <div className="flex flex-col items-center gap-2">
+    <Skeleton className="h-[70vh] w-full max-w-4xl" />
+    <Skeleton className="h-[70vh] w-full max-w-4xl" />
   </div>
 );
