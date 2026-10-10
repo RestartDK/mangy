@@ -13,9 +13,12 @@
     "check-types": "tsc -b"
   },
   "dependencies": {
+    "@effect/sql-pg": "catalog:",
     "@mangy/db": "workspace:*",
     "@mangy/env": "workspace:*",
     "better-auth": "catalog:",
+    "drizzle-orm": "^0.45.4",
+    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
