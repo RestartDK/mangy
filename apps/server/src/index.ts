@@ -1,4 +1,4 @@
-import { auth } from "@mangy/auth";
+import { getAuth } from "@mangy/auth";
 import { Effect } from "effect";
 import { Elysia } from "elysia";
 
@@ -15,7 +15,7 @@ import { makeServer } from "./server";
 
 export const createApp = (config: AppConfig) =>
   new Elysia()
-    .mount(auth.handler)
+    .mount(getAuth().handler)
     .use(sources)
     .use(series)
     .use(makeLibrary(config.trackingPollIntervalMs))

@@ -1,6 +1,6 @@
 import { PgClient } from "@effect/sql-pg";
 import { columnsByModel } from "@mangy/db/model";
-import { env } from "@mangy/env";
+import { envConfig } from "@mangy/env";
 import { createAdapterFactory } from "better-auth/adapters";
 import type {
   AdapterFactoryCustomizeAdapterCreator,
@@ -9,7 +9,7 @@ import type {
   JoinConfig,
   ModelTarget,
 } from "better-auth/adapters";
-import { Effect, ManagedRuntime, Redacted } from "effect";
+import { Effect, ManagedRuntime } from "effect";
 import { SqlClient, Statement } from "effect/sql";
 import type { SqlError } from "effect/sql/SqlError";
 import type { Fragment } from "effect/sql/Statement";
@@ -20,7 +20,7 @@ const resolveColumn = (model: string, field: string): string =>
   columnsByModel[model]?.[field] ?? field;
 
 const runtime = ManagedRuntime.make(
-  PgClient.layer({ url: Redacted.make(env.DATABASE_URL) })
+  PgClient.layerConfig({ url: envConfig.DATABASE_URL })
 );
 
 const run = async <A>(

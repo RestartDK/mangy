@@ -1,5 +1,5 @@
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
-import { auth } from "@mangy/auth";
+import { getAuth } from "@mangy/auth";
 import { Layer } from "effect";
 import {
   HttpEffect,
@@ -40,12 +40,6 @@ const makeAllowedOrigin = (
       devOriginPatterns.some((pattern) => pattern.test(origin)));
 };
 
-const AuthRoutes = HttpRouter.add(
-  "*",
-  "/api/auth/*",
-  HttpEffect.fromWebHandler(auth.handler)
-);
-
 const HealthRoute = HttpRouter.add(
   "GET",
   "/",
@@ -63,6 +57,12 @@ export const makeServer = (
   },
   config: AppConfig
 ) => {
+  const AuthRoutes = HttpRouter.add(
+    "*",
+    "/api/auth/*",
+    HttpEffect.fromWebHandler(getAuth().handler)
+  );
+
   const CorsMiddleware = HttpRouter.middleware(
     HttpMiddleware.cors({
       allowedOrigins: makeAllowedOrigin(config),
