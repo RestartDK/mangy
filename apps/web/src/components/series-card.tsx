@@ -1,7 +1,7 @@
+import type { DiscoverSection } from "@mangy/contract";
 import { Link } from "@tanstack/react-router";
 
 import { SeriesCover } from "@/components/series-cover";
-import type { DiscoverSection } from "@/hooks/use-source-discover";
 
 type SeriesCardItem = DiscoverSection["items"][number];
 

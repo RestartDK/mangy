@@ -1,5 +1,16 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { AsyncResult } from "effect/reactivity";
+import { toast } from "sonner";
 
+import { reactivityKey } from "@/atoms/keys";
+import {
+  markAllNotificationsRead,
+  markNotificationRead,
+  notificationPreferencesQuery,
+  notificationsQuery,
+} from "@/atoms/notifications";
+import type { NotificationItem } from "@/atoms/notifications";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -8,11 +19,11 @@ import type { StatusTone } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMarkAllNotificationsRead } from "@/hooks/use-mark-all-notifications-read";
-import { useMarkNotificationRead } from "@/hooks/use-mark-notification-read";
-import { useNotificationPreferences } from "@/hooks/use-notification-preferences";
-import type { NotificationItem } from "@/hooks/use-notifications";
-import { useNotifications } from "@/hooks/use-notifications";
+import {
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 import { cn } from "@/lib/utils";
@@ -40,13 +51,38 @@ const NotificationsSkeleton = () => (
   </div>
 );
 const NotificationsRouteComponent = () => {
-  const notificationsQuery = useNotifications();
-  const preferencesQuery = useNotificationPreferences();
-  const markNotificationRead = useMarkNotificationRead();
-  const markAllNotificationsRead = useMarkAllNotificationsRead();
+  const notifications = useAtomValue(notificationsQuery);
+  const preferences = useAtomValue(notificationPreferencesQuery);
+  const markRead = useAtomSet(markNotificationRead, { mode: "promise" });
+  const markAllRead = useAtomSet(markAllNotificationsRead, { mode: "promise" });
+  const markAllResult = useAtomValue(markAllNotificationsRead);
+  const unreadCount = asyncResultValue(preferences)?.unreadCount ?? 0;
+  const items = asyncResultValue(notifications) ?? [];
+  const error =
+    asyncResultError(notifications) ?? asyncResultError(preferences);
+  const isLoading = asyncResultLoading(notifications);
+  const isMarkingAllRead = AsyncResult.isWaiting(markAllResult);
 
-  const unreadCount = preferencesQuery.data?.unreadCount ?? 0;
-  const notifications = notificationsQuery.data ?? [];
+  const markAll = async (): Promise<void> => {
+    try {
+      const result = await markAllRead({
+        reactivityKeys: [
+          reactivityKey.notifications,
+          reactivityKey.notificationPreferences,
+          reactivityKey.settingsBootstrap,
+        ],
+      });
+      const { updatedCount } = result;
+
+      toast.success(
+        updatedCount
+          ? `${updatedCount} notifications marked as read`
+          : "All notifications are already read"
+      );
+    } catch (markError) {
+      toast.error(getErrorMessage(markError, "Unable to update notifications"));
+    }
+  };
 
   return (
     <AppShell>
@@ -57,46 +93,41 @@ const NotificationsRouteComponent = () => {
               {unreadCount === 0 ? "All read" : `${unreadCount} unread`}
             </span>
             <Button
-              disabled={markAllNotificationsRead.isPending || unreadCount === 0}
+              disabled={isMarkingAllRead || unreadCount === 0}
               onClick={() => {
-                markAllNotificationsRead.mutate();
+                void markAll();
               }}
               size="lg"
               variant="outline"
             >
-              {markAllNotificationsRead.isPending
-                ? "Working..."
-                : "Mark all read"}
+              {isMarkingAllRead ? "Working..." : "Mark all read"}
             </Button>
           </div>
         }
         title="Notifications"
       />
 
-      {notificationsQuery.error || preferencesQuery.error ? (
+      {error === undefined ? null : (
         <Alert variant="destructive">
           <AlertTitle>Unable to load notifications</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(
-              notificationsQuery.error ?? preferencesQuery.error,
-              "Try again in a moment."
-            )}
+            {getErrorMessage(error, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
-      {notificationsQuery.isLoading ? <NotificationsSkeleton /> : null}
+      {isLoading ? <NotificationsSkeleton /> : null}
 
-      {notificationsQuery.isLoading || notifications.length ? null : (
+      {isLoading || items.length ? null : (
         <EmptyState
           description="Download and tracking updates land here."
           title="No notifications yet"
         />
       )}
 
-      {notifications.length ? (
+      {items.length ? (
         <div className="panel rows">
-          {notifications.map((item) => {
+          {items.map((item) => {
             const type = notificationTypeLabels[item.type];
 
             return (
@@ -126,9 +157,15 @@ const NotificationsRouteComponent = () => {
                   <span className="meta">{formatDateTime(item.createdAt)}</span>
                   {item.isRead ? null : (
                     <Button
-                      disabled={markNotificationRead.isPending}
                       onClick={() => {
-                        markNotificationRead.mutate(item.id);
+                        void markRead({
+                          params: { notificationId: item.id },
+                          reactivityKeys: [
+                            reactivityKey.notifications,
+                            reactivityKey.notificationPreferences,
+                            reactivityKey.settingsBootstrap,
+                          ],
+                        });
                       }}
                       size="sm"
                       type="button"

@@ -1,4 +1,6 @@
 export const reactivityKey = {
+  browserPushClientState: "browser-push-client-state",
+  browserPushSettings: "browser-push-settings",
   downloads: "downloads",
   library: "library",
   librarySeriesState: "library-series-state",

@@ -1,6 +1,5 @@
+import type { SourceSummary } from "@mangy/contract";
 import { useCallback, useEffect, useState } from "react";
-
-import type { SourceSummary } from "@/hooks/use-sources";
 
 const PREFERRED_SOURCE_STORAGE_KEY = "mangy.preferred-source-id";
 
