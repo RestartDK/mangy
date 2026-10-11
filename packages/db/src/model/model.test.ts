@@ -34,7 +34,10 @@ describe("model column names", () => {
       );
       const actual: Record<string, string> = model.columns;
       expect(actual).toEqual(expected);
-      expect(Object.keys(model.row.fields).toSorted()).toEqual(
+      expect(Object.keys(model.row.to.fields).toSorted()).toEqual(
+        Object.keys(expected).toSorted()
+      );
+      expect(Object.keys(model.row.from.fields).toSorted()).toEqual(
         Object.values(expected).toSorted()
       );
     });

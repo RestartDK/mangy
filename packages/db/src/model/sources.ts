@@ -1,120 +1,119 @@
 import { Schema } from "effect";
 
-import { defineTable } from "./table";
+import { fieldColumns } from "./columns";
+import { ChapterIdSchema, SeriesIdSchema, SourceIdSchema } from "./ids";
 
-export const { row: sourceRow, columns: sourceColumns } = defineTable({
-  createdAt: { column: "created_at", schema: Schema.Date },
-  description: { column: "description", schema: Schema.String },
-  iconUrl: { column: "icon_url", nullable: true, schema: Schema.String },
-  id: { column: "id", schema: Schema.String },
-  isEnabled: { column: "is_enabled", schema: Schema.Boolean },
-  languageCode: { column: "language_code", schema: Schema.String },
-  name: { column: "name", schema: Schema.String },
-  supportedLanguages: {
-    column: "supported_languages",
-    schema: Schema.Array(Schema.String),
-  },
-  supportsChapterFeed: {
-    column: "supports_chapter_feed",
-    schema: Schema.Boolean,
-  },
-  supportsFilters: { column: "supports_filters", schema: Schema.Boolean },
-  supportsLatest: { column: "supports_latest", schema: Schema.Boolean },
-  supportsPageFetch: { column: "supports_page_fetch", schema: Schema.Boolean },
-  supportsPopular: { column: "supports_popular", schema: Schema.Boolean },
-  supportsSearch: { column: "supports_search", schema: Schema.Boolean },
-  supportsSeriesDetails: {
-    column: "supports_series_details",
-    schema: Schema.Boolean,
-  },
-  supportsTrending: { column: "supports_trending", schema: Schema.Boolean },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-  websiteUrl: { column: "website_url", schema: Schema.String },
-});
+export const sourceRow = Schema.Struct({
+  createdAt: Schema.Date,
+  description: Schema.String,
+  iconUrl: Schema.NullOr(Schema.String),
+  id: SourceIdSchema,
+  isEnabled: Schema.Boolean,
+  languageCode: Schema.String,
+  name: Schema.String,
+  supportedLanguages: Schema.Array(Schema.String),
+  supportsChapterFeed: Schema.Boolean,
+  supportsFilters: Schema.Boolean,
+  supportsLatest: Schema.Boolean,
+  supportsPageFetch: Schema.Boolean,
+  supportsPopular: Schema.Boolean,
+  supportsSearch: Schema.Boolean,
+  supportsSeriesDetails: Schema.Boolean,
+  supportsTrending: Schema.Boolean,
+  updatedAt: Schema.Date,
+  websiteUrl: Schema.String,
+}).pipe(
+  Schema.encodeKeys({
+    createdAt: "created_at",
+    iconUrl: "icon_url",
+    isEnabled: "is_enabled",
+    languageCode: "language_code",
+    supportedLanguages: "supported_languages",
+    supportsChapterFeed: "supports_chapter_feed",
+    supportsFilters: "supports_filters",
+    supportsLatest: "supports_latest",
+    supportsPageFetch: "supports_page_fetch",
+    supportsPopular: "supports_popular",
+    supportsSearch: "supports_search",
+    supportsSeriesDetails: "supports_series_details",
+    supportsTrending: "supports_trending",
+    updatedAt: "updated_at",
+    websiteUrl: "website_url",
+  })
+);
+export const sourceColumns = fieldColumns(sourceRow);
 
-export const { row: seriesRow, columns: seriesColumns } = defineTable({
-  artistNames: { column: "artist_names", schema: Schema.Array(Schema.String) },
-  authorNames: { column: "author_names", schema: Schema.Array(Schema.String) },
-  availableTranslatedLanguages: {
-    column: "available_translated_languages",
-    schema: Schema.Array(Schema.String),
-  },
-  canonicalUrl: {
-    column: "canonical_url",
-    nullable: true,
-    schema: Schema.String,
-  },
-  contentRating: {
-    column: "content_rating",
-    nullable: true,
-    schema: Schema.String,
-  },
-  coverImageUrl: {
-    column: "cover_image_url",
-    nullable: true,
-    schema: Schema.String,
-  },
-  createdAt: { column: "created_at", schema: Schema.Date },
-  description: { column: "description", nullable: true, schema: Schema.String },
-  externalId: { column: "external_id", schema: Schema.String },
-  id: { column: "id", schema: Schema.String },
-  lastFetchedAt: { column: "last_fetched_at", schema: Schema.Date },
-  latestChapter: {
-    column: "latest_chapter",
-    nullable: true,
-    schema: Schema.String,
-  },
-  originalLanguage: {
-    column: "original_language",
-    nullable: true,
-    schema: Schema.String,
-  },
-  publicationDemographic: {
-    column: "publication_demographic",
-    nullable: true,
-    schema: Schema.String,
-  },
-  sourceId: { column: "source_id", schema: Schema.String },
-  status: { column: "status", schema: Schema.String },
-  tags: { column: "tags", schema: Schema.Array(Schema.String) },
-  title: { column: "title", schema: Schema.String },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-});
+export const seriesRow = Schema.Struct({
+  artistNames: Schema.Array(Schema.String),
+  authorNames: Schema.Array(Schema.String),
+  availableTranslatedLanguages: Schema.Array(Schema.String),
+  canonicalUrl: Schema.NullOr(Schema.String),
+  contentRating: Schema.NullOr(Schema.String),
+  coverImageUrl: Schema.NullOr(Schema.String),
+  createdAt: Schema.Date,
+  description: Schema.NullOr(Schema.String),
+  externalId: Schema.String,
+  id: SeriesIdSchema,
+  lastFetchedAt: Schema.Date,
+  latestChapter: Schema.NullOr(Schema.String),
+  originalLanguage: Schema.NullOr(Schema.String),
+  publicationDemographic: Schema.NullOr(Schema.String),
+  sourceId: SourceIdSchema,
+  status: Schema.String,
+  tags: Schema.Array(Schema.String),
+  title: Schema.String,
+  updatedAt: Schema.Date,
+}).pipe(
+  Schema.encodeKeys({
+    artistNames: "artist_names",
+    authorNames: "author_names",
+    availableTranslatedLanguages: "available_translated_languages",
+    canonicalUrl: "canonical_url",
+    contentRating: "content_rating",
+    coverImageUrl: "cover_image_url",
+    createdAt: "created_at",
+    externalId: "external_id",
+    lastFetchedAt: "last_fetched_at",
+    latestChapter: "latest_chapter",
+    originalLanguage: "original_language",
+    publicationDemographic: "publication_demographic",
+    sourceId: "source_id",
+    updatedAt: "updated_at",
+  })
+);
+export const seriesColumns = fieldColumns(seriesRow);
 
-export const { row: chapterRow, columns: chapterColumns } = defineTable({
-  chapterNumber: {
-    column: "chapter_number",
-    nullable: true,
-    schema: Schema.String,
-  },
-  createdAt: { column: "created_at", schema: Schema.Date },
-  externalId: { column: "external_id", schema: Schema.String },
-  externalUrl: {
-    column: "external_url",
-    nullable: true,
-    schema: Schema.String,
-  },
-  id: { column: "id", schema: Schema.String },
-  isDownloaded: { column: "is_downloaded", schema: Schema.Boolean },
-  isUnavailable: { column: "is_unavailable", schema: Schema.Boolean },
-  pageCount: { column: "page_count", nullable: true, schema: Schema.Int },
-  publishedAt: { column: "published_at", nullable: true, schema: Schema.Date },
-  seriesId: { column: "series_id", schema: Schema.String },
-  sourceOrder: {
-    column: "source_order",
-    nullable: true,
-    schema: Schema.String,
-  },
-  title: { column: "title", nullable: true, schema: Schema.String },
-  translatedLanguage: {
-    column: "translated_language",
-    nullable: true,
-    schema: Schema.String,
-  },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-  volumeNumber: {
-    column: "volume_number",
-    nullable: true,
-    schema: Schema.String,
-  },
-});
+export const chapterRow = Schema.Struct({
+  chapterNumber: Schema.NullOr(Schema.String),
+  createdAt: Schema.Date,
+  externalId: Schema.String,
+  externalUrl: Schema.NullOr(Schema.String),
+  id: ChapterIdSchema,
+  isDownloaded: Schema.Boolean,
+  isUnavailable: Schema.Boolean,
+  pageCount: Schema.NullOr(Schema.Int),
+  publishedAt: Schema.NullOr(Schema.Date),
+  seriesId: SeriesIdSchema,
+  sourceOrder: Schema.NullOr(Schema.String),
+  title: Schema.NullOr(Schema.String),
+  translatedLanguage: Schema.NullOr(Schema.String),
+  updatedAt: Schema.Date,
+  volumeNumber: Schema.NullOr(Schema.String),
+}).pipe(
+  Schema.encodeKeys({
+    chapterNumber: "chapter_number",
+    createdAt: "created_at",
+    externalId: "external_id",
+    externalUrl: "external_url",
+    isDownloaded: "is_downloaded",
+    isUnavailable: "is_unavailable",
+    pageCount: "page_count",
+    publishedAt: "published_at",
+    seriesId: "series_id",
+    sourceOrder: "source_order",
+    translatedLanguage: "translated_language",
+    updatedAt: "updated_at",
+    volumeNumber: "volume_number",
+  })
+);
+export const chapterColumns = fieldColumns(chapterRow);

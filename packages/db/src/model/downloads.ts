@@ -1,61 +1,71 @@
 import { Schema } from "effect";
 
-import { defineTable } from "./table";
+import { fieldColumns } from "./columns";
+import {
+  ChapterIdSchema,
+  DownloadArtifactIdSchema,
+  DownloadDestinationIdSchema,
+  DownloadJobIdSchema,
+  SeriesIdSchema,
+  UserIdSchema,
+} from "./ids";
 
-export const { row: downloadJobRow, columns: downloadJobColumns } = defineTable(
-  {
-    attempts: { column: "attempts", schema: Schema.Int },
-    chapterId: { column: "chapter_id", nullable: true, schema: Schema.String },
-    completedAt: {
-      column: "completed_at",
-      nullable: true,
-      schema: Schema.Date,
-    },
-    createdAt: { column: "created_at", schema: Schema.Date },
-    downloadDestinationId: {
-      column: "download_destination_id",
-      nullable: true,
-      schema: Schema.String,
-    },
-    errorMessage: {
-      column: "error_message",
-      nullable: true,
-      schema: Schema.String,
-    },
-    id: { column: "id", schema: Schema.String },
-    leaseOwner: {
-      column: "lease_owner",
-      nullable: true,
-      schema: Schema.String,
-    },
-    leasedAt: { column: "leased_at", nullable: true, schema: Schema.Date },
-    maxAttempts: { column: "max_attempts", schema: Schema.Int },
-    progressPercent: { column: "progress_percent", schema: Schema.Int },
-    seriesId: { column: "series_id", nullable: true, schema: Schema.String },
-    startedAt: { column: "started_at", nullable: true, schema: Schema.Date },
-    status: { column: "status", schema: Schema.String },
-    updatedAt: { column: "updated_at", schema: Schema.Date },
-    userId: { column: "user_id", schema: Schema.String },
-  }
+export const downloadJobRow = Schema.Struct({
+  attempts: Schema.Int,
+  chapterId: Schema.NullOr(ChapterIdSchema),
+  completedAt: Schema.NullOr(Schema.Date),
+  createdAt: Schema.Date,
+  downloadDestinationId: Schema.NullOr(DownloadDestinationIdSchema),
+  errorMessage: Schema.NullOr(Schema.String),
+  id: DownloadJobIdSchema,
+  leaseOwner: Schema.NullOr(Schema.String),
+  leasedAt: Schema.NullOr(Schema.Date),
+  maxAttempts: Schema.Int,
+  progressPercent: Schema.Int,
+  seriesId: Schema.NullOr(SeriesIdSchema),
+  startedAt: Schema.NullOr(Schema.Date),
+  status: Schema.String,
+  updatedAt: Schema.Date,
+  userId: UserIdSchema,
+}).pipe(
+  Schema.encodeKeys({
+    chapterId: "chapter_id",
+    completedAt: "completed_at",
+    createdAt: "created_at",
+    downloadDestinationId: "download_destination_id",
+    errorMessage: "error_message",
+    leaseOwner: "lease_owner",
+    leasedAt: "leased_at",
+    maxAttempts: "max_attempts",
+    progressPercent: "progress_percent",
+    seriesId: "series_id",
+    startedAt: "started_at",
+    updatedAt: "updated_at",
+    userId: "user_id",
+  })
 );
+export const downloadJobColumns = fieldColumns(downloadJobRow);
 
-export const { row: downloadArtifactRow, columns: downloadArtifactColumns } =
-  defineTable({
-    chapterId: { column: "chapter_id", nullable: true, schema: Schema.String },
-    createdAt: { column: "created_at", schema: Schema.Date },
-    downloadJobId: { column: "download_job_id", schema: Schema.String },
-    fileSizeBytes: {
-      column: "file_size_bytes",
-      nullable: true,
-      schema: Schema.Int,
-    },
-    id: { column: "id", schema: Schema.String },
-    importedToKomgaAt: {
-      column: "imported_to_komga_at",
-      nullable: true,
-      schema: Schema.Date,
-    },
-    outputPath: { column: "output_path", schema: Schema.String },
-    packageFormat: { column: "package_format", schema: Schema.String },
-    updatedAt: { column: "updated_at", schema: Schema.Date },
-  });
+export const downloadArtifactRow = Schema.Struct({
+  chapterId: Schema.NullOr(ChapterIdSchema),
+  createdAt: Schema.Date,
+  downloadJobId: DownloadJobIdSchema,
+  fileSizeBytes: Schema.NullOr(Schema.Int),
+  id: DownloadArtifactIdSchema,
+  importedToKomgaAt: Schema.NullOr(Schema.Date),
+  outputPath: Schema.String,
+  packageFormat: Schema.String,
+  updatedAt: Schema.Date,
+}).pipe(
+  Schema.encodeKeys({
+    chapterId: "chapter_id",
+    createdAt: "created_at",
+    downloadJobId: "download_job_id",
+    fileSizeBytes: "file_size_bytes",
+    importedToKomgaAt: "imported_to_komga_at",
+    outputPath: "output_path",
+    packageFormat: "package_format",
+    updatedAt: "updated_at",
+  })
+);
+export const downloadArtifactColumns = fieldColumns(downloadArtifactRow);

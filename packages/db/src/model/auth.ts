@@ -1,66 +1,93 @@
 import { Schema } from "effect";
 
-import { defineTable } from "./table";
+import { fieldColumns } from "./columns";
+import {
+  AccountIdSchema,
+  SessionIdSchema,
+  UserIdSchema,
+  VerificationIdSchema,
+} from "./ids";
 
-export const { row: userRow, columns: userColumns } = defineTable({
-  createdAt: { column: "created_at", schema: Schema.Date },
-  email: { column: "email", schema: Schema.String },
-  emailVerified: { column: "email_verified", schema: Schema.Boolean },
-  id: { column: "id", schema: Schema.String },
-  image: { column: "image", nullable: true, schema: Schema.String },
-  name: { column: "name", schema: Schema.String },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-});
+export const userRow = Schema.Struct({
+  createdAt: Schema.Date,
+  email: Schema.String,
+  emailVerified: Schema.Boolean,
+  id: UserIdSchema,
+  image: Schema.NullOr(Schema.String),
+  name: Schema.String,
+  updatedAt: Schema.Date,
+}).pipe(
+  Schema.encodeKeys({
+    createdAt: "created_at",
+    emailVerified: "email_verified",
+    updatedAt: "updated_at",
+  })
+);
+export const userColumns = fieldColumns(userRow);
 
-export const { row: sessionRow, columns: sessionColumns } = defineTable({
-  createdAt: { column: "created_at", schema: Schema.Date },
-  expiresAt: { column: "expires_at", schema: Schema.Date },
-  id: { column: "id", schema: Schema.String },
-  ipAddress: { column: "ip_address", nullable: true, schema: Schema.String },
-  token: { column: "token", schema: Schema.String },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-  userAgent: { column: "user_agent", nullable: true, schema: Schema.String },
-  userId: { column: "user_id", schema: Schema.String },
-});
+export const sessionRow = Schema.Struct({
+  createdAt: Schema.Date,
+  expiresAt: Schema.Date,
+  id: SessionIdSchema,
+  ipAddress: Schema.NullOr(Schema.String),
+  token: Schema.String,
+  updatedAt: Schema.Date,
+  userAgent: Schema.NullOr(Schema.String),
+  userId: UserIdSchema,
+}).pipe(
+  Schema.encodeKeys({
+    createdAt: "created_at",
+    expiresAt: "expires_at",
+    ipAddress: "ip_address",
+    updatedAt: "updated_at",
+    userAgent: "user_agent",
+    userId: "user_id",
+  })
+);
+export const sessionColumns = fieldColumns(sessionRow);
 
-export const { row: accountRow, columns: accountColumns } = defineTable({
-  accessToken: {
-    column: "access_token",
-    nullable: true,
-    schema: Schema.String,
-  },
-  accessTokenExpiresAt: {
-    column: "access_token_expires_at",
-    nullable: true,
-    schema: Schema.Date,
-  },
-  accountId: { column: "account_id", schema: Schema.String },
-  createdAt: { column: "created_at", schema: Schema.Date },
-  id: { column: "id", schema: Schema.String },
-  idToken: { column: "id_token", nullable: true, schema: Schema.String },
-  password: { column: "password", nullable: true, schema: Schema.String },
-  providerId: { column: "provider_id", schema: Schema.String },
-  refreshToken: {
-    column: "refresh_token",
-    nullable: true,
-    schema: Schema.String,
-  },
-  refreshTokenExpiresAt: {
-    column: "refresh_token_expires_at",
-    nullable: true,
-    schema: Schema.Date,
-  },
-  scope: { column: "scope", nullable: true, schema: Schema.String },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-  userId: { column: "user_id", schema: Schema.String },
-});
+export const accountRow = Schema.Struct({
+  accessToken: Schema.NullOr(Schema.String),
+  accessTokenExpiresAt: Schema.NullOr(Schema.Date),
+  accountId: Schema.String,
+  createdAt: Schema.Date,
+  id: AccountIdSchema,
+  idToken: Schema.NullOr(Schema.String),
+  password: Schema.NullOr(Schema.String),
+  providerId: Schema.String,
+  refreshToken: Schema.NullOr(Schema.String),
+  refreshTokenExpiresAt: Schema.NullOr(Schema.Date),
+  scope: Schema.NullOr(Schema.String),
+  updatedAt: Schema.Date,
+  userId: UserIdSchema,
+}).pipe(
+  Schema.encodeKeys({
+    accessToken: "access_token",
+    accessTokenExpiresAt: "access_token_expires_at",
+    accountId: "account_id",
+    createdAt: "created_at",
+    idToken: "id_token",
+    providerId: "provider_id",
+    refreshToken: "refresh_token",
+    refreshTokenExpiresAt: "refresh_token_expires_at",
+    updatedAt: "updated_at",
+    userId: "user_id",
+  })
+);
+export const accountColumns = fieldColumns(accountRow);
 
-export const { row: verificationRow, columns: verificationColumns } =
-  defineTable({
-    createdAt: { column: "created_at", schema: Schema.Date },
-    expiresAt: { column: "expires_at", schema: Schema.Date },
-    id: { column: "id", schema: Schema.String },
-    identifier: { column: "identifier", schema: Schema.String },
-    updatedAt: { column: "updated_at", schema: Schema.Date },
-    value: { column: "value", schema: Schema.String },
-  });
+export const verificationRow = Schema.Struct({
+  createdAt: Schema.Date,
+  expiresAt: Schema.Date,
+  id: VerificationIdSchema,
+  identifier: Schema.String,
+  updatedAt: Schema.Date,
+  value: Schema.String,
+}).pipe(
+  Schema.encodeKeys({
+    createdAt: "created_at",
+    expiresAt: "expires_at",
+    updatedAt: "updated_at",
+  })
+);
+export const verificationColumns = fieldColumns(verificationRow);

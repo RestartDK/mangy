@@ -1,65 +1,80 @@
 import { Schema } from "effect";
 
-import { defineTable } from "./table";
+import { fieldColumns } from "./columns";
+import {
+  ChapterIdSchema,
+  DownloadDestinationIdSchema,
+  LibraryEntryIdSchema,
+  SeriesIdSchema,
+  TrackedSeriesStateIdSchema,
+  UserIdSchema,
+} from "./ids";
 
-export const {
-  row: downloadDestinationRow,
-  columns: downloadDestinationColumns,
-} = defineTable({
-  absolutePath: { column: "absolute_path", schema: Schema.String },
-  createdAt: { column: "created_at", schema: Schema.Date },
-  id: { column: "id", schema: Schema.String },
-  isDefault: { column: "is_default", schema: Schema.Boolean },
-  isEnabled: { column: "is_enabled", schema: Schema.Boolean },
-  komgaLibraryId: {
-    column: "komga_library_id",
-    nullable: true,
-    schema: Schema.String,
-  },
-  name: { column: "name", schema: Schema.String },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-  userId: { column: "user_id", schema: Schema.String },
-});
+export const downloadDestinationRow = Schema.Struct({
+  absolutePath: Schema.String,
+  createdAt: Schema.Date,
+  id: DownloadDestinationIdSchema,
+  isDefault: Schema.Boolean,
+  isEnabled: Schema.Boolean,
+  komgaLibraryId: Schema.NullOr(Schema.String),
+  name: Schema.String,
+  updatedAt: Schema.Date,
+  userId: UserIdSchema,
+}).pipe(
+  Schema.encodeKeys({
+    absolutePath: "absolute_path",
+    createdAt: "created_at",
+    isDefault: "is_default",
+    isEnabled: "is_enabled",
+    komgaLibraryId: "komga_library_id",
+    updatedAt: "updated_at",
+    userId: "user_id",
+  })
+);
+export const downloadDestinationColumns = fieldColumns(downloadDestinationRow);
 
-export const { row: libraryEntryRow, columns: libraryEntryColumns } =
-  defineTable({
-    autoDownload: { column: "auto_download", schema: Schema.Boolean },
-    createdAt: { column: "created_at", schema: Schema.Date },
-    downloadDestinationId: {
-      column: "download_destination_id",
-      nullable: true,
-      schema: Schema.String,
-    },
-    id: { column: "id", schema: Schema.String },
-    isTracked: { column: "is_tracked", schema: Schema.Boolean },
-    lastOpenedChapterId: {
-      column: "last_opened_chapter_id",
-      nullable: true,
-      schema: Schema.String,
-    },
-    seriesId: { column: "series_id", schema: Schema.String },
-    updatedAt: { column: "updated_at", schema: Schema.Date },
-    userId: { column: "user_id", schema: Schema.String },
-  });
+export const libraryEntryRow = Schema.Struct({
+  autoDownload: Schema.Boolean,
+  createdAt: Schema.Date,
+  downloadDestinationId: Schema.NullOr(DownloadDestinationIdSchema),
+  id: LibraryEntryIdSchema,
+  isTracked: Schema.Boolean,
+  lastOpenedChapterId: Schema.NullOr(ChapterIdSchema),
+  seriesId: SeriesIdSchema,
+  updatedAt: Schema.Date,
+  userId: UserIdSchema,
+}).pipe(
+  Schema.encodeKeys({
+    autoDownload: "auto_download",
+    createdAt: "created_at",
+    downloadDestinationId: "download_destination_id",
+    isTracked: "is_tracked",
+    lastOpenedChapterId: "last_opened_chapter_id",
+    seriesId: "series_id",
+    updatedAt: "updated_at",
+    userId: "user_id",
+  })
+);
+export const libraryEntryColumns = fieldColumns(libraryEntryRow);
 
-export const {
-  row: trackedSeriesStateRow,
-  columns: trackedSeriesStateColumns,
-} = defineTable({
-  checkFailureCount: { column: "check_failure_count", schema: Schema.Int },
-  createdAt: { column: "created_at", schema: Schema.Date },
-  id: { column: "id", schema: Schema.String },
-  lastCheckedAt: {
-    column: "last_checked_at",
-    nullable: true,
-    schema: Schema.Date,
-  },
-  lastSeenChapterExternalId: {
-    column: "last_seen_chapter_external_id",
-    nullable: true,
-    schema: Schema.String,
-  },
-  libraryEntryId: { column: "library_entry_id", schema: Schema.String },
-  nextCheckAt: { column: "next_check_at", nullable: true, schema: Schema.Date },
-  updatedAt: { column: "updated_at", schema: Schema.Date },
-});
+export const trackedSeriesStateRow = Schema.Struct({
+  checkFailureCount: Schema.Int,
+  createdAt: Schema.Date,
+  id: TrackedSeriesStateIdSchema,
+  lastCheckedAt: Schema.NullOr(Schema.Date),
+  lastSeenChapterExternalId: Schema.NullOr(Schema.String),
+  libraryEntryId: LibraryEntryIdSchema,
+  nextCheckAt: Schema.NullOr(Schema.Date),
+  updatedAt: Schema.Date,
+}).pipe(
+  Schema.encodeKeys({
+    checkFailureCount: "check_failure_count",
+    createdAt: "created_at",
+    lastCheckedAt: "last_checked_at",
+    lastSeenChapterExternalId: "last_seen_chapter_external_id",
+    libraryEntryId: "library_entry_id",
+    nextCheckAt: "next_check_at",
+    updatedAt: "updated_at",
+  })
+);
+export const trackedSeriesStateColumns = fieldColumns(trackedSeriesStateRow);
