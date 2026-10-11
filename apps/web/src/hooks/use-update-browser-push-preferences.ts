@@ -2,24 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-
-type UpdateBrowserPushPreferencesPayload = NonNullable<
-  Parameters<typeof api.api.settings.push.preferences.patch>[0]
->;
+import type { UpdateBrowserPushPreferencesPayload } from "@/lib/api";
 
 export const useUpdateBrowserPushPreferences = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: UpdateBrowserPushPreferencesPayload) => {
-      const { data, error } =
-        await api.api.settings.push.preferences.patch(body);
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (body: UpdateBrowserPushPreferencesPayload) =>
+      await api.run((client) =>
+        client.settings.updatePushPreferences({ payload: body })
+      ),
     onError: (error) => {
       toast.error(
         error instanceof Error

@@ -7,16 +7,10 @@ export const useDeleteDestination = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (destinationId: string) => {
-      const { data, error } = await api.api.settings
-        .destinations({ destinationId })
-        .delete();
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (destinationId: string) =>
+      await api.run((client) =>
+        client.settings.deleteDestination({ params: { destinationId } })
+      ),
     onError: (error) => {
       toast.error(
         error instanceof Error ? error.message : "Unable to remove destination"

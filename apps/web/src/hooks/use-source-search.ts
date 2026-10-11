@@ -2,14 +2,7 @@ import type { InfiniteData, QueryKey } from "@tanstack/react-query";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
-
-type SearchResponse = NonNullable<
-  Awaited<
-    ReturnType<ReturnType<typeof api.api.sources>["search"]["post"]>
-  >["data"]
->;
-
-export type SourceSearchPage = SearchResponse;
+import type { SourceSearchPage } from "@/lib/api";
 
 export interface SourceSearchParams {
   enabled?: boolean;
@@ -23,28 +16,18 @@ const fetchSearchPage = async (
   sourceId: string,
   params: SourceSearchParams,
   page: number
-): Promise<SourceSearchPage> => {
-  const { data, error } = await api.api.sources({ sourceId }).search.post({
-    filters: params.filters,
-    page,
-    pageSize: params.pageSize,
-    query: params.query,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return (
-    data ?? {
-      hasNextPage: false,
-      items: [],
-      page,
-      pageSize: params.pageSize ?? 20,
-      total: null,
-    }
+): Promise<SourceSearchPage> =>
+  await api.run((client) =>
+    client.sources.search({
+      params: { sourceId },
+      payload: {
+        filters: params.filters,
+        page,
+        pageSize: params.pageSize,
+        query: params.query,
+      },
+    })
   );
-};
 
 export const useSourceSearch = (params: SourceSearchParams) =>
   useInfiniteQuery<

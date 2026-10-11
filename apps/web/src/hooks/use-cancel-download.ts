@@ -7,14 +7,8 @@ export const useCancelDownload = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (jobId: string) => {
-      const { data, error } = await api.api.downloads({ jobId }).cancel.post();
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (jobId: string) =>
+      await api.run((client) => client.downloads.cancel({ params: { jobId } })),
     onError: (error) => {
       toast.error(
         error instanceof Error ? error.message : "Unable to cancel job"

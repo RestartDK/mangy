@@ -6,16 +6,10 @@ export const useMarkNotificationRead = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (notificationId: string) => {
-      const { data, error } = await api.api
-        .notifications({ notificationId })
-        .read.patch();
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (notificationId: string) =>
+      await api.run((client) =>
+        client.notifications.markRead({ params: { notificationId } })
+      ),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["notifications"] }),

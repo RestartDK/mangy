@@ -1,139 +1,114 @@
-import { Elysia } from "elysia";
-import { z } from "zod";
+import { Api, SeriesPageNotFound, SeriesRequestFailed } from "@mangy/contract";
+import { Effect } from "effect";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { HttpApiBuilder } from "effect/http-api";
 
-import { getSessionUser } from "@/lib/auth";
+import { currentUser, getSessionUser } from "@/lib/auth";
 
-import {
-  chapterSchema,
-  errorResponseSchema,
-  seriesChapterParamsSchema,
-  seriesPageParamsSchema,
-  seriesParamsSchema,
-  seriesSourceQuerySchema,
-  sourcePageListSchema,
-  sourceSeriesSchema,
-  unauthorizedResponseSchema,
-} from "./model";
 import { SeriesService, SeriesServiceError } from "./service";
 
-const getAuthenticatedUser = async (request: Request) =>
-  await getSessionUser(request);
+const seriesMessage = (cause: unknown) =>
+  cause instanceof Error ? cause.message : "Unable to load series data";
 
-const handleSeriesError = (
-  error: unknown,
-  set: { status?: number | string }
-) => {
-  set.status = error instanceof SeriesServiceError ? error.status : 400;
+const seriesRequestFailed = (cause: unknown) =>
+  new SeriesRequestFailed({ message: seriesMessage(cause) });
 
-  return {
-    message:
-      error instanceof Error ? error.message : "Unable to load series data",
-  };
-};
+const seriesPageFailed = (cause: unknown) =>
+  cause instanceof SeriesServiceError && cause.status === 404
+    ? new SeriesPageNotFound({ message: seriesMessage(cause) })
+    : seriesRequestFailed(cause);
 
-export const series = new Elysia({ prefix: "/api/series" })
-  .get(
-    "/:seriesId",
-    async ({ params, query, request, set }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
+const seriesErrorStatus = (cause: unknown) =>
+  cause instanceof SeriesServiceError ? cause.status : 400;
 
-      try {
-        return await SeriesService.getSeries(query.sourceId, params.seriesId);
-      } catch (error) {
-        return handleSeriesError(error, set);
-      }
-    },
-    {
-      params: seriesParamsSchema,
-      query: seriesSourceQuerySchema,
-      response: {
-        200: sourceSeriesSchema,
-        400: errorResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .get(
-    "/:seriesId/chapters",
-    async ({ params, query, request, set }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
+// HttpServerRequest.url carries no scheme or host, so the origin the request
+// arrived on has to be rebuilt from the host header before the proxy URL is
+// handed back to the browser.
+const requestUrl = (request: HttpServerRequest.HttpServerRequest) =>
+  new URL(request.url, `http://${request.headers.host ?? "localhost"}`);
 
-      try {
-        return await SeriesService.getChapters(query.sourceId, params.seriesId);
-      } catch (error) {
-        return handleSeriesError(error, set);
-      }
-    },
-    {
-      params: seriesParamsSchema,
-      query: seriesSourceQuerySchema,
-      response: {
-        200: z.array(chapterSchema),
-        400: errorResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .get(
-    "/:seriesId/chapters/:chapterId/pages",
-    async ({ params, query, request, set }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
+export const SeriesApiLive = HttpApiBuilder.group(Api, "series", (handlers) =>
+  handlers.handleAll({
+    get: Effect.fn(function* getSeriesHandler({ params, query }) {
+      yield* currentUser;
+      return yield* Effect.tryPromise({
+        catch: seriesRequestFailed,
+        try: async () =>
+          await SeriesService.getSeries(query.sourceId, params.seriesId),
+      });
+    }),
+    getChapters: Effect.fn(function* getChaptersHandler({ params, query }) {
+      yield* currentUser;
+      return yield* Effect.tryPromise({
+        catch: seriesRequestFailed,
+        try: async () =>
+          await SeriesService.getChapters(query.sourceId, params.seriesId),
+      });
+    }),
+    getPages: Effect.fn(function* getPagesHandler({ params, query, request }) {
+      yield* currentUser;
+      const absoluteUrl = requestUrl(request);
+      return yield* Effect.tryPromise({
+        catch: seriesPageFailed,
+        try: async () =>
+          await SeriesService.getPages(
+            query.sourceId,
+            params.seriesId,
+            params.chapterId,
+            absoluteUrl.toString()
+          ),
+      });
+    }),
+  })
+);
 
-      try {
-        return await SeriesService.getPages(
-          query.sourceId,
-          params.seriesId,
-          params.chapterId,
-          request.url
-        );
-      } catch (error) {
-        return handleSeriesError(error, set);
-      }
-    },
-    {
-      params: seriesChapterParamsSchema,
-      query: seriesSourceQuerySchema,
-      response: {
-        200: sourcePageListSchema,
-        400: errorResponseSchema,
-        401: unauthorizedResponseSchema,
-        404: errorResponseSchema,
-      },
-    }
-  )
-  .get(
-    "/:seriesId/chapters/:chapterId/pages/:pageIndex/image",
-    async ({ params, query, set, request }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await SeriesService.proxyPageImage(
-          query.sourceId,
-          params.chapterId,
-          params.pageIndex
-        );
-      } catch (error) {
-        return handleSeriesError(error, set);
-      }
-    },
-    {
-      params: seriesPageParamsSchema,
-      query: seriesSourceQuerySchema,
-    }
+const seriesErrorResponse = (cause: unknown) =>
+  HttpServerResponse.jsonUnsafe(
+    { message: seriesMessage(cause) },
+    { status: seriesErrorStatus(cause) }
   );
+
+// Byte responses carry upstream headers (content-type, cache-control, etag,
+// last-modified) that the schema-encoded HttpApi stack cannot express.
+export const SeriesPageImageRoute = HttpRouter.add(
+  "GET",
+  "/api/series/:seriesId/chapters/:chapterId/pages/:pageIndex/image",
+  Effect.gen(function* seriesPageImage() {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const params = yield* HttpRouter.params;
+    const webRequest = yield* HttpServerRequest.toWeb(request);
+    const user = yield* Effect.promise(
+      async () => await getSessionUser(webRequest)
+    );
+
+    if (!user) {
+      return HttpServerResponse.jsonUnsafe(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const sourceId = requestUrl(request).searchParams.get("sourceId");
+    const { chapterId } = params;
+    const pageIndex = Number(params.pageIndex);
+
+    if (
+      sourceId === null ||
+      chapterId === undefined ||
+      !Number.isInteger(pageIndex)
+    ) {
+      return HttpServerResponse.jsonUnsafe(
+        { message: "Unable to load series data" },
+        { status: 400 }
+      );
+    }
+
+    const proxied = yield* Effect.tryPromise({
+      catch: seriesErrorResponse,
+      try: async () =>
+        await SeriesService.proxyPageImage(sourceId, chapterId, pageIndex),
+    });
+
+    return HttpServerResponse.fromWeb(proxied);
+  })
+);

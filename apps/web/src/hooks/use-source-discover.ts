@@ -2,11 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-type DiscoverResponse = Awaited<
-  ReturnType<ReturnType<typeof api.api.sources>["discover"]["get"]>
->["data"];
-
-export type DiscoverSection = NonNullable<DiscoverResponse>[number];
+export type { DiscoverSection } from "@/lib/api";
 
 export const useSourceDiscover = (sourceId: string | undefined, limit = 12) =>
   useQuery({
@@ -16,14 +12,9 @@ export const useSourceDiscover = (sourceId: string | undefined, limit = 12) =>
         return [];
       }
 
-      const { data, error } = await api.api.sources({ sourceId }).discover.get({
-        query: { limit },
-      });
-      if (error) {
-        throw error;
-      }
-
-      return data ?? [];
+      return await api.run((client) =>
+        client.sources.discover({ params: { sourceId }, query: { limit } })
+      );
     },
     queryKey: ["sourceDiscover", sourceId, limit],
   });

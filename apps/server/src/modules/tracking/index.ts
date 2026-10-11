@@ -1,8 +1,7 @@
+import { Api, RefreshFailed } from "@mangy/contract";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
-import { Api } from "@/api";
-import { RefreshFailed } from "@/api/tracking";
 import { currentUser } from "@/lib/auth";
 
 import { TrackingService } from "./service";

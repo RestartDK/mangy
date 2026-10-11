@@ -2,18 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-type SourcesResponse = Awaited<ReturnType<typeof api.api.sources.get>>["data"];
-export type SourceSummary = NonNullable<SourcesResponse>[number];
+export type { SourceSummary } from "@/lib/api";
 
 export const useSources = () =>
   useQuery({
-    queryFn: async () => {
-      const { data, error } = await api.api.sources.get();
-      if (error) {
-        throw error;
-      }
-
-      return data ?? [];
-    },
+    queryFn: async () => await api.run((client) => client.sources.list()),
     queryKey: ["sources"],
   });

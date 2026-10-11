@@ -1,127 +1,61 @@
-import { Elysia } from "elysia";
-import { z } from "zod";
+import { Api, BadRequest } from "@mangy/contract";
+import { Effect } from "effect";
+import { HttpApiBuilder } from "effect/http-api";
 
-import { getSessionUser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 
-import {
-  badRequestResponseSchema,
-  libraryItemSchema,
-  librarySeriesQuerySchema,
-  librarySeriesStateSchema,
-  removeLibrarySeriesResponseSchema,
-  unauthorizedResponseSchema,
-  updateLibrarySeriesStateBody,
-} from "./model";
 import { LibraryService } from "./service";
 
-export const makeLibrary = (trackingPollIntervalMs: string) =>
-  new Elysia({ prefix: "/api/library" })
-    .get(
-      "/",
-      async ({ request, set }) => {
-        const user = await getSessionUser(request);
-        if (!user) {
-          set.status = 401;
-          return { message: "Unauthorized" };
-        }
+const badRequest = (message: string) => (cause: unknown) =>
+  new BadRequest({
+    message: cause instanceof Error ? cause.message : message,
+  });
 
-        return await LibraryService.list(user.id);
-      },
-      {
-        response: {
-          200: z.array(libraryItemSchema),
-          401: unauthorizedResponseSchema,
-        },
-      }
-    )
-    .get(
-      "/series-state",
-      async ({ query, request, set }) => {
-        const user = await getSessionUser(request);
-        if (!user) {
-          set.status = 401;
-          return { message: "Unauthorized" };
-        }
-
-        return await LibraryService.getSeriesState(
-          user.id,
-          query.sourceId,
-          query.seriesId
+export const makeLibraryApiLive = (trackingPollIntervalMs: string) =>
+  HttpApiBuilder.group(Api, "library", (handlers) =>
+    handlers.handleAll({
+      getSeriesState: Effect.fn(function* getSeriesStateHandler({ query }) {
+        const userId = yield* currentUser;
+        return yield* Effect.promise(
+          async () =>
+            await LibraryService.getSeriesState(
+              userId,
+              query.sourceId,
+              query.seriesId
+            )
         );
-      },
-      {
-        query: librarySeriesQuerySchema,
-        response: {
-          200: librarySeriesStateSchema,
-          401: unauthorizedResponseSchema,
-        },
-      }
-    )
-    .patch(
-      "/series-state",
-      async ({ body, request, set }) => {
-        const user = await getSessionUser(request);
-        if (!user) {
-          set.status = 401;
-          return { message: "Unauthorized" };
-        }
-
-        try {
-          return await LibraryService.updateSeriesState(
-            user.id,
-            body,
-            trackingPollIntervalMs
-          );
-        } catch (error) {
-          set.status = 400;
-          return {
-            message:
-              error instanceof Error
-                ? error.message
-                : "Unable to update library state",
-          };
-        }
-      },
-      {
-        body: updateLibrarySeriesStateBody,
-        response: {
-          200: librarySeriesStateSchema,
-          400: badRequestResponseSchema,
-          401: unauthorizedResponseSchema,
-        },
-      }
-    )
-    .delete(
-      "/series-state",
-      async ({ query, request, set }) => {
-        const user = await getSessionUser(request);
-        if (!user) {
-          set.status = 401;
-          return { message: "Unauthorized" };
-        }
-
-        try {
-          return await LibraryService.removeSeries(
-            user.id,
-            query.sourceId,
-            query.seriesId
-          );
-        } catch (error) {
-          set.status = 400;
-          return {
-            message:
-              error instanceof Error
-                ? error.message
-                : "Unable to remove library series",
-          };
-        }
-      },
-      {
-        query: librarySeriesQuerySchema,
-        response: {
-          200: removeLibrarySeriesResponseSchema,
-          400: badRequestResponseSchema,
-          401: unauthorizedResponseSchema,
-        },
-      }
-    );
+      }),
+      list: Effect.fn(function* listHandler() {
+        const userId = yield* currentUser;
+        return yield* Effect.promise(
+          async () => await LibraryService.list(userId)
+        );
+      }),
+      removeSeries: Effect.fn(function* removeSeriesHandler({ query }) {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to remove library series"),
+          try: async () =>
+            await LibraryService.removeSeries(
+              userId,
+              query.sourceId,
+              query.seriesId
+            ),
+        });
+      }),
+      updateSeriesState: Effect.fn(function* updateSeriesStateHandler({
+        payload,
+      }) {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to update library state"),
+          try: async () =>
+            await LibraryService.updateSeriesState(
+              userId,
+              payload,
+              trackingPollIntervalMs
+            ),
+        });
+      }),
+    })
+  );

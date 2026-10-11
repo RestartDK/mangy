@@ -21,15 +21,12 @@ export const useConnectCurrentBrowserPush = () => {
   return useMutation({
     mutationFn: async ({ vapidPublicKey }: { vapidPublicKey: string }) => {
       const subscription = await subscribeCurrentBrowserToPush(vapidPublicKey);
-      const { data, error } = await api.api.settings.push.subscriptions.post({
-        ...subscription,
-        userAgent: navigator.userAgent,
-      });
-      if (error) {
-        throw new Error(error.value.message);
-      }
 
-      return data;
+      return await api.run((client) =>
+        client.settings.savePushSubscription({
+          payload: { ...subscription, userAgent: navigator.userAgent },
+        })
+      );
     },
     onError: (error) => {
       toast.error(
@@ -58,13 +55,9 @@ export const useDisconnectCurrentBrowserPush = () => {
         return null;
       }
 
-      const { data, error } =
-        await api.api.settings.push.subscriptions.remove.post({ endpoint });
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
+      return await api.run((client) =>
+        client.settings.removePushSubscription({ payload: { endpoint } })
+      );
     },
     onError: (error) => {
       toast.error(

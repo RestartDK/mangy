@@ -2,24 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-
-type UpdateNotificationPreferencesPayload = NonNullable<
-  Parameters<typeof api.api.notifications.preferences.patch>[0]
->;
+import type { UpdateNotificationPreferencesPayload } from "@/lib/api";
 
 export const useUpdateNotificationPreferences = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: UpdateNotificationPreferencesPayload) => {
-      const { data, error } =
-        await api.api.notifications.preferences.patch(body);
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (body: UpdateNotificationPreferencesPayload) =>
+      await api.run((client) =>
+        client.notifications.updatePreferences({ payload: body })
+      ),
     onError: (error) => {
       toast.error(
         error instanceof Error

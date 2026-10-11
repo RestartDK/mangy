@@ -1,245 +1,92 @@
-import { Elysia } from "elysia";
+import { Api, BadRequest } from "@mangy/contract";
+import { Effect } from "effect";
+import { HttpApiBuilder } from "effect/http-api";
 
-import { getSessionUser } from "@/lib/auth";
+import { currentSessionUser, currentUser } from "@/lib/auth";
 
-import {
-  badRequestResponseSchema,
-  browserPushSettingsSchema,
-  browserPushTestResponseSchema,
-  createDestinationBody,
-  deleteDestinationResponseSchema,
-  destinationParamsSchema,
-  destinationSchema,
-  removePushSubscriptionBody,
-  savePushSubscriptionBody,
-  settingsBootstrapSchema,
-  unauthorizedResponseSchema,
-  updateBrowserPushPreferencesBody,
-} from "./model";
 import { SettingsService } from "./service";
 
-export const settings = new Elysia({ prefix: "/api/settings" })
-  .get(
-    "/bootstrap",
-    async ({ request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
+const badRequest = (message: string) => (cause: unknown) =>
+  new BadRequest({
+    message: cause instanceof Error ? cause.message : message,
+  });
 
-      return await SettingsService.getBootstrap(user.id, {
-        email: user.email,
-        name: user.name,
-      });
-    },
-    {
-      response: {
-        200: settingsBootstrapSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .get(
-    "/push",
-    async ({ request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await SettingsService.getBrowserPushSettings(user.id);
-    },
-    {
-      response: {
-        200: browserPushSettingsSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .patch(
-    "/push/preferences",
-    async ({ body, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await SettingsService.updateBrowserPushPreferences(
-          user.id,
-          body
+export const SettingsApiLive = HttpApiBuilder.group(
+  Api,
+  "settings",
+  (handlers) =>
+    handlers.handleAll({
+      bootstrap: Effect.fn(function* bootstrapHandler() {
+        const { email, id, name } = yield* currentSessionUser;
+        return yield* Effect.promise(
+          async () => await SettingsService.getBootstrap(id, { email, name })
         );
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to update browser notification settings",
-        };
-      }
-    },
-    {
-      body: updateBrowserPushPreferencesBody,
-      response: {
-        200: browserPushSettingsSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .post(
-    "/push/subscriptions",
-    async ({ body, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await SettingsService.savePushSubscription(user.id, body);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to save this browser subscription",
-        };
-      }
-    },
-    {
-      body: savePushSubscriptionBody,
-      response: {
-        200: browserPushSettingsSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .post(
-    "/push/subscriptions/remove",
-    async ({ body, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await SettingsService.removePushSubscription(user.id, body);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to remove this browser subscription",
-        };
-      }
-    },
-    {
-      body: removePushSubscriptionBody,
-      response: {
-        200: browserPushSettingsSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .post(
-    "/push/test",
-    async ({ request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await SettingsService.sendTestBrowserPush(user.id);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to send a browser test notification",
-        };
-      }
-    },
-    {
-      response: {
-        200: browserPushTestResponseSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .post(
-    "/destinations",
-    async ({ body, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await SettingsService.createDestination(user.id, body);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to save destination",
-        };
-      }
-    },
-    {
-      body: createDestinationBody,
-      response: {
-        200: destinationSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .delete(
-    "/destinations/:destinationId",
-    async ({ params, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await SettingsService.deleteDestination(
-          user.id,
-          params.destinationId
+      }),
+      createDestination: Effect.fn(function* createDestinationHandler({
+        payload,
+      }) {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to save destination"),
+          try: async () =>
+            await SettingsService.createDestination(userId, payload),
+        });
+      }),
+      deleteDestination: Effect.fn(function* deleteDestinationHandler({
+        params,
+      }) {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to delete destination"),
+          try: async () =>
+            await SettingsService.deleteDestination(
+              userId,
+              params.destinationId
+            ),
+        });
+      }),
+      getPush: Effect.fn(function* getPushHandler() {
+        const userId = yield* currentUser;
+        return yield* Effect.promise(
+          async () => await SettingsService.getBrowserPushSettings(userId)
         );
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to delete destination",
-        };
-      }
-    },
-    {
-      params: destinationParamsSchema,
-      response: {
-        200: deleteDestinationResponseSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  );
+      }),
+      removePushSubscription: Effect.fn(
+        function* removePushSubscriptionHandler({ payload }) {
+          const userId = yield* currentUser;
+          return yield* Effect.tryPromise({
+            catch: badRequest("Unable to remove this browser subscription"),
+            try: async () =>
+              await SettingsService.removePushSubscription(userId, payload),
+          });
+        }
+      ),
+      savePushSubscription: Effect.fn(function* savePushSubscriptionHandler({
+        payload,
+      }) {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to save this browser subscription"),
+          try: async () =>
+            await SettingsService.savePushSubscription(userId, payload),
+        });
+      }),
+      sendTestPush: Effect.fn(function* sendTestPushHandler() {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to send a browser test notification"),
+          try: async () => await SettingsService.sendTestBrowserPush(userId),
+        });
+      }),
+      updatePushPreferences: Effect.fn(function* updatePushPreferencesHandler({
+        payload,
+      }) {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to update browser notification settings"),
+          try: async () =>
+            await SettingsService.updateBrowserPushPreferences(userId, payload),
+        });
+      }),
+    })
+);

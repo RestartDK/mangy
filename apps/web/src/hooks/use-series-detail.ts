@@ -2,59 +2,47 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-type SeriesRoute = ReturnType<typeof api.api.series>;
-type SeriesResponse = Awaited<ReturnType<SeriesRoute["get"]>>["data"];
-type ChaptersResponse = Awaited<
-  ReturnType<SeriesRoute["chapters"]["get"]>
->["data"];
-
-export type SeriesDetail = NonNullable<SeriesResponse>;
-export type SeriesChapter = NonNullable<ChaptersResponse>[number];
+export type { SeriesDetail, SeriesChapter } from "@/lib/api";
 
 export const useSeriesDetail = (
   sourceId: string | undefined,
   seriesId: string | undefined
 ) => {
-  const params = sourceId && seriesId ? { seriesId, sourceId } : undefined;
+  const params =
+    sourceId === undefined || seriesId === undefined
+      ? undefined
+      : { seriesId, sourceId };
 
   const seriesQuery = useQuery({
-    enabled: Boolean(params),
+    enabled: params !== undefined,
     queryFn: async () => {
-      if (!params) {
+      if (params === undefined) {
         return null;
       }
 
-      const { data, error } = await api.api
-        .series({ seriesId: params.seriesId })
-        .get({
+      return await api.run((client) =>
+        client.series.get({
+          params: { seriesId: params.seriesId },
           query: { sourceId: params.sourceId },
-        });
-      if (error) {
-        throw error;
-      }
-
-      return data ?? null;
+        })
+      );
     },
     queryKey: ["seriesDetail", sourceId, seriesId],
   });
 
   const chaptersQuery = useQuery({
-    enabled: Boolean(params),
+    enabled: params !== undefined,
     queryFn: async () => {
-      if (!params) {
+      if (params === undefined) {
         return [];
       }
 
-      const { data, error } = await api.api
-        .series({ seriesId: params.seriesId })
-        .chapters.get({
+      return await api.run((client) =>
+        client.series.getChapters({
+          params: { seriesId: params.seriesId },
           query: { sourceId: params.sourceId },
-        });
-      if (error) {
-        throw error;
-      }
-
-      return data ?? [];
+        })
+      );
     },
     queryKey: ["seriesChapters", sourceId, seriesId],
   });

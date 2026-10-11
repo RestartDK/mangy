@@ -1,5 +1,6 @@
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { getAuth } from "@mangy/auth";
+import { Api } from "@mangy/contract";
 import { Layer } from "effect";
 import {
   HttpEffect,
@@ -9,9 +10,16 @@ import {
   HttpServerResponse,
 } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
+import { Elysia } from "elysia";
 
-import { Api } from "./api";
 import type { AppConfig } from "./config";
+import { DownloadsApiLive } from "./modules/downloads";
+import { makeLibraryApiLive } from "./modules/library";
+import { LiveApiLive } from "./modules/live";
+import { NotificationsApiLive } from "./modules/notifications";
+import { SeriesApiLive, SeriesPageImageRoute } from "./modules/series";
+import { SettingsApiLive } from "./modules/settings";
+import { SourcesApiLive } from "./modules/sources";
 import { TrackingApiLive } from "./modules/tracking";
 
 const devOriginPatterns = [
@@ -51,12 +59,7 @@ const HealthRoute = HttpRouter.add(
   })
 );
 
-export const makeServer = (
-  elysia: {
-    handle: (request: Request) => Promise<Response>;
-  },
-  config: AppConfig
-) => {
+export const makeServer = (config: AppConfig) => {
   const AuthRoutes = HttpRouter.add(
     "*",
     "/api/auth/*",
@@ -71,16 +74,37 @@ export const makeServer = (
     { global: true }
   );
 
+  // The empty Elysia app is the fallback: it owns no routes now that every
+  // module moved to HttpApi, and it stays mounted so Elysia can be deleted in
+  // its own slice without touching this file twice.
+  const elysiaFallbackApp = new Elysia();
+
   const ElysiaFallback = HttpRouter.add(
     "*",
     "/*",
-    HttpEffect.fromWebHandler(async (request) => await elysia.handle(request))
+    HttpEffect.fromWebHandler(
+      async (request) => await elysiaFallbackApp.handle(request)
+    )
   );
 
   const routes = Layer.mergeAll(
-    HttpApiBuilder.layer(Api).pipe(Layer.provide(TrackingApiLive)),
+    HttpApiBuilder.layer(Api).pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          TrackingApiLive,
+          NotificationsApiLive,
+          DownloadsApiLive,
+          makeLibraryApiLive(config.trackingPollIntervalMs),
+          SourcesApiLive,
+          SeriesApiLive,
+          SettingsApiLive,
+          LiveApiLive
+        )
+      )
+    ),
     AuthRoutes,
     HealthRoute,
+    SeriesPageImageRoute,
     ElysiaFallback,
     CorsMiddleware
   );

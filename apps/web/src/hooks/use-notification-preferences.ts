@@ -2,22 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-type NotificationPreferencesResponse = Awaited<
-  ReturnType<typeof api.api.notifications.preferences.get>
->["data"];
-
-export type NotificationPreferences =
-  NonNullable<NotificationPreferencesResponse>;
+export type { NotificationPreferences } from "@/lib/api";
 
 export const useNotificationPreferences = () =>
   useQuery({
-    queryFn: async () => {
-      const { data, error } = await api.api.notifications.preferences.get();
-      if (error) {
-        throw error;
-      }
-
-      return data ?? { inAppEnabled: true, unreadCount: 0 };
-    },
+    queryFn: async () =>
+      await api.run((client) => client.notifications.getPreferences()),
     queryKey: ["notificationPreferences"],
   });

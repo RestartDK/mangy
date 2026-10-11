@@ -13,7 +13,7 @@ export interface ActiveFilter {
 }
 
 export const findSelectFilter = (
-  definitions: SourceFilterDefinition[],
+  definitions: readonly SourceFilterDefinition[],
   key: string
 ): Extract<SourceFilterDefinition, { type: "select" }> | undefined => {
   const definition = definitions.find((item) => item.key === key);
@@ -77,7 +77,7 @@ const toActiveFilters = (
 
 export const getActiveFilters = (
   filters: Record<string, unknown>,
-  definitions: SourceFilterDefinition[]
+  definitions: readonly SourceFilterDefinition[]
 ): ActiveFilter[] =>
   definitions
     .filter((definition) => !TOOLBAR_FILTER_KEYS.has(definition.key))

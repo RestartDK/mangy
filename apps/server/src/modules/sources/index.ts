@@ -1,98 +1,35 @@
-import { Elysia } from "elysia";
-import { z } from "zod";
+import { Api } from "@mangy/contract";
+import { Effect } from "effect";
+import { HttpApiBuilder } from "effect/http-api";
 
-import { getSessionUser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 
-import {
-  sourceDiscoverQuery,
-  sourceDiscoverSectionSchema,
-  sourceFilterSchema,
-  sourceParamsSchema,
-  sourceSchema,
-  sourceSearchBody,
-  sourceSeriesListSchema,
-  unauthorizedResponseSchema,
-} from "./model";
 import { SourcesService } from "./service";
 
-const getAuthenticatedUser = async (request: Request) =>
-  await getSessionUser(request);
-
-export const sources = new Elysia({ prefix: "/api/sources" })
-  .get(
-    "/",
-    async ({ request, set }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await SourcesService.list();
-    },
-    {
-      response: {
-        200: z.array(sourceSchema),
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .get(
-    "/:sourceId/filters",
-    async ({ params, request, set }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await SourcesService.getFilters(params.sourceId);
-    },
-    {
-      params: sourceParamsSchema,
-      response: {
-        200: z.array(sourceFilterSchema),
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .get(
-    "/:sourceId/discover",
-    async ({ params, query, request, set }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await SourcesService.getDiscover(params.sourceId, query.limit);
-    },
-    {
-      params: sourceParamsSchema,
-      query: sourceDiscoverQuery,
-      response: {
-        200: z.array(sourceDiscoverSectionSchema),
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .post(
-    "/:sourceId/search",
-    async ({ params, body, request, set }) => {
-      const user = await getAuthenticatedUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await SourcesService.search(params.sourceId, body);
-    },
-    {
-      body: sourceSearchBody,
-      params: sourceParamsSchema,
-      response: {
-        200: sourceSeriesListSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  );
+export const SourcesApiLive = HttpApiBuilder.group(Api, "sources", (handlers) =>
+  handlers.handleAll({
+    discover: Effect.fn(function* discoverHandler({ params, query }) {
+      yield* currentUser;
+      return yield* Effect.promise(
+        async () =>
+          await SourcesService.getDiscover(params.sourceId, query.limit)
+      );
+    }),
+    getFilters: Effect.fn(function* getFiltersHandler({ params }) {
+      yield* currentUser;
+      return yield* Effect.promise(
+        async () => await SourcesService.getFilters(params.sourceId)
+      );
+    }),
+    list: Effect.fn(function* listHandler() {
+      yield* currentUser;
+      return yield* Effect.promise(async () => await SourcesService.list());
+    }),
+    search: Effect.fn(function* searchHandler({ params, payload }) {
+      yield* currentUser;
+      return yield* Effect.promise(
+        async () => await SourcesService.search(params.sourceId, payload)
+      );
+    }),
+  })
+);
