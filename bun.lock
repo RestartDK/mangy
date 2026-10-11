@@ -149,6 +149,9 @@
     },
     "packages/env": {
       "name": "@mangy/env",
+      "dependencies": {
+        "effect": "catalog:",
+      },
       "devDependencies": {
         "@mangy/config": "workspace:*",
         "typescript": "catalog:",
