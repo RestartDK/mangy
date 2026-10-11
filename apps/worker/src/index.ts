@@ -1,78 +1,90 @@
 import { BunRuntime } from "@effect/platform-bun";
+import { runSql } from "@mangy/db";
 import { env } from "@mangy/env";
-import { Effect } from "effect";
+import { Duration, Effect, Schedule } from "effect";
 
-import { claimNextDownloadJob, failDownloadJob } from "./jobs";
 import {
   claimNextPushDelivery,
   failPushDelivery,
   processPushDelivery,
 } from "./notifications";
-import { CancelledError, runDownloadJob } from "./runner";
+import {
+  consumeDownloadQueue,
+  downloadQueueLayer,
+  makeDownloadQueue,
+  reconcileQueuedDownloadJobs,
+} from "./queue";
 import {
   claimDueTrackedSeries,
   failTrackedSeries,
   processTrackedSeries,
 } from "./tracking";
 
-const sleep = async (durationMs: number): Promise<void> => {
-  await Bun.sleep(durationMs);
-};
-
 const workerHostname = Bun.env.HOSTNAME ?? Bun.env.HOST ?? "worker";
 const workerId = `${workerHostname}-${Date.now()}-${crypto.randomUUID()}`;
 
-const runWorkerLoop = async (): Promise<never> => {
-  const pollIntervalMs = Number(env.WORKER_POLL_INTERVAL_MS);
+const getPollInterval = (): Duration.Duration => {
+  const intervalMs = Number(env.WORKER_POLL_INTERVAL_MS);
 
-  while (true) {
-    const job = await claimNextDownloadJob(workerId);
+  return Duration.millis(
+    Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : 15_000
+  );
+};
 
-    if (!job) {
-      const trackedSeries = await claimDueTrackedSeries();
+const processTrackedSeriesOnce = async (): Promise<void> => {
+  const trackedSeries = await claimDueTrackedSeries();
+  if (!trackedSeries) {
+    return;
+  }
 
-      if (!trackedSeries) {
-        const pushDelivery = await claimNextPushDelivery(workerId);
-
-        if (!pushDelivery) {
-          await sleep(pollIntervalMs);
-          continue;
-        }
-
-        try {
-          await processPushDelivery(pushDelivery);
-        } catch (error) {
-          await failPushDelivery(pushDelivery, error);
-        }
-
-        continue;
-      }
-
-      try {
-        await processTrackedSeries(trackedSeries);
-      } catch (error) {
-        await failTrackedSeries(trackedSeries, error);
-      }
-
-      continue;
-    }
-
-    try {
-      await runDownloadJob(job);
-    } catch (error) {
-      if (error instanceof CancelledError) {
-        continue;
-      }
-
-      await failDownloadJob(job, error);
-    }
+  try {
+    await processTrackedSeries(trackedSeries);
+  } catch (error) {
+    await failTrackedSeries(trackedSeries, error);
   }
 };
+
+const processPushDeliveryOnce = async (): Promise<void> => {
+  const pushDelivery = await claimNextPushDelivery(workerId);
+  if (!pushDelivery) {
+    return;
+  }
+
+  try {
+    await processPushDelivery(pushDelivery);
+  } catch (error) {
+    await failPushDelivery(pushDelivery, error);
+  }
+};
+
+const reconcileStep = Effect.gen(function* reconcileStepEffect() {
+  const queue = yield* makeDownloadQueue;
+  yield* reconcileQueuedDownloadJobs(queue);
+  yield* Effect.promise(processTrackedSeriesOnce);
+  yield* Effect.promise(processPushDeliveryOnce);
+});
 
 const program = Effect.gen(function* program() {
   yield* Effect.logInfo(`worker ${workerId} started`);
 
-  return yield* Effect.promise(async () => await runWorkerLoop());
+  yield* Effect.all(
+    [
+      consumeDownloadQueue,
+      Effect.repeat(
+        reconcileStep.pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Worker poll failed", cause)
+          )
+        ),
+        Schedule.spaced(getPollInterval())
+      ),
+    ],
+    { concurrency: "unbounded" }
+  );
 });
 
-BunRuntime.runMain(program);
+BunRuntime.runMain(
+  Effect.promise(async () => {
+    await runSql(program.pipe(Effect.provide(downloadQueueLayer)));
+  })
+);

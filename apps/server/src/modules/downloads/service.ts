@@ -307,6 +307,7 @@ const cancel = (userId: string, jobId: string) =>
         errorMessage: null,
         leaseOwner: null,
         leasedAt: null,
+        queueId: null,
         status: "cancelled",
         updatedAt: new Date(),
       }
@@ -347,6 +348,7 @@ const retry = (userId: string, jobId: string) =>
         leaseOwner: null,
         leasedAt: null,
         progressPercent: 0,
+        queueId: null,
         startedAt: null,
         status: "queued",
         updatedAt: now,
