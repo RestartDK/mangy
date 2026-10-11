@@ -5,12 +5,7 @@ import {
 } from "@mangy/downloader";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 
-import {
-  cancelRunningDownloadJob,
-  completeDownloadJob,
-  isDownloadJobCancelled,
-  updateDownloadJobProgress,
-} from "./jobs";
+import { completeDownloadJob, updateDownloadJobProgress } from "./jobs";
 import type { ClaimedDownloadJob } from "./jobs";
 import { scanKomgaLibrary } from "./komga";
 
@@ -30,7 +25,8 @@ const getRequiredValue = (value: string | null, message: string): string => {
 };
 
 export const runDownloadJob = async (
-  job: ClaimedDownloadJob
+  job: ClaimedDownloadJob,
+  isCancelled: () => boolean
 ): Promise<void> => {
   const sourceId = getRequiredValue(
     job.seriesSourceId,
@@ -74,8 +70,8 @@ export const runDownloadJob = async (
 
   try {
     const downloadResult = await downloadPagesToCbz({
-      beforePage: async () => {
-        if (await isDownloadJobCancelled(job.id)) {
+      beforePage: () => {
+        if (isCancelled()) {
           throw new CancelledError();
         }
       },
@@ -99,10 +95,6 @@ export const runDownloadJob = async (
   } catch (error) {
     if (!didFinishDownload) {
       await removePath(outputPath);
-    }
-
-    if (error instanceof CancelledError) {
-      await cancelRunningDownloadJob(job.id);
     }
 
     throw error;

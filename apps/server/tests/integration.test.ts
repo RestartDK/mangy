@@ -32,13 +32,12 @@ import { SqlClient } from "effect/sql";
 import type { SqlError } from "effect/sql";
 import { unzipSync } from "fflate";
 
-import { claimNextDownloadJob } from "../../worker/src/jobs";
 import { setKomgaConfigForTests } from "../../worker/src/komga";
 import {
   claimNextPushDelivery,
   processPushDelivery,
 } from "../../worker/src/notifications";
-import { runDownloadJob } from "../../worker/src/runner";
+import { processNextDownloadJob } from "../../worker/src/queue";
 import {
   claimDueTrackedSeries,
   processTrackedSeries,
@@ -482,12 +481,6 @@ describe("server and worker integration", () => {
     );
     expect(queuedJob.status).toBe("queued");
 
-    const prioritizeResponse = await apiFetch(
-      `/api/downloads/${queuedJob.id}/prioritize`,
-      { method: "POST" }
-    );
-    expect(prioritizeResponse.status).toBe(200);
-
     const cancelResponse = await apiFetch(
       `/api/downloads/${queuedJob.id}/cancel`,
       {
@@ -508,10 +501,9 @@ describe("server and worker integration", () => {
     const body2 = await readJson<{ status: string }>(retryResponse);
     expect(body2.status).toBe("queued");
 
-    const claimedJob = await claimNextDownloadJob("test-worker");
+    const claimedJob = await processNextDownloadJob("test-worker");
     expect(claimedJob?.id).toBe(queuedJob.id);
     assert.ok(claimedJob, "Expected a claimed download job.");
-    await runDownloadJob(claimedJob);
 
     const downloadsResponse = await apiFetch("/api/downloads", {
       method: "GET",
@@ -807,11 +799,10 @@ describe("server and worker integration", () => {
       expect(queueResponse.status).toBe(200);
       const queuedJob = await readJson<{ id: string }>(queueResponse);
 
-      const claimedJob = await claimNextDownloadJob("komga-worker");
+      const claimedJob = await processNextDownloadJob("komga-worker");
       expect(claimedJob?.id).toBe(queuedJob.id);
       expect(claimedJob?.destinationKomgaLibraryId).toBe(komgaLibraryId);
       assert.ok(claimedJob, "Expected a claimed download job.");
-      await runDownloadJob(claimedJob);
 
       expect(scanRequests).toEqual([
         {
@@ -1010,10 +1001,9 @@ describe("server and worker integration", () => {
     expect(queueResponse.status).toBe(200);
     const queuedJob = await readJson<{ id: string }>(queueResponse);
 
-    const claimedJob = await claimNextDownloadJob("push-worker");
+    const claimedJob = await processNextDownloadJob("push-worker");
     expect(claimedJob?.id).toBe(queuedJob.id);
     assert.ok(claimedJob, "Expected a claimed download job.");
-    await runDownloadJob(claimedJob);
 
     const queuedDeliveries = await query(
       Schema.Struct({
@@ -1633,10 +1623,9 @@ describe("server and worker integration", () => {
       expect(queueResponse.status).toBe(200);
       const queuedJob = await readJson<{ id: string }>(queueResponse);
 
-      const claimedJob = await claimNextDownloadJob("metadata-worker");
+      const claimedJob = await processNextDownloadJob("metadata-worker");
       expect(claimedJob?.id).toBe(queuedJob.id);
       assert.ok(claimedJob, "Expected a claimed download job.");
-      await runDownloadJob(claimedJob);
 
       const entries = await readdir(tempDirectory, { recursive: true });
       const downloadedFiles = entries.filter((entry) => entry.endsWith(".cbz"));

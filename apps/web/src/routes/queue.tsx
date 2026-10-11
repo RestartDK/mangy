@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUp, RotateCcw, X } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCancelDownload } from "@/hooks/use-cancel-download";
 import type { DownloadItem } from "@/hooks/use-downloads";
 import { useDownloads } from "@/hooks/use-downloads";
-import { usePrioritizeDownload } from "@/hooks/use-prioritize-download";
 import { useRetryDownload } from "@/hooks/use-retry-download";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
@@ -59,7 +58,6 @@ interface QueueListProps {
   cancelDownload: ReturnType<typeof useCancelDownload>;
   empty: string;
   jobs: DownloadItem[];
-  prioritizeDownload: ReturnType<typeof usePrioritizeDownload>;
   retryDownload: ReturnType<typeof useRetryDownload>;
 }
 
@@ -67,7 +65,6 @@ const QueueList = ({
   cancelDownload,
   empty,
   jobs,
-  prioritizeDownload,
   retryDownload,
 }: QueueListProps) => {
   if (jobs.length === 0) {
@@ -114,21 +111,6 @@ const QueueList = ({
                 </div>
               ) : null}
               <div className="flex items-center gap-1">
-                {item.status === "queued" ||
-                item.status === "retryableFailed" ? (
-                  <Button
-                    disabled={prioritizeDownload.isPending}
-                    onClick={() => {
-                      prioritizeDownload.mutate(item.id);
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <ArrowUp className="size-3.5" />
-                    Prioritize
-                  </Button>
-                ) : null}
                 {isActive || item.status === "retryableFailed" ? (
                   <Button
                     disabled={cancelDownload.isPending}
@@ -184,7 +166,6 @@ const QueueRouteComponent = () => {
   const downloadsQuery = useDownloads();
   const cancelDownload = useCancelDownload();
   const retryDownload = useRetryDownload();
-  const prioritizeDownload = usePrioritizeDownload();
   const jobs = downloadsQuery.data ?? [];
 
   const activeJobs = sortQueuedJobs(
@@ -285,7 +266,6 @@ const QueueRouteComponent = () => {
                 cancelDownload={cancelDownload}
                 empty={view.empty}
                 jobs={view.jobs}
-                prioritizeDownload={prioritizeDownload}
                 retryDownload={retryDownload}
               />
             </TabsContent>

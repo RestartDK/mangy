@@ -23,6 +23,7 @@ export class DownloadJob extends Model.Class<DownloadJob>("DownloadJob")({
   leasedAt: Schema.NullOr(Schema.Date),
   maxAttempts: Schema.Int,
   progressPercent: Schema.Int,
+  queueId: Schema.NullOr(Schema.String),
   seriesId: Schema.NullOr(SeriesIdSchema),
   startedAt: Schema.NullOr(Schema.Date),
   status: Schema.Literals([
@@ -48,6 +49,7 @@ export const downloadJobColumns = {
   leasedAt: "leased_at",
   maxAttempts: "max_attempts",
   progressPercent: "progress_percent",
+  queueId: "queue_id",
   seriesId: "series_id",
   startedAt: "started_at",
   status: "status",
