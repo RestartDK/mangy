@@ -5,6 +5,17 @@ export const TOOLBAR_FILTER_KEYS = new Set(["sort", "order"]);
 const isUnknownArray = (value: unknown): value is unknown[] =>
   Array.isArray(value);
 
+// Filter values arrive as `Record<string, unknown>` from the contract, so they are
+// narrowed here once instead of being asserted at each read. The source adapters do
+// the same on their side.
+export const readStringList = (value: unknown): readonly string[] =>
+  isUnknownArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+
+export const readStringValue = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
 export interface ActiveFilter {
   key: string;
   label: string;
