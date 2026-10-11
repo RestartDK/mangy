@@ -11,7 +11,6 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@elysiajs/eden": "^1.4.9",
     "@fontsource-variable/figtree": "^5.3.0",
     "@fontsource-variable/noto-sans": "^5.3.0",
     "@mangy/auth": "workspace:*",
@@ -32,8 +31,7 @@
     "shadcn": "^4.21.4",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
-    "tw-animate-css": "^1.4.0",
-    "zod": "catalog:"
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@mangy/config": "workspace:*",
@@ -44,7 +42,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "elysia": "^1.4.30",
     "postcss": "^8.5.29",
     "tailwindcss": "^4.3.3",
     "typescript": "catalog:",
