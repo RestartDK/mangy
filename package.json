@@ -38,17 +38,20 @@
     "db:migrate": "turbo -F @mangy/db db:migrate",
     "db:start": "bash scripts/dev-db.sh start",
     "db:stop": "bash scripts/dev-db.sh stop",
-    "postinstall": "bunx bun2nix -o bun.nix"
+    "postinstall": "bunx bun2nix -o bun.nix",
+    "prepare": "effect-tsgo patch --oxlint"
   },
   "dependencies": {
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@effect/tsgo": "^0.51.1",
     "@tailwindcss/typography": "^0.5.20",
     "@types/bun": "catalog:",
     "bun2nix": "*",
     "oxfmt": "^0.72.0",
     "oxlint": "^1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
     "turbo": "^2.11.7",
     "typescript": "catalog:",
     "ultracite": "^7.12.4"
