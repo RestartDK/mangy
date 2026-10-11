@@ -1,37 +1,61 @@
-import { accountColumns, accountTable } from "./account";
-import { chapterColumns, chapterTable } from "./chapter";
+import type { Schema } from "effect";
+
+import { Account, accountColumns, accountTable } from "./account";
+import { Chapter, chapterColumns, chapterTable } from "./chapter";
 import {
+  DownloadArtifact,
   downloadArtifactColumns,
   downloadArtifactTable,
 } from "./download-artifact";
 import {
+  DownloadDestination,
   downloadDestinationColumns,
   downloadDestinationTable,
 } from "./download-destination";
-import { downloadJobColumns, downloadJobTable } from "./download-job";
-import { libraryEntryColumns, libraryEntryTable } from "./library-entry";
-import { notificationColumns, notificationTable } from "./notification";
 import {
+  DownloadJob,
+  downloadJobColumns,
+  downloadJobTable,
+} from "./download-job";
+import {
+  LibraryEntry,
+  libraryEntryColumns,
+  libraryEntryTable,
+} from "./library-entry";
+import {
+  Notification,
+  notificationColumns,
+  notificationTable,
+} from "./notification";
+import {
+  NotificationDelivery,
   notificationDeliveryColumns,
   notificationDeliveryTable,
 } from "./notification-delivery";
 import {
+  NotificationEndpoint,
   notificationEndpointColumns,
   notificationEndpointTable,
 } from "./notification-endpoint";
 import {
+  PushSubscription,
   pushSubscriptionColumns,
   pushSubscriptionTable,
 } from "./push-subscription";
-import { seriesColumns, seriesTable } from "./series";
-import { sessionColumns, sessionTable } from "./session";
-import { sourceColumns, sourceTable } from "./source";
+import { Series, seriesColumns, seriesTable } from "./series";
+import { Session, sessionColumns, sessionTable } from "./session";
+import { Source, sourceColumns, sourceTable } from "./source";
 import {
+  TrackedSeriesState,
   trackedSeriesStateColumns,
   trackedSeriesStateTable,
 } from "./tracked-series-state";
-import { userColumns, userTable } from "./user";
-import { verificationColumns, verificationTable } from "./verification";
+import { User, userColumns, userTable } from "./user";
+import {
+  Verification,
+  verificationColumns,
+  verificationTable,
+} from "./verification";
 
 export * from "./user";
 export * from "./session";
@@ -52,40 +76,62 @@ export * from "./notification-delivery";
 export * from "./ids";
 
 export const modelTables = {
-  account: { columns: accountColumns, table: accountTable },
-  chapter: { columns: chapterColumns, table: chapterTable },
+  account: { columns: accountColumns, schema: Account, table: accountTable },
+  chapter: { columns: chapterColumns, schema: Chapter, table: chapterTable },
   downloadArtifact: {
     columns: downloadArtifactColumns,
+    schema: DownloadArtifact,
     table: downloadArtifactTable,
   },
   downloadDestination: {
     columns: downloadDestinationColumns,
+    schema: DownloadDestination,
     table: downloadDestinationTable,
   },
-  downloadJob: { columns: downloadJobColumns, table: downloadJobTable },
-  libraryEntry: { columns: libraryEntryColumns, table: libraryEntryTable },
-  notification: { columns: notificationColumns, table: notificationTable },
+  downloadJob: {
+    columns: downloadJobColumns,
+    schema: DownloadJob,
+    table: downloadJobTable,
+  },
+  libraryEntry: {
+    columns: libraryEntryColumns,
+    schema: LibraryEntry,
+    table: libraryEntryTable,
+  },
+  notification: {
+    columns: notificationColumns,
+    schema: Notification,
+    table: notificationTable,
+  },
   notificationDelivery: {
     columns: notificationDeliveryColumns,
+    schema: NotificationDelivery,
     table: notificationDeliveryTable,
   },
   notificationEndpoint: {
     columns: notificationEndpointColumns,
+    schema: NotificationEndpoint,
     table: notificationEndpointTable,
   },
   pushSubscription: {
     columns: pushSubscriptionColumns,
+    schema: PushSubscription,
     table: pushSubscriptionTable,
   },
-  series: { columns: seriesColumns, table: seriesTable },
-  session: { columns: sessionColumns, table: sessionTable },
-  source: { columns: sourceColumns, table: sourceTable },
+  series: { columns: seriesColumns, schema: Series, table: seriesTable },
+  session: { columns: sessionColumns, schema: Session, table: sessionTable },
+  source: { columns: sourceColumns, schema: Source, table: sourceTable },
   trackedSeriesState: {
     columns: trackedSeriesStateColumns,
+    schema: TrackedSeriesState,
     table: trackedSeriesStateTable,
   },
-  user: { columns: userColumns, table: userTable },
-  verification: { columns: verificationColumns, table: verificationTable },
+  user: { columns: userColumns, schema: User, table: userTable },
+  verification: {
+    columns: verificationColumns,
+    schema: Verification,
+    table: verificationTable,
+  },
 } as const;
 
 export const columnsByModel: Record<
@@ -94,3 +140,18 @@ export const columnsByModel: Record<
 > = Object.fromEntries(
   Object.entries(modelTables).map(([model, { columns }]) => [model, columns])
 );
+
+/**
+ * A decoded row schema as exposed by `Model.Class`. The concrete field map is
+ * intentionally widened here so the registry can be indexed by an arbitrary
+ * model name, the same way `columnsByModel` is.
+ */
+export type ModelRowSchema = Schema.Top & {
+  readonly fields: Schema.Struct.Fields;
+};
+
+/** Row schemas for every known model, keyed the same way as `columnsByModel`. */
+export const schemasByModel: Record<string, ModelRowSchema> =
+  Object.fromEntries(
+    Object.entries(modelTables).map(([model, { schema }]) => [model, schema])
+  );
