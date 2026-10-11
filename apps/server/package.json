@@ -11,6 +11,7 @@
     "test:live-routes": "bun --env-file=../../.env --env-file=../../.env.local run tests/live-routes.ts"
   },
   "dependencies": {
+    "@effect/platform-bun": "catalog:",
     "@elysiajs/cors": "^1.4.2",
     "@mangy/auth": "workspace:*",
     "@mangy/db": "workspace:*",
