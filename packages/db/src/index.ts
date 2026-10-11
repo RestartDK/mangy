@@ -1,6 +1,6 @@
 import { PgClient } from "@effect/sql-pg";
-import { env } from "@mangy/env";
-import { ManagedRuntime, Redacted, Schema } from "effect";
+import { envConfig } from "@mangy/env";
+import { Config, ManagedRuntime, Schema } from "effect";
 import type { Effect } from "effect";
 import type { SqlClient } from "effect/sql";
 import { fragment, identifier } from "effect/sql/Statement";
@@ -15,12 +15,12 @@ type ColumnMap = Record<string, string>;
 type RowValues<C extends ColumnMap> = Partial<Record<keyof C, unknown>>;
 
 const runtime = ManagedRuntime.make(
-  PgClient.layer({
+  PgClient.layerConfig({
     // `timestamp` columns carry instants and the driver reads their wall clock
     // as UTC, so pin the session to UTC and writes and reads stay a fixed point
     // instead of shifting by the server's zone on every round trip.
-    startupOptions: "-c TimeZone=UTC",
-    url: Redacted.make(env.DATABASE_URL),
+    startupOptions: Config.succeed("-c TimeZone=UTC"),
+    url: envConfig.DATABASE_URL,
   })
 );
 

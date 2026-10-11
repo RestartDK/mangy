@@ -1,4 +1,4 @@
-import { auth } from "@mangy/auth";
+import { getAuth } from "@mangy/auth";
 import { UserIdSchema } from "@mangy/db/model/ids";
 import type { UserId } from "@mangy/db/model/ids";
 import { Effect, Schema } from "effect";
@@ -11,7 +11,7 @@ import { Unauthorized } from "@/api/auth";
  * @returns The user object if authenticated, null otherwise
  */
 export const getSessionUser = async (request: Request) => {
-  const session = await auth.api.getSession({ headers: request.headers });
+  const session = await getAuth().api.getSession({ headers: request.headers });
   if (!session?.user) {
     return null;
   }
@@ -28,7 +28,7 @@ export const currentUser: Effect.Effect<
   const request = yield* HttpServerRequest.HttpServerRequest;
   const session = yield* Effect.promise(
     async () =>
-      await auth.api.getSession({ headers: new Headers(request.headers) })
+      await getAuth().api.getSession({ headers: new Headers(request.headers) })
   );
   if (!session?.user) {
     return yield* new Unauthorized({ message: "Unauthorized" });
