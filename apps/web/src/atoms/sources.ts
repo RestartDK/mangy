@@ -71,6 +71,22 @@ export const searchPages = Atom.family((input: SearchInput) =>
   )
 );
 
+// Each search keys its own atom, so a new search starts from nothing and the route
+// would drop to a skeleton. React Query kept the previous page list on screen while
+// the next search ran, so the previous atom is kept as a fallback and the returned
+// atom stays writable, which is what the Load more write needs.
+let previousSearch: ReturnType<typeof searchPages> | undefined;
+
+export const searchPagesWithHistory = (input: SearchInput) => {
+  const primary = searchPages(input);
+  const fallback = previousSearch;
+  previousSearch = primary;
+
+  return fallback === undefined
+    ? primary
+    : Atom.withFallback(primary, fallback);
+};
+
 const emptyPage: SourceSeriesList = {
   hasNextPage: false,
   items: [],

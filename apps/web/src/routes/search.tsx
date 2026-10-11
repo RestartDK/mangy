@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   searchIdle,
-  searchPages,
+  searchPagesWithHistory,
   sourceFilters,
   sourceFiltersIdle,
   sourcesQuery,
@@ -294,7 +294,7 @@ const SearchRouteComponent = () => {
     sourceId !== "" &&
     !asyncResultLoading(filtersResult);
   const searchAtom = isSearchEnabled
-    ? searchPages({
+    ? searchPagesWithHistory({
         filters: effectiveFilters,
         pageSize: undefined,
         query,

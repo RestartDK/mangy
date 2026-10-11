@@ -56,12 +56,14 @@ const NotificationsRouteComponent = () => {
   const markRead = useAtomSet(markNotificationRead, { mode: "promise" });
   const markAllRead = useAtomSet(markAllNotificationsRead, { mode: "promise" });
   const markAllResult = useAtomValue(markAllNotificationsRead);
+  const markReadResult = useAtomValue(markNotificationRead);
   const unreadCount = asyncResultValue(preferences)?.unreadCount ?? 0;
   const items = asyncResultValue(notifications) ?? [];
   const error =
     asyncResultError(notifications) ?? asyncResultError(preferences);
   const isLoading = asyncResultLoading(notifications);
   const isMarkingAllRead = AsyncResult.isWaiting(markAllResult);
+  const isMarkingRead = AsyncResult.isWaiting(markReadResult);
 
   const markAll = async (): Promise<void> => {
     try {
@@ -157,6 +159,7 @@ const NotificationsRouteComponent = () => {
                   <span className="meta">{formatDateTime(item.createdAt)}</span>
                   {item.isRead ? null : (
                     <Button
+                      disabled={isMarkingRead}
                       onClick={() => {
                         void markRead({
                           params: { notificationId: item.id },
