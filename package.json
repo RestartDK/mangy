@@ -28,7 +28,6 @@
     "test:sources:live": "LIVE_SOURCE_TESTS=1 bun --cwd packages/source-sdk test:live",
     "test:routes:live": "LIVE_SOURCE_TESTS=1 bun --cwd apps/server test:live-routes",
     "dev:worker": "turbo -F worker dev",
-    "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
     "test:integration": "turbo -F server test:integration",
@@ -37,9 +36,6 @@
     "db:stop": "bash scripts/dev-db.sh stop",
     "postinstall": "bunx bun2nix -o bun.nix",
     "prepare": "effect-tsgo patch --oxlint"
-  },
-  "dependencies": {
-    "zod": "catalog:"
   },
   "devDependencies": {
     "@effect/tsgo": "^0.51.1",

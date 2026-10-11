@@ -10,7 +10,6 @@ import {
   HttpServerResponse,
 } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
-import { Elysia } from "elysia";
 
 import type { AppConfig } from "./config";
 import { DownloadsApiLive } from "./modules/downloads";
@@ -74,19 +73,6 @@ export const makeServer = (config: AppConfig) => {
     { global: true }
   );
 
-  // The empty Elysia app is the fallback: it owns no routes now that every
-  // module moved to HttpApi, and it stays mounted so Elysia can be deleted in
-  // its own slice without touching this file twice.
-  const elysiaFallbackApp = new Elysia();
-
-  const ElysiaFallback = HttpRouter.add(
-    "*",
-    "/*",
-    HttpEffect.fromWebHandler(
-      async (request) => await elysiaFallbackApp.handle(request)
-    )
-  );
-
   const routes = Layer.mergeAll(
     HttpApiBuilder.layer(Api).pipe(
       Layer.provide(
@@ -105,7 +91,6 @@ export const makeServer = (config: AppConfig) => {
     AuthRoutes,
     HealthRoute,
     SeriesPageImageRoute,
-    ElysiaFallback,
     CorsMiddleware
   );
 
