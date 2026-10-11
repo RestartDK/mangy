@@ -4,6 +4,8 @@ import { env } from "@mangy/env";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
+import { effectSqlAdapter } from "./effect-sql-adapter";
+
 const configuredOrigins = env.CORS_ORIGIN.split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -26,14 +28,19 @@ const getTrustedOrigins = (): string[] => {
   return [...new Set([...configuredOrigins, ...trustedDevOrigins])];
 };
 
+const database =
+  env.AUTH_ADAPTER === "effect-sql"
+    ? effectSqlAdapter()
+    : drizzleAdapter(db, {
+        provider: "pg",
+
+        schema,
+      });
+
 export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
-  database: drizzleAdapter(db, {
-    provider: "pg",
-
-    schema,
-  }),
+  database,
   trustedOrigins: () => getTrustedOrigins(),
   emailAndPassword: {
     enabled: true,

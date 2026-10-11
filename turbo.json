@@ -57,6 +57,7 @@
       "cache": false,
       "persistent": true,
       "env": [
+        "AUTH_ADAPTER",
         "DATABASE_URL",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
@@ -74,6 +75,7 @@
       "cache": false,
       "persistent": true,
       "env": [
+        "AUTH_ADAPTER",
         "DATABASE_URL",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
@@ -90,6 +92,7 @@
       "dependsOn": ["@mangy/db#db:migrate"],
       "cache": false,
       "env": [
+        "AUTH_ADAPTER",
         "DATABASE_URL",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
