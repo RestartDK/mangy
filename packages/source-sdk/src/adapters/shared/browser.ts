@@ -132,8 +132,16 @@ const autoScroll = (page: Page): Effect.Effect<void, BrowserUnavailableError> =>
     },
   });
 
+// A foreign module object, so the shape cannot be parsed. The predicate checks the
+// one member that is used rather than claiming the module shape from the presence
+// of a key.
+const isIndexableObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
 const isPlaywrightModule = (value: unknown): value is PlaywrightModule =>
-  typeof value === "object" && value !== null && "chromium" in value;
+  isIndexableObject(value) &&
+  isIndexableObject(value["chromium"]) &&
+  typeof value["chromium"]["launch"] === "function";
 
 const loadPlaywrightModule = async (): Promise<PlaywrightModule> => {
   const playwrightModule: unknown = await import(playwrightModuleName);
