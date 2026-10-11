@@ -9,7 +9,7 @@ import type {
   JoinConfig,
   ModelTarget,
 } from "better-auth/adapters";
-import { Effect, ManagedRuntime } from "effect";
+import { Effect, ManagedRuntime, Schema } from "effect";
 import { SqlClient, Statement } from "effect/sql";
 import type { SqlError } from "effect/sql/SqlError";
 import type { Fragment } from "effect/sql/Statement";
@@ -66,16 +66,16 @@ const selectColumns = (
       );
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+const rowValues = Schema.Record(Schema.String, Schema.Unknown);
 
+// better-auth's `update` is generic over an unconstrained `T`, so the payload is
+// parsed rather than narrowed: a value that is not a record of column values
+// fails here instead of being read as one.
 const mapRow = (model: string, row: unknown): Record<string, unknown> => {
-  if (!isRecord(row)) {
-    throw new Error("Expected a row object to map to database columns.");
-  }
+  const values = Schema.decodeUnknownSync(rowValues)(row);
 
   return Object.fromEntries(
-    Object.entries(row).map(([field, value]) => [
+    Object.entries(values).map(([field, value]) => [
       resolveColumn(model, field),
       value,
     ])
