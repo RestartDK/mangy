@@ -1,6 +1,6 @@
-import { PgClient } from "@effect/sql-pg";
+import { PgClient, PgTypes } from "@effect/sql-pg";
 import { envConfig } from "@mangy/env";
-import { Config, ManagedRuntime, Schema } from "effect";
+import { Config, ManagedRuntime, Result, Schema } from "effect";
 import type { Effect } from "effect";
 import type { SqlClient } from "effect/sql";
 import { fragment, identifier } from "effect/sql/Statement";
@@ -55,13 +55,20 @@ export const column = <C extends ColumnMap>(
   field: Extract<keyof C, string>
 ): Fragment => fragment([identifier(columnName(columns, field))]);
 
+// An empty array tells the driver nothing about its element type, so it needs
+// an explicit OID. Every array column in this schema is `text[]`.
+const encodeValue = (value: unknown): unknown =>
+  Array.isArray(value) && value.length === 0
+    ? Result.getOrThrow(PgTypes.array([], PgTypes.OID.text))
+    : value;
+
 const asColumns = <C extends ColumnMap>(
   columns: C,
   values: RowValues<C>
 ): Record<string, unknown> => {
   const record: Record<string, unknown> = {};
   for (const [field, value] of Object.entries(values)) {
-    record[columnName(columns, field)] = value;
+    record[columnName(columns, field)] = encodeValue(value);
   }
   return record;
 };
