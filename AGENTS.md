@@ -37,25 +37,26 @@ apps/server/src/
   lib/
     auth.ts             # Shared utilities (getSessionUser)
   modules/
-    events/              # Events feature module
-      index.ts          # Elysia controller (routes)
-      service.ts        # Business logic (DB operations)
-      model.ts          # TypeBox schemas
-    chat/                # Chat feature module
-      index.ts          # Elysia controller (routes)
-      service.ts        # Business logic (tool execution)
-      model.ts          # TypeBox schemas
-      agent/            # Agent implementation
-        calendar-agent.ts
-        tools.ts
+    downloads/          # One directory per domain
+      index.ts          # effect/http-api handlers for that group
+      service.ts        # Business logic (Effect programs over effect/sql)
+      storage.ts        # Row-level SQL, when the module needs it
+    library/
+    live/
+    notifications/
+    series/
+    settings/
+    sources/
+    tracking/
 ```
 
 **Key principles:**
 
 - **Use path aliases**: Always use `@/*` imports instead of relative paths (`../`)
-- **Separation of concerns**: Controllers handle HTTP, services handle business logic
+- **Separation of concerns**: `index.ts` maps HTTP to service calls, `service.ts` holds the logic
 - **Shared utilities**: Common code (like auth) goes in `lib/`
-- **Module composition**: `index.ts` composes modules via `.use()`
+- **Module composition**: `index.ts` composes the API with `HttpApiBuilder.group(Api, ...)`
+- **No framework glue in services**: services return Effects and never see a Request
 
 ## UI Components
 
@@ -63,24 +64,29 @@ apps/server/src/
 
 ## Type Management
 
-Types flow from **Drizzle schema → TypeBox → Elysia → Treaty**. This ensures a single source of truth.
+One source of truth, and it is the Effect Schema. Types flow from the table models in
+`@mangy/db` to the `HttpApi` definition in `@mangy/contract`, and both apps derive from
+that contract rather than declaring anything of their own.
 
-### Drizzle + TypeBox
+```
+packages/db/src/model/*        # Model.Class per table: columns, ids, brands
+packages/contract/src/*        # HttpApi groups: params, payload, success, typed errors
+apps/server                    # HttpApiBuilder.group(Api, ...) implements the contract
+apps/web                       # AtomHttpApi.Service over the same Api value
+```
 
-Use `drizzle-typebox` to generate TypeBox schemas directly from Drizzle table definitions:
-
-- `createSelectSchema(table)` for response types
-- `createInsertSchema(table)` for create request bodies
-- `createUpdateSchema(table)` for update request bodies
-- Use `t.Omit()` to exclude server-managed fields (id, userId, timestamps)
-
-### Elysia Treaty as Source of Truth
-
-- Server exports `export type App = typeof app;`
-- Web imports this and creates a typed client: `treaty<App>(...)`
-- **NEVER** create separate TypeScript interfaces/types for API requests or responses
-- Frontend types are automatically inferred from the Elysia route definitions
-- If you need a type on the frontend, extract it from the Treaty client
+- **NEVER** write a second TypeScript interface for an API request or response. Derive it
+  from the contract with `typeof schema.Type`, or let the client infer it.
+- Absence is `Option`, not `null` and not a missing key. Response fields use
+  `Schema.OptionFromNullOr`, so `None` is `null` on the wire and `Some("")` is a present
+  empty string. Read them with `Option.isSome`, `Option.getOrElse` or `Option.match`, and
+  never test an `Option` for truthiness, since an Option object is always truthy.
+- A parsed value stays parsed. Do not add a helper that converts an `Option` back to
+  `undefined`, and do not narrow `unknown` with a hand-written predicate that claims a
+  shape it never checked. Decode with a schema at the boundary instead.
+- Request payloads are validated by the contract, and the web reads responses through
+  `AtomHttpApi` in `apps/web/src/atoms/*`, where an atom's value is an `AsyncResult` and
+  `AsyncResult.value` yields an `Option`.
 
 ## Environment Variables
 
