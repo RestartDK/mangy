@@ -1,18 +1,31 @@
-import { treaty } from "@elysiajs/eden";
-import type { App } from "@server/index";
+import { makeApiClient } from "@mangy/contract";
 
-import { makeTrackingClient } from "../../../server/src/api/client";
 import { getServerOrigin } from "./server-origin";
 
-export const api = treaty<App>(getServerOrigin(), {
-  fetch: {
-    credentials: "include",
-  },
-});
+export const api = makeApiClient(getServerOrigin());
 
-export const tracking = makeTrackingClient(getServerOrigin());
+export { decodeRefreshTrackedSeries } from "@mangy/contract";
 
 export type {
-  RefreshTrackedSeries,
+  CreateDestination as CreateDestinationPayload,
+  DiscoverSection,
+  DownloadJob as DownloadItem,
+  EnqueueDownload as EnqueueDownloadPayload,
+  LibraryItem,
+  LibrarySeriesState,
+  Notification as NotificationItem,
+  NotificationPreferences,
+  PushSettings,
+  SavePushSubscription,
+  SeriesChapter,
+  SettingsBootstrap,
+  SourceFilterDefinition,
+  SourceSearchInput,
+  SourceSeries as SeriesDetail,
+  SourceSeriesList as SourceSearchPage,
+  SourceSummary,
   TrackedSeries,
-} from "../../../server/src/api/tracking";
+  UpdateBrowserPushPreferences as UpdateBrowserPushPreferencesPayload,
+  UpdateLibrarySeriesState as UpdateLibrarySeriesStatePayload,
+  UpdateNotificationPreferences as UpdateNotificationPreferencesPayload,
+} from "@mangy/contract";

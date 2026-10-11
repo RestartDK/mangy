@@ -7,19 +7,8 @@ export const useRemoveLibrarySeries = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { sourceId: string; seriesId: string }) => {
-      const { data, error } = await api.api.library["series-state"].delete(
-        undefined,
-        {
-          query: input,
-        }
-      );
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (input: { sourceId: string; seriesId: string }) =>
+      await api.run((client) => client.library.removeSeries({ query: input })),
     onError: (error) => {
       toast.error(
         error instanceof Error

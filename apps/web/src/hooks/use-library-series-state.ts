@@ -2,11 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-type LibrarySeriesStateResponse = Awaited<
-  ReturnType<(typeof api.api.library)["series-state"]["get"]>
->["data"];
-
-export type LibrarySeriesState = NonNullable<LibrarySeriesStateResponse>;
+export type { LibrarySeriesState } from "@/lib/api";
 
 export const useLibrarySeriesState = (
   sourceId: string | undefined,
@@ -19,17 +15,9 @@ export const useLibrarySeriesState = (
         return null;
       }
 
-      const { data, error } = await api.api.library["series-state"].get({
-        query: {
-          seriesId,
-          sourceId,
-        },
-      });
-      if (error) {
-        throw error;
-      }
-
-      return data ?? null;
+      return await api.run((client) =>
+        client.library.getSeriesState({ query: { seriesId, sourceId } })
+      );
     },
     queryKey: ["librarySeriesState", sourceId, seriesId],
     refetchInterval: 5000,

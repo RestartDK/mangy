@@ -7,14 +7,8 @@ export const useSendBrowserPushTest = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      const { data, error } = await api.api.settings.push.test.post();
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async () =>
+      await api.run((client) => client.settings.sendTestPush()),
     onError: (error) => {
       toast.error(
         error instanceof Error
@@ -24,9 +18,9 @@ export const useSendBrowserPushTest = () => {
     },
     onSuccess: async (data) => {
       toast.success(
-        data?.deliveredCount === 1
+        data.deliveredCount === 1
           ? "Test notification sent"
-          : `Test notification sent to ${data?.deliveredCount ?? 0} browsers`
+          : `Test notification sent to ${data.deliveredCount} browsers`
       );
       await queryClient.invalidateQueries({
         queryKey: ["browserPushSettings"],

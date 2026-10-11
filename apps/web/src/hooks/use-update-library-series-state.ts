@@ -2,23 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-
-type UpdateLibrarySeriesStatePayload = NonNullable<
-  Parameters<(typeof api.api.library)["series-state"]["patch"]>[0]
->;
+import type { UpdateLibrarySeriesStatePayload } from "@/lib/api";
 
 export const useUpdateLibrarySeriesState = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: UpdateLibrarySeriesStatePayload) => {
-      const { data, error } = await api.api.library["series-state"].patch(body);
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (body: UpdateLibrarySeriesStatePayload) =>
+      await api.run((client) =>
+        client.library.updateSeriesState({ payload: body })
+      ),
     onError: (error) => {
       toast.error(
         error instanceof Error

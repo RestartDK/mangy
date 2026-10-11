@@ -2,11 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-type FiltersResponse = Awaited<
-  ReturnType<ReturnType<typeof api.api.sources>["filters"]["get"]>
->["data"];
-
-export type SourceFilterDefinition = NonNullable<FiltersResponse>[number];
+export type { SourceFilterDefinition } from "@/lib/api";
 
 export const useSourceFilters = (sourceId: string | undefined) =>
   useQuery({
@@ -16,12 +12,9 @@ export const useSourceFilters = (sourceId: string | undefined) =>
         return [];
       }
 
-      const { data, error } = await api.api.sources({ sourceId }).filters.get();
-      if (error) {
-        throw error;
-      }
-
-      return data ?? [];
+      return await api.run((client) =>
+        client.sources.getFilters({ params: { sourceId } })
+      );
     },
     queryKey: ["sourceFilters", sourceId],
   });

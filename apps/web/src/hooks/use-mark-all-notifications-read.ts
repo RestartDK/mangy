@@ -7,15 +7,8 @@ export const useMarkAllNotificationsRead = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      const { data, error } =
-        await api.api.notifications["mark-all-read"].post();
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async () =>
+      await api.run((client) => client.notifications.markAllRead()),
     onError: (error) => {
       toast.error(
         error instanceof Error
@@ -25,7 +18,7 @@ export const useMarkAllNotificationsRead = () => {
     },
     onSuccess: async (result) => {
       toast.success(
-        result?.updatedCount
+        result.updatedCount
           ? `${result.updatedCount} notifications marked as read`
           : "All notifications are already read"
       );

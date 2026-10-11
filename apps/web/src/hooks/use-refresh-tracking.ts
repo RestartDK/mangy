@@ -1,16 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { tracking } from "@/lib/api";
-
-import { decodeRefreshTrackedSeries } from "../../../server/src/api/tracking";
+import { api, decodeRefreshTrackedSeries } from "@/lib/api";
 
 export const useRefreshTracking = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (body: { seriesId: string; sourceId: string }) =>
-      await tracking.run((client) =>
+      await api.run((client) =>
         client.tracking.refresh({
           payload: decodeRefreshTrackedSeries(body),
         })

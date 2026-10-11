@@ -2,23 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-
-type EnqueueDownloadPayload = NonNullable<
-  Parameters<typeof api.api.downloads.post>[0]
->;
+import type { EnqueueDownloadPayload } from "@/lib/api";
 
 export const useEnqueueDownload = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: EnqueueDownloadPayload) => {
-      const { data, error } = await api.api.downloads.post(body);
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (body: EnqueueDownloadPayload) =>
+      await api.run((client) => client.downloads.enqueue({ payload: body })),
     onError: (error) => {
       toast.error(
         error instanceof Error ? error.message : "Unable to queue chapter"

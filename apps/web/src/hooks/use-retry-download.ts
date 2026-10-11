@@ -7,14 +7,8 @@ export const useRetryDownload = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (jobId: string) => {
-      const { data, error } = await api.api.downloads({ jobId }).retry.post();
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (jobId: string) =>
+      await api.run((client) => client.downloads.retry({ params: { jobId } })),
     onError: (error) => {
       toast.error(
         error instanceof Error ? error.message : "Unable to retry job"
