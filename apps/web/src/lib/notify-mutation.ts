@@ -10,11 +10,13 @@ interface MutationMessages {
 export const notifyMutation = async (
   mutation: Promise<unknown>,
   { failure, success }: MutationMessages
-): Promise<void> => {
+): Promise<boolean> => {
   try {
     await mutation;
     toast.success(success);
+    return true;
   } catch (error) {
     toast.error(getErrorMessage(error, failure));
+    return false;
   }
 };
