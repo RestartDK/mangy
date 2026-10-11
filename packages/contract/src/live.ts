@@ -17,15 +17,16 @@ const connectedEventSchema = Schema.Struct({
   event: Schema.Literal("connected"),
 });
 
+export const liveStatePayloadSchema = Schema.Struct({
+  downloadsChanged: Schema.Boolean,
+  notificationsChanged: Schema.Boolean,
+  snapshot: liveSnapshotSchema,
+  trackingChanged: Schema.Boolean,
+});
+export type LiveStatePayload = typeof liveStatePayloadSchema.Type;
+
 const stateEventSchema = Schema.Struct({
-  data: Schema.fromJsonString(
-    Schema.Struct({
-      downloadsChanged: Schema.Boolean,
-      notificationsChanged: Schema.Boolean,
-      snapshot: liveSnapshotSchema,
-      trackingChanged: Schema.Boolean,
-    })
-  ),
+  data: Schema.fromJsonString(liveStatePayloadSchema),
   event: Schema.Literal("state"),
 });
 

@@ -237,6 +237,10 @@
     url = "https://registry.npmjs.org/@ecies/ciphers/-/ciphers-0.2.5.tgz";
     hash = "sha512-GalEZH4JgOMHYYcYmVqnFirFsjZHeoGMDt9IxEnM9F7GRUUyUksJ7Ou53L83WHJq3RWKD3AcBpo0iQh0oMpf8A==";
   };
+  "@effect/atom-react@4.0.2" = fetchurl {
+    url = "https://registry.npmjs.org/@effect/atom-react/-/atom-react-4.0.2.tgz";
+    hash = "sha512-rg9xnPHzjURhKhOm+bKnYitPPQC02m6R7ZmJLNdxtrNCgDQ9fSOPqZHN5W/GzUw+OsvplKSvaBe/JSQejeYKYA==";
+  };
   "@effect/platform-bun@4.0.2" = fetchurl {
     url = "https://registry.npmjs.org/@effect/platform-bun/-/platform-bun-4.0.2.tgz";
     hash = "sha512-wbQ9jQKtTjqHOYvMrgINWKuP05Q0cXe/Rze2c2gOAakztE34tVzT4aRvvooUR2l+JGWf/hL26nmHXJ4/Urkqiw==";

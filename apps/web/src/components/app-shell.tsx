@@ -1,3 +1,4 @@
+import { useAtomMount } from "@effect/atom-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import type { PropsWithChildren } from "react";
 
+import { liveUpdates } from "@/atoms/live";
 import { ShellUserMenu } from "@/components/shell-user-menu";
 import {
   Sidebar,
@@ -71,6 +73,7 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
   const { data: session } = authClient.useSession();
 
   useLiveUpdates(Boolean(session?.user.id));
+  useAtomMount(liveUpdates);
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
