@@ -81,7 +81,7 @@ const ReaderRouteComponent = () => {
     pageCount > 0 ? pluralize(pageCount, "page") : null,
     hasText(translatedLanguage) ? translatedLanguage.toUpperCase() : null,
     hasText(volumeNumber) ? `Volume ${volumeNumber}` : null,
-  ].filter((item): item is string => Boolean(item));
+  ].filter(hasText);
 
   return (
     <AppShell>
