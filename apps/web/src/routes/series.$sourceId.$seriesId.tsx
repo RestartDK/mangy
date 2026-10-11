@@ -1,7 +1,15 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { decodeRefreshTrackedSeries } from "@mangy/contract";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { AsyncResult } from "effect/reactivity";
 import { BookOpen, ExternalLink, RefreshCcw, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { enqueueDownload } from "@/atoms/downloads";
+import { reactivityKey } from "@/atoms/keys";
+import { librarySeriesState, updateLibrarySeriesState } from "@/atoms/library";
+import { seriesChapters, seriesDetail } from "@/atoms/series";
+import { refreshTrackedSeries } from "@/atoms/tracking";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -28,20 +36,20 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { useEnqueueDownload } from "@/hooks/use-enqueue-download";
-import { useLibrarySeriesState } from "@/hooks/use-library-series-state";
-import { useRefreshTracking } from "@/hooks/use-refresh-tracking";
-import { useSeriesDetail } from "@/hooks/use-series-detail";
 import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
-import { useUpdateLibrarySeriesState } from "@/hooks/use-update-library-series-state";
+import {
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
 import {
   formatDate,
   formatDateTime,
   getErrorMessage,
   pluralize,
 } from "@/lib/format";
+import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
-import { runMutation } from "@/lib/run-mutation";
 
 const SeriesDetailSkeleton = () => (
   <div className="page-grid">
@@ -71,51 +79,69 @@ const SeriesDetailRouteComponent = () => {
   const { sourceId, seriesId } = useParams({
     from: "/series/$sourceId/$seriesId",
   });
-  const { chapters, error, isLoading, series } = useSeriesDetail(
-    sourceId,
-    seriesId
-  );
+  const detailResult = useAtomValue(seriesDetail({ seriesId, sourceId }));
+  const chaptersResult = useAtomValue(seriesChapters({ seriesId, sourceId }));
   const settingsQuery = useSettingsBootstrap();
-  const libraryStateQuery = useLibrarySeriesState(sourceId, seriesId);
-  const enqueueDownload = useEnqueueDownload();
-  const updateLibrarySeriesState = useUpdateLibrarySeriesState();
-  const refreshTracking = useRefreshTracking();
+  const libraryStateResult = useAtomValue(
+    librarySeriesState({ seriesId, sourceId })
+  );
+  const enqueueChapter = useAtomSet(enqueueDownload, { mode: "promise" });
+  const saveTrackingState = useAtomSet(updateLibrarySeriesState, {
+    mode: "promise",
+  });
+  const requestTrackingRefresh = useAtomSet(refreshTrackedSeries, {
+    mode: "promise",
+  });
+  const enqueueResult = useAtomValue(enqueueDownload);
+  const updateResult = useAtomValue(updateLibrarySeriesState);
+  const refreshResult = useAtomValue(refreshTrackedSeries);
+  const isQueueing = AsyncResult.isWaiting(enqueueResult);
+  const isSavingTracking = AsyncResult.isWaiting(updateResult);
+  const isRefreshingTracking = AsyncResult.isWaiting(refreshResult);
   const [selectedDestinationId, setSelectedDestinationId] = useState("");
   const [pendingChapterId, setPendingChapterId] = useState<string | null>(null);
   const [isTracked, setIsTracked] = useState(false);
   const [autoDownload, setAutoDownload] = useState(false);
 
+  const series = asyncResultValue(detailResult);
+  const chapters = asyncResultValue(chaptersResult) ?? [];
+  const libraryState = asyncResultValue(libraryStateResult);
+  const error =
+    asyncResultError(detailResult) ?? asyncResultError(chaptersResult);
+  const isLoading =
+    asyncResultLoading(detailResult) || asyncResultLoading(chaptersResult);
+  const settings = settingsQuery.data;
+
   const enabledDestinations = useMemo(
     () =>
-      settingsQuery.data?.destinations.filter(
-        (destination) => destination.isEnabled
-      ) ?? [],
-    [settingsQuery.data]
+      settings?.destinations.filter((destination) => destination.isEnabled) ??
+      [],
+    [settings]
   );
-  const trackingState = libraryStateQuery.data?.trackingState ?? null;
+  const trackingState = libraryState?.trackingState ?? null;
   const defaultDestinationId =
     enabledDestinations.find((destination) => destination.isDefault)?.id ??
     enabledDestinations[0]?.id ??
     "";
 
   const baselineDestinationId =
-    libraryStateQuery.data?.downloadDestinationId ?? defaultDestinationId;
+    libraryState?.downloadDestinationId ?? defaultDestinationId;
   const isTrackingDirty =
-    isTracked !== (libraryStateQuery.data?.isTracked ?? false) ||
-    autoDownload !== (libraryStateQuery.data?.autoDownload ?? false) ||
+    isTracked !== (libraryState?.isTracked ?? false) ||
+    autoDownload !== (libraryState?.autoDownload ?? false) ||
     selectedDestinationId !== baselineDestinationId;
 
   useEffect(() => {
-    if (!libraryStateQuery.data) {
+    if (!libraryState) {
       return;
     }
 
-    setIsTracked(libraryStateQuery.data.isTracked);
-    setAutoDownload(libraryStateQuery.data.autoDownload);
+    setIsTracked(libraryState.isTracked);
+    setAutoDownload(libraryState.autoDownload);
     setSelectedDestinationId(
-      libraryStateQuery.data.downloadDestinationId ?? defaultDestinationId
+      libraryState.downloadDestinationId ?? defaultDestinationId
     );
-  }, [defaultDestinationId, libraryStateQuery.data]);
+  }, [defaultDestinationId, libraryState]);
 
   useEffect(() => {
     if (selectedDestinationId || enabledDestinations.length === 0) {
@@ -133,10 +159,30 @@ const SeriesDetailRouteComponent = () => {
 
   const canQueue = Boolean(selectedDestinationId);
   const canSaveTracking =
-    Boolean(libraryStateQuery.data) &&
+    Boolean(libraryState) &&
     isTrackingDirty &&
     !(autoDownload && !selectedDestinationId) &&
-    !updateLibrarySeriesState.isPending;
+    !isSavingTracking;
+
+  const queueChapter = async (chapterId: string): Promise<void> => {
+    setPendingChapterId(chapterId);
+    await notifyMutation(
+      enqueueChapter({
+        payload: {
+          chapterId,
+          downloadDestinationId: selectedDestinationId,
+          seriesId,
+          sourceId,
+        },
+        reactivityKeys: [reactivityKey.downloads, reactivityKey.library],
+      }),
+      {
+        failure: "Unable to queue chapter",
+        success: "Chapter added to the queue",
+      }
+    );
+    setPendingChapterId((current) => (current === chapterId ? null : current));
+  };
 
   const metadata = [
     {
@@ -192,14 +238,14 @@ const SeriesDetailRouteComponent = () => {
 
       {isLoading ? <SeriesDetailSkeleton /> : null}
 
-      {error ? (
+      {error === undefined ? null : (
         <Alert variant="destructive">
           <AlertTitle>Unable to load this series</AlertTitle>
           <AlertDescription>
             {getErrorMessage(error, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
       {series ? (
         <div className="page-grid">
@@ -320,29 +366,10 @@ const SeriesDetailRouteComponent = () => {
                           )}
                           <Button
                             disabled={
-                              chapter.isUnavailable ||
-                              !canQueue ||
-                              enqueueDownload.isPending
+                              chapter.isUnavailable || !canQueue || isQueueing
                             }
                             onClick={() => {
-                              setPendingChapterId(chapter.chapterId);
-                              void runMutation(
-                                enqueueDownload.mutateAsync({
-                                  chapterId: chapter.chapterId,
-                                  downloadDestinationId: selectedDestinationId,
-                                  seriesId,
-                                  sourceId,
-                                }),
-                                {
-                                  onSettled: () => {
-                                    setPendingChapterId((current) =>
-                                      current === chapter.chapterId
-                                        ? null
-                                        : current
-                                    );
-                                  },
-                                }
-                              );
+                              void queueChapter(chapter.chapterId);
                             }}
                             size="sm"
                             type="button"
@@ -368,7 +395,8 @@ const SeriesDetailRouteComponent = () => {
                 )}
               </div>
 
-              {settingsQuery.isLoading || libraryStateQuery.isLoading ? (
+              {settingsQuery.isLoading ||
+              asyncResultLoading(libraryStateResult) ? (
                 <div className="space-y-3 p-4">
                   <Skeleton className="h-16 w-full" />
                   <Skeleton className="h-10 w-full" />
@@ -468,33 +496,59 @@ const SeriesDetailRouteComponent = () => {
                   <Button
                     disabled={!canSaveTracking}
                     onClick={() => {
-                      void runMutation(
-                        updateLibrarySeriesState.mutateAsync({
-                          autoDownload,
-                          downloadDestinationId: selectedDestinationId || null,
-                          isTracked,
-                          seriesId,
-                          sourceId,
-                        })
+                      void notifyMutation(
+                        saveTrackingState({
+                          payload: {
+                            autoDownload,
+                            downloadDestinationId:
+                              selectedDestinationId || null,
+                            isTracked,
+                            seriesId,
+                            sourceId,
+                          },
+                          reactivityKeys: [
+                            reactivityKey.library,
+                            reactivityKey.tracking,
+                            reactivityKey.librarySeriesState,
+                          ],
+                        }),
+                        {
+                          failure: "Unable to update tracking settings",
+                          success: "Tracking settings updated",
+                        }
                       );
                     }}
                     type="button"
                   >
                     <Save className="size-3.5" />
-                    {updateLibrarySeriesState.isPending ? "Saving..." : "Save"}
+                    {isSavingTracking ? "Saving..." : "Save"}
                   </Button>
                   <Button
-                    disabled={!trackingState || refreshTracking.isPending}
+                    disabled={!trackingState || isRefreshingTracking}
                     onClick={() => {
-                      void runMutation(
-                        refreshTracking.mutateAsync({ seriesId, sourceId })
+                      void notifyMutation(
+                        requestTrackingRefresh({
+                          payload: decodeRefreshTrackedSeries({
+                            seriesId,
+                            sourceId,
+                          }),
+                          reactivityKeys: [
+                            reactivityKey.tracking,
+                            reactivityKey.notifications,
+                            reactivityKey.librarySeriesState,
+                          ],
+                        }),
+                        {
+                          failure: "Unable to request a tracking refresh",
+                          success: "Tracking refresh queued",
+                        }
                       );
                     }}
                     type="button"
                     variant="outline"
                   >
                     <RefreshCcw className="size-3.5" />
-                    {refreshTracking.isPending
+                    {isRefreshingTracking
                       ? "Scheduling..."
                       : "Refresh tracking"}
                   </Button>

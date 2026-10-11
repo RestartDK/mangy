@@ -1,6 +1,8 @@
+import { useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
+import { chapterPages, seriesChapters, seriesDetail } from "@/atoms/series";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -15,8 +17,11 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useChapterPages } from "@/hooks/use-chapter-pages";
-import { useSeriesDetail } from "@/hooks/use-series-detail";
+import {
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
 import { getErrorMessage, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -30,13 +35,23 @@ const ReaderRouteComponent = () => {
   const { chapterId, seriesId, sourceId } = useParams({
     from: "/series/$sourceId/$seriesId/read/$chapterId",
   });
-  const {
-    chapters,
-    error: seriesError,
-    isLoading: isSeriesLoading,
-    series,
-  } = useSeriesDetail(sourceId, seriesId);
-  const pagesQuery = useChapterPages(sourceId, seriesId, chapterId);
+  const detailResult = useAtomValue(seriesDetail({ seriesId, sourceId }));
+  const chaptersResult = useAtomValue(seriesChapters({ seriesId, sourceId }));
+  const pagesResult = useAtomValue(
+    chapterPages({ chapterId, seriesId, sourceId })
+  );
+
+  const series = asyncResultValue(detailResult);
+  const chapters = asyncResultValue(chaptersResult) ?? [];
+  const pages = asyncResultValue(pagesResult)?.pages ?? [];
+  const error =
+    asyncResultError(detailResult) ??
+    asyncResultError(chaptersResult) ??
+    asyncResultError(pagesResult);
+  const isLoading =
+    asyncResultLoading(detailResult) ||
+    asyncResultLoading(chaptersResult) ||
+    asyncResultLoading(pagesResult);
 
   const chapterIndex = chapters.findIndex(
     (chapter) => chapter.chapterId === chapterId
@@ -51,7 +66,7 @@ const ReaderRouteComponent = () => {
   const chapterLabel = chapter?.chapterNumber
     ? `Chapter ${chapter.chapterNumber}`
     : (chapter?.title ?? "Chapter reader");
-  const pageCount = pagesQuery.data?.length ?? 0;
+  const pageCount = pages.length;
 
   const readerMeta = [
     series?.title,
@@ -131,25 +146,22 @@ const ReaderRouteComponent = () => {
         }
       />
 
-      {isSeriesLoading || pagesQuery.isLoading ? <ReaderSkeleton /> : null}
+      {isLoading ? <ReaderSkeleton /> : null}
 
-      {seriesError || pagesQuery.error ? (
+      {error === undefined ? null : (
         <Alert variant="destructive">
           <AlertTitle>Unable to load this chapter</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(
-              seriesError ?? pagesQuery.error,
-              "Try again in a moment."
-            )}
+            {getErrorMessage(error, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
-      {series && !pagesQuery.isLoading && !pagesQuery.error ? (
+      {series && !isLoading && error === undefined ? (
         <div className="flex flex-col items-center gap-6">
-          {pagesQuery.data?.length ? (
+          {pages.length ? (
             <div className="w-full max-w-4xl space-y-2">
-              {pagesQuery.data.map((page) => (
+              {pages.map((page) => (
                 <img
                   alt={`${series.title} ${chapterLabel} page ${page.index + 1}`}
                   className="bg-muted w-full"

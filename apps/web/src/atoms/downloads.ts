@@ -9,4 +9,6 @@ export const downloadsQuery = ApiAtoms.query("downloads", "list", {
 
 export const cancelDownload = ApiAtoms.mutation("downloads", "cancel");
 
+export const enqueueDownload = ApiAtoms.mutation("downloads", "enqueue");
+
 export const retryDownload = ApiAtoms.mutation("downloads", "retry");

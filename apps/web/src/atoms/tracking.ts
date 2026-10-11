@@ -6,3 +6,5 @@ export type { TrackedSeries } from "@mangy/contract";
 export const trackingQuery = ApiAtoms.query("tracking", "list", {
   reactivityKeys: [reactivityKey.tracking],
 });
+
+export const refreshTrackedSeries = ApiAtoms.mutation("tracking", "refresh");
