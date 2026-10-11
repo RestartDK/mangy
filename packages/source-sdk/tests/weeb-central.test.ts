@@ -5,6 +5,7 @@ import { Effect } from "effect";
 
 import { BrowserUnavailableError } from "../src/adapters/shared/browser";
 import { createWeebCentralSourceAdapter } from "../src/adapters/weeb-central";
+import { SourceParseError } from "../src/errors";
 
 const fixture = async (name: string): Promise<string> =>
   await readFile(
@@ -166,5 +167,26 @@ describe("WeebCentral adapter", () => {
       imageUrl: "https://temp.compsci88.com/manga/One-Piece/1178-003.png",
       index: 2,
     });
+  });
+
+  test("fails loudly when a required series field is missing", async () => {
+    globalThis.fetch = async () => {
+      const html = await fixture("series.html");
+
+      return createHtmlResponse(
+        html.replace(/<title>.*?<\/title>/su, ""),
+        "https://weebcentral.com/series/01J76XY7E9FNDZ1DBBM6PBJPFK/One-Piece"
+      );
+    };
+
+    const adapter = createWeebCentralSourceAdapter();
+    const error = await Effect.runPromise(
+      adapter
+        .getSeries("01J76XY7E9FNDZ1DBBM6PBJPFK:One-Piece")
+        .pipe(Effect.flip)
+    );
+
+    expect(error).toBeInstanceOf(SourceParseError);
+    expect(error.message).toContain("title");
   });
 });
