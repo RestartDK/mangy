@@ -104,7 +104,6 @@
         "@mangy/env": "workspace:*",
         "better-auth": "catalog:",
         "effect": "catalog:",
-        "zod": "catalog:",
       },
       "devDependencies": {
         "@mangy/config": "workspace:*",
@@ -180,7 +179,6 @@
         "cheerio": "^1.2.0",
         "effect": "catalog:",
         "playwright": "^1.64.0",
-        "zod": "catalog:",
       },
       "devDependencies": {
         "@mangy/config": "workspace:*",
@@ -199,7 +197,6 @@
     "better-auth": "^1.7.7",
     "effect": "4.0.2",
     "typescript": "^7.0.2",
-    "zod": "^4.6.5",
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],

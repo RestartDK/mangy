@@ -17,8 +17,7 @@
   "dependencies": {
     "cheerio": "^1.2.0",
     "effect": "catalog:",
-    "playwright": "^1.64.0",
-    "zod": "catalog:"
+    "playwright": "^1.64.0"
   },
   "devDependencies": {
     "@mangy/config": "workspace:*",
