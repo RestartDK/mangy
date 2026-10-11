@@ -1,3 +1,4 @@
+import { RegistryProvider } from "@effect/atom-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import {
@@ -33,11 +34,13 @@ const RootComponent = () => (
       enableSystem
     >
       <QueryClientProvider client={queryClient}>
-        <div className="bg-background text-foreground min-h-svh">
-          <Outlet />
-        </div>
-        <Toaster />
-        <ReactQueryDevtools initialIsOpen={false} />
+        <RegistryProvider>
+          <div className="bg-background text-foreground min-h-svh">
+            <Outlet />
+          </div>
+          <Toaster />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </RegistryProvider>
       </QueryClientProvider>
     </ThemeProvider>
     <TanStackRouterDevtools position="bottom-left" />

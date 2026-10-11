@@ -5,13 +5,12 @@ import { HttpApiClient } from "effect/http-api";
 
 import { Api } from "./api";
 
-const makeRuntime = () =>
-  ManagedRuntime.make(
-    Layer.mergeAll(
-      FetchHttpClient.layer,
-      Layer.succeed(FetchHttpClient.RequestInit)({ credentials: "include" })
-    )
-  );
+export const apiHttpClient = Layer.mergeAll(
+  FetchHttpClient.layer,
+  Layer.succeed(FetchHttpClient.RequestInit)({ credentials: "include" })
+);
+
+const makeRuntime = () => ManagedRuntime.make(apiHttpClient);
 
 export const makeApiClient = (baseUrl: string) => {
   const runtime = makeRuntime();

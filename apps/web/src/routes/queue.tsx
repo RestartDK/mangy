@@ -1,6 +1,15 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { AsyncResult } from "effect/reactivity";
 import { RotateCcw, X } from "lucide-react";
 
+import {
+  cancelDownload as cancelDownloadAtom,
+  downloadsQuery,
+  retryDownload as retryDownloadAtom,
+} from "@/atoms/downloads";
+import type { DownloadItem } from "@/atoms/downloads";
+import { reactivityKey } from "@/atoms/keys";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -11,11 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCancelDownload } from "@/hooks/use-cancel-download";
-import type { DownloadItem } from "@/hooks/use-downloads";
-import { useDownloads } from "@/hooks/use-downloads";
-import { useRetryDownload } from "@/hooks/use-retry-download";
+import {
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
+import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
 
 const sortQueuedJobs = <T extends { createdAt: string }>(items: T[]): T[] =>
@@ -55,17 +66,21 @@ const resolveJobState = (
 };
 
 interface QueueListProps {
-  cancelDownload: ReturnType<typeof useCancelDownload>;
   empty: string;
+  isCancelling: boolean;
+  isRetrying: boolean;
   jobs: DownloadItem[];
-  retryDownload: ReturnType<typeof useRetryDownload>;
+  onCancel: (jobId: string) => void;
+  onRetry: (jobId: string) => void;
 }
 
 const QueueList = ({
-  cancelDownload,
   empty,
+  isCancelling,
+  isRetrying,
   jobs,
-  retryDownload,
+  onCancel,
+  onRetry,
 }: QueueListProps) => {
   if (jobs.length === 0) {
     return (
@@ -113,9 +128,9 @@ const QueueList = ({
               <div className="flex items-center gap-1">
                 {isActive || item.status === "retryableFailed" ? (
                   <Button
-                    disabled={cancelDownload.isPending}
+                    disabled={isCancelling}
                     onClick={() => {
-                      cancelDownload.mutate(item.id);
+                      onCancel(item.id);
                     }}
                     size="sm"
                     type="button"
@@ -128,9 +143,9 @@ const QueueList = ({
                 {item.status === "retryableFailed" ||
                 item.status === "cancelled" ? (
                   <Button
-                    disabled={retryDownload.isPending}
+                    disabled={isRetrying}
                     onClick={() => {
-                      retryDownload.mutate(item.id);
+                      onRetry(item.id);
                     }}
                     size="sm"
                     type="button"
@@ -163,10 +178,36 @@ const QueueSkeleton = () => (
   </div>
 );
 const QueueRouteComponent = () => {
-  const downloadsQuery = useDownloads();
-  const cancelDownload = useCancelDownload();
-  const retryDownload = useRetryDownload();
-  const jobs = downloadsQuery.data ?? [];
+  const downloads = useAtomValue(downloadsQuery);
+  const cancelDownload = useAtomSet(cancelDownloadAtom, { mode: "promise" });
+  const retryDownload = useAtomSet(retryDownloadAtom, { mode: "promise" });
+  const cancelResult = useAtomValue(cancelDownloadAtom);
+  const retryResult = useAtomValue(retryDownloadAtom);
+  const jobs = asyncResultValue(downloads) ?? [];
+  const error = asyncResultError(downloads);
+  const isLoading = asyncResultLoading(downloads);
+  const isCancelling = AsyncResult.isWaiting(cancelResult);
+  const isRetrying = AsyncResult.isWaiting(retryResult);
+
+  const onCancel = (jobId: string): void => {
+    void notifyMutation(
+      cancelDownload({
+        params: { jobId },
+        reactivityKeys: [reactivityKey.downloads],
+      }),
+      { failure: "Unable to cancel job", success: "Job cancelled" }
+    );
+  };
+
+  const onRetry = (jobId: string): void => {
+    void notifyMutation(
+      retryDownload({
+        params: { jobId },
+        reactivityKeys: [reactivityKey.downloads],
+      }),
+      { failure: "Unable to retry job", success: "Job queued for retry" }
+    );
+  };
 
   const activeJobs = sortQueuedJobs(
     jobs.filter((job) => job.status === "queued" || job.status === "running")
@@ -227,18 +268,18 @@ const QueueRouteComponent = () => {
     <AppShell>
       <PageHeader title="Queue" />
 
-      {downloadsQuery.error ? (
+      {error === undefined ? null : (
         <Alert variant="destructive">
           <AlertTitle>Unable to load the queue</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(downloadsQuery.error, "Try again in a moment.")}
+            {getErrorMessage(error, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
-      {downloadsQuery.isLoading ? <QueueSkeleton /> : null}
+      {isLoading ? <QueueSkeleton /> : null}
 
-      {!downloadsQuery.isLoading && jobs.length === 0 ? (
+      {!isLoading && jobs.length === 0 ? (
         <EmptyState
           action={
             <Button asChild variant="outline">
@@ -263,10 +304,12 @@ const QueueRouteComponent = () => {
           {views.map((view) => (
             <TabsContent key={view.value} value={view.value}>
               <QueueList
-                cancelDownload={cancelDownload}
                 empty={view.empty}
+                isCancelling={isCancelling}
+                isRetrying={isRetrying}
                 jobs={view.jobs}
-                retryDownload={retryDownload}
+                onCancel={onCancel}
+                onRetry={onRetry}
               />
             </TabsContent>
           ))}
