@@ -1,6 +1,5 @@
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { auth } from "@mangy/auth";
-import { env } from "@mangy/env";
 import { Layer } from "effect";
 import {
   HttpEffect,
@@ -12,13 +11,8 @@ import {
 import { HttpApiBuilder } from "effect/http-api";
 
 import { Api } from "./api";
+import type { AppConfig } from "./config";
 import { TrackingApiLive } from "./modules/tracking";
-
-const configuredOrigins = new Set(
-  env.CORS_ORIGIN.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-);
 
 const devOriginPatterns = [
   /^http:\/\/localhost:3001$/u,
@@ -30,24 +24,21 @@ const devOriginPatterns = [
   /^http:\/\/[a-z0-9-]+\.local:3001$/iu,
 ];
 
-const isAllowedOrigin = (origin: string): boolean => {
-  if (configuredOrigins.has(origin)) {
-    return true;
-  }
-
-  return (
-    process.env.NODE_ENV !== "production" &&
-    devOriginPatterns.some((pattern) => pattern.test(origin))
+const makeAllowedOrigin = (
+  config: AppConfig
+): ((origin: string) => boolean) => {
+  const configuredOrigins = new Set(
+    config.corsOrigin
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
   );
-};
 
-const CorsMiddleware = HttpRouter.middleware(
-  HttpMiddleware.cors({
-    allowedOrigins: isAllowedOrigin,
-    credentials: true,
-  }),
-  { global: true }
-);
+  return (origin: string): boolean =>
+    configuredOrigins.has(origin) ||
+    (config.nodeEnv !== "production" &&
+      devOriginPatterns.some((pattern) => pattern.test(origin)));
+};
 
 const AuthRoutes = HttpRouter.add(
   "*",
@@ -66,9 +57,20 @@ const HealthRoute = HttpRouter.add(
   })
 );
 
-export const makeServer = (elysia: {
-  handle: (request: Request) => Promise<Response>;
-}) => {
+export const makeServer = (
+  elysia: {
+    handle: (request: Request) => Promise<Response>;
+  },
+  config: AppConfig
+) => {
+  const CorsMiddleware = HttpRouter.middleware(
+    HttpMiddleware.cors({
+      allowedOrigins: makeAllowedOrigin(config),
+      credentials: true,
+    }),
+    { global: true }
+  );
+
   const ElysiaFallback = HttpRouter.add(
     "*",
     "/*",

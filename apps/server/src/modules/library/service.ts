@@ -16,15 +16,14 @@ import {
   seriesColumns,
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
-import { env } from "@mangy/env";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 import { SourcesService } from "../sources/service";
 import { SourcesStorage } from "../sources/storage";
 
-const getTrackingPollIntervalMs = (): number => {
-  const intervalMs = Number(env.TRACKING_POLL_INTERVAL_MS);
+const getTrackingPollIntervalMs = (rawIntervalMs: string): number => {
+  const intervalMs = Number(rawIntervalMs);
 
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
     return 900_000;
@@ -234,6 +233,7 @@ const upsertTrackedState = (input: {
   seriesExternalId: string;
   seriesRecordId: string;
   sourceId: string;
+  trackingPollIntervalMs: string;
 }) =>
   Effect.gen(function* upsertTrackedStateEffect() {
     const sql = yield* SqlClient.SqlClient;
@@ -260,7 +260,9 @@ const upsertTrackedState = (input: {
       });
 
       const now = new Date();
-      const nextCheckAt = new Date(now.getTime() + getTrackingPollIntervalMs());
+      const nextCheckAt = new Date(
+        now.getTime() + getTrackingPollIntervalMs(input.trackingPollIntervalMs)
+      );
 
       const trackedStateStatement = primaryState
         ? sql`UPDATE ${table("trackedSeriesState")} SET ${updateRow(
@@ -312,7 +314,8 @@ const updateSeriesState = (
     isTracked: boolean;
     autoDownload: boolean;
     downloadDestinationId?: string | null;
-  }
+  },
+  trackingPollIntervalMs: string
 ) =>
   Effect.gen(function* updateSeriesStateEffect() {
     const sql = yield* SqlClient.SqlClient;
@@ -377,6 +380,7 @@ const updateSeriesState = (
           seriesExternalId: input.seriesId,
           seriesRecordId: seriesRecord.id,
           sourceId: input.sourceId,
+          trackingPollIntervalMs,
         })
       : sql`DELETE FROM ${table("trackedSeriesState")}
         WHERE ${column(trackedSeriesStateColumns, "libraryEntryId")} = ${entry.id}`;
@@ -426,8 +430,11 @@ export const LibraryService = {
       isTracked: boolean;
       autoDownload: boolean;
       downloadDestinationId?: string | null;
-    }
+    },
+    trackingPollIntervalMs: string
   ) {
-    return await runSql(updateSeriesState(userId, input));
+    return await runSql(
+      updateSeriesState(userId, input, trackingPollIntervalMs)
+    );
   },
 };
