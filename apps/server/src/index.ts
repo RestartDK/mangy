@@ -1,9 +1,11 @@
 import { auth } from "@mangy/auth";
-import { env } from "@mangy/env";
+import { Effect } from "effect";
 import { Elysia } from "elysia";
 
+import type { AppConfig } from "./config";
+import { loadConfig } from "./config";
 import { downloads } from "./modules/downloads";
-import { library } from "./modules/library";
+import { makeLibrary } from "./modules/library";
 import { live } from "./modules/live";
 import { notifications } from "./modules/notifications";
 import { series } from "./modules/series";
@@ -11,26 +13,27 @@ import { settings } from "./modules/settings";
 import { sources } from "./modules/sources";
 import { makeServer } from "./server";
 
-export const createApp = () =>
+export const createApp = (config: AppConfig) =>
   new Elysia()
     .mount(auth.handler)
     .use(sources)
     .use(series)
-    .use(library)
+    .use(makeLibrary(config.trackingPollIntervalMs))
     .use(downloads)
     .use(notifications)
     .use(settings)
     .use(live);
 
-const elysia = createApp();
+export type App = ReturnType<typeof createApp>;
 
-export const app = makeServer(elysia);
+const config = Effect.runSync(loadConfig);
+const elysia = createApp(config);
 
-export type App = typeof elysia;
+export const app = makeServer(elysia, config);
 
 if (import.meta.main) {
   app.listen({
-    hostname: env.HOST,
-    port: Number(env.PORT),
+    hostname: config.host,
+    port: Number(config.port),
   });
 }
