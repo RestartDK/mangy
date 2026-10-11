@@ -11,14 +11,14 @@ export class PushSubscription extends Model.Class<PushSubscription>(
   auth: Schema.String,
   createdAt: Schema.Date,
   endpoint: Schema.String,
-  expirationTime: Schema.NullOr(Schema.Date),
+  expirationTime: Schema.OptionFromNullOr(Schema.Date),
   id: PushSubscriptionIdSchema,
   isActive: Schema.Boolean,
-  lastError: Schema.NullOr(Schema.String),
+  lastError: Schema.OptionFromNullOr(Schema.String),
   lastSeenAt: Schema.Date,
   p256dh: Schema.String,
   updatedAt: Schema.Date,
-  userAgent: Schema.NullOr(Schema.String),
+  userAgent: Schema.OptionFromNullOr(Schema.String),
   userId: UserIdSchema,
 }) {}
 

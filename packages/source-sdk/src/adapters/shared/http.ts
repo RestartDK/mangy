@@ -1,5 +1,7 @@
 import { Data, Duration, Effect, Schedule } from "effect";
 
+import { hasText } from "./html";
+
 export const defaultUserAgent =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";
 
@@ -41,11 +43,11 @@ const createRequestHeaders = (options: FetchRequestOptions): Headers => {
     headers.set("user-agent", defaultUserAgent);
   }
 
-  if (options.accept && !headers.has("accept")) {
+  if (hasText(options.accept) && !headers.has("accept")) {
     headers.set("accept", options.accept);
   }
 
-  if (options.referer && !headers.has("referer")) {
+  if (hasText(options.referer) && !headers.has("referer")) {
     headers.set("referer", options.referer);
   }
 

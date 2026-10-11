@@ -5,7 +5,7 @@ import {
 } from "@mangy/downloader";
 import type { SourceAdapterError } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
-import { Data, Effect } from "effect";
+import { Data, Effect, Option } from "effect";
 
 import { DownloadJobError } from "./download-job-error";
 import { completeDownloadJob, updateDownloadJobProgress } from "./jobs";
@@ -20,12 +20,12 @@ export type DownloadJobFailure =
   | SourceAdapterError;
 
 const requireValue = (
-  value: string | null,
+  value: Option.Option<string>,
   message: string
 ): Effect.Effect<string, DownloadJobError> =>
-  value === null || value.length === 0
-    ? Effect.fail(new DownloadJobError({ message }))
-    : Effect.succeed(value);
+  Option.isSome(value) && value.value.length > 0
+    ? Effect.succeed(value.value)
+    : Effect.fail(new DownloadJobError({ message }));
 
 const promiseStep = <TResult>(
   evaluate: () => Promise<TResult>
@@ -83,11 +83,11 @@ export const runDownloadJob = (
       async () =>
         await prepareChapterOutputFile({
           chapterId: chapterExternalId,
-          chapterNumber: job.chapterNumber,
-          chapterTitle: job.chapterTitle,
+          chapterNumber: Option.getOrNull(job.chapterNumber),
+          chapterTitle: Option.getOrNull(job.chapterTitle),
           destinationPath,
           extension: ".cbz",
-          seriesTitle: job.seriesTitle ?? "Series",
+          seriesTitle: Option.getOrElse(job.seriesTitle, () => "Series"),
         })
     );
 
@@ -126,7 +126,7 @@ export const runDownloadJob = (
     const importedToKomgaAt = yield* promiseStep(
       async () =>
         await scanKomgaLibrary({
-          libraryId: job.destinationKomgaLibraryId,
+          libraryId: Option.getOrNull(job.destinationKomgaLibraryId),
         })
     );
 

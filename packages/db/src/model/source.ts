@@ -8,7 +8,7 @@ export const sourceTable = "source";
 export class Source extends Model.Class<Source>("Source")({
   createdAt: Schema.Date,
   description: Schema.String,
-  iconUrl: Schema.NullOr(Schema.String),
+  iconUrl: Schema.OptionFromNullOr(Schema.String),
   id: SourceIdSchema,
   isEnabled: Schema.Boolean,
   languageCode: Schema.String,

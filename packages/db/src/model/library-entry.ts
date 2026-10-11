@@ -14,10 +14,10 @@ export const libraryEntryTable = "library_entry";
 export class LibraryEntry extends Model.Class<LibraryEntry>("LibraryEntry")({
   autoDownload: Schema.Boolean,
   createdAt: Schema.Date,
-  downloadDestinationId: Schema.NullOr(DownloadDestinationIdSchema),
+  downloadDestinationId: Schema.OptionFromNullOr(DownloadDestinationIdSchema),
   id: LibraryEntryIdSchema,
   isTracked: Schema.Boolean,
-  lastOpenedChapterId: Schema.NullOr(ChapterIdSchema),
+  lastOpenedChapterId: Schema.OptionFromNullOr(ChapterIdSchema),
   seriesId: SeriesIdSchema,
   updatedAt: Schema.Date,
   userId: UserIdSchema,

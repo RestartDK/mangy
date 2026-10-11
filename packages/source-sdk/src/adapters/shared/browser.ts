@@ -1,6 +1,7 @@
 import { Data, Effect, Semaphore } from "effect";
 import type { Browser, LaunchOptions, Page } from "playwright";
 
+import { hasText } from "./html";
 import { defaultUserAgent } from "./http";
 
 const defaultTimeoutMs = 20_000;
@@ -190,7 +191,11 @@ const createHeaders = (options: BrowserPageOptions): Record<string, string> => {
     ...options.headers,
   };
 
-  if (options.referer && !headers.referer && !headers.Referer) {
+  if (
+    hasText(options.referer) &&
+    !hasText(headers.referer) &&
+    !hasText(headers.Referer)
+  ) {
     headers.Referer = options.referer;
   }
 
@@ -257,7 +262,7 @@ export const withBrowserPage = <TResult, E>(
           });
 
           const selector = options.waitForSelector;
-          if (selector) {
+          if (hasText(selector)) {
             yield* Effect.tryPromise({
               catch: (cause) =>
                 browserUnavailable(`Unable to find ${selector}.`, cause),
@@ -266,12 +271,12 @@ export const withBrowserPage = <TResult, E>(
             });
           }
 
-          if (options.scrollToBottom) {
+          if (options.scrollToBottom === true) {
             yield* autoScroll(page);
           }
 
           const { waitAfterLoadMs } = options;
-          if (waitAfterLoadMs && waitAfterLoadMs > 0) {
+          if (waitAfterLoadMs !== undefined && waitAfterLoadMs > 0) {
             yield* Effect.tryPromise({
               catch: (cause) =>
                 browserUnavailable("Unable to wait after page load.", cause),

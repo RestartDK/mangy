@@ -17,7 +17,7 @@ import {
   libraryEntryColumns,
   seriesColumns,
 } from "@mangy/db/model";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { Fragment } from "effect/sql/Statement";
 
@@ -28,18 +28,18 @@ const activeJobStatuses = ["queued", "running", "retryableFailed"] as const;
 
 const jobProjection = Schema.Struct({
   attempts: DownloadJob.fields.attempts,
-  chapterId: Schema.NullOr(Chapter.fields.externalId),
-  chapterTitle: Schema.NullOr(Chapter.fields.title),
+  chapterId: Schema.OptionFromNullOr(Chapter.fields.externalId),
+  chapterTitle: Chapter.fields.title,
   completedAt: DownloadJob.fields.completedAt,
   createdAt: DownloadJob.fields.createdAt,
-  destinationName: Schema.NullOr(DownloadDestination.fields.name),
+  destinationName: Schema.OptionFromNullOr(DownloadDestination.fields.name),
   errorMessage: DownloadJob.fields.errorMessage,
   id: DownloadJob.fields.id,
   maxAttempts: DownloadJob.fields.maxAttempts,
   progressPercent: DownloadJob.fields.progressPercent,
-  seriesId: Schema.NullOr(Series.fields.externalId),
-  seriesTitle: Schema.NullOr(Series.fields.title),
-  sourceId: Schema.NullOr(Series.fields.sourceId),
+  seriesId: Schema.OptionFromNullOr(Series.fields.externalId),
+  seriesTitle: Schema.OptionFromNullOr(Series.fields.title),
+  sourceId: Schema.OptionFromNullOr(Series.fields.sourceId),
   status: DownloadJob.fields.status,
   updatedAt: DownloadJob.fields.updatedAt,
 });
@@ -48,7 +48,9 @@ type DownloadJobSummary = Schema.Schema.Type<typeof jobProjection>;
 
 const serializeJob = (row: DownloadJobSummary) => ({
   ...row,
-  completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+  completedAt: row.completedAt.pipe(
+    Option.map((completedAt) => completedAt.toISOString())
+  ),
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -141,7 +143,10 @@ const resolveDestination = (
       );
     }
 
-    if (requestedDestinationId) {
+    if (
+      requestedDestinationId !== undefined &&
+      requestedDestinationId.length > 0
+    ) {
       const explicitDestination = enabledDestinations.find(
         (destination) => destination.id === requestedDestinationId
       );

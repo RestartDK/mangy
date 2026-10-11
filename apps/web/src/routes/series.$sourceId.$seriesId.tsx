@@ -1,6 +1,7 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { decodeRefreshTrackedSeries } from "@mangy/contract";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { BookOpen, ExternalLink, RefreshCcw, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -46,6 +47,7 @@ import {
   formatDate,
   formatDateTime,
   getErrorMessage,
+  hasText,
   pluralize,
 } from "@/lib/format";
 import { notifyMutation } from "@/lib/notify-mutation";
@@ -118,14 +120,19 @@ const SeriesDetailRouteComponent = () => {
       [],
     [settings]
   );
-  const trackingState = libraryState?.trackingState ?? null;
+  const trackingState = libraryState?.trackingState ?? Option.none();
   const defaultDestinationId =
     enabledDestinations.find((destination) => destination.isDefault)?.id ??
     enabledDestinations[0]?.id ??
     "";
 
   const baselineDestinationId =
-    libraryState?.downloadDestinationId ?? defaultDestinationId;
+    libraryState === undefined
+      ? defaultDestinationId
+      : Option.getOrElse(
+          libraryState.downloadDestinationId,
+          () => defaultDestinationId
+        );
   const isTrackingDirty =
     isTracked !== (libraryState?.isTracked ?? false) ||
     autoDownload !== (libraryState?.autoDownload ?? false) ||
@@ -139,7 +146,10 @@ const SeriesDetailRouteComponent = () => {
     setIsTracked(libraryState.isTracked);
     setAutoDownload(libraryState.autoDownload);
     setSelectedDestinationId(
-      libraryState.downloadDestinationId ?? defaultDestinationId
+      Option.getOrElse(
+        libraryState.downloadDestinationId,
+        () => defaultDestinationId
+      )
     );
   }, [defaultDestinationId, libraryState]);
 
@@ -152,7 +162,7 @@ const SeriesDetailRouteComponent = () => {
       enabledDestinations.find((item) => item.isDefault) ??
       enabledDestinations[0];
 
-    if (destination) {
+    if (destination !== undefined) {
       setSelectedDestinationId(destination.id);
     }
   }, [enabledDestinations, selectedDestinationId]);
@@ -187,11 +197,17 @@ const SeriesDetailRouteComponent = () => {
   const metadata = [
     {
       label: "Author",
-      value: series?.authorNames.length ? series.authorNames.join(", ") : null,
+      value:
+        series === undefined || series.authorNames.length === 0
+          ? null
+          : series.authorNames.join(", "),
     },
     {
       label: "Artist",
-      value: series?.artistNames.length ? series.artistNames.join(", ") : null,
+      value:
+        series === undefined || series.artistNames.length === 0
+          ? null
+          : series.artistNames.join(", "),
     },
     {
       label: "Demographic",
@@ -199,9 +215,11 @@ const SeriesDetailRouteComponent = () => {
     },
     {
       label: "Languages",
-      value: series?.availableTranslatedLanguages.length
-        ? series.availableTranslatedLanguages.join(", ").toUpperCase()
-        : null,
+      value:
+        series === undefined ||
+        series.availableTranslatedLanguages.length === 0
+          ? null
+          : series.availableTranslatedLanguages.join(", ").toUpperCase(),
     },
   ].filter((item) => Boolean(item.value));
 
@@ -209,7 +227,7 @@ const SeriesDetailRouteComponent = () => {
     <AppShell>
       <PageHeader
         action={
-          series?.canonicalUrl ? (
+          series !== undefined && hasText(series.canonicalUrl) ? (
             <Button asChild size="sm" variant="outline">
               <a href={series.canonicalUrl} rel="noopener" target="_blank">
                 <ExternalLink className="size-3.5" />
@@ -307,7 +325,7 @@ const SeriesDetailRouteComponent = () => {
               ) : (
                 <div className="rows">
                   {chapters.map((chapter) => {
-                    const chapterLabel = chapter.chapterNumber
+                    const chapterLabel = hasText(chapter.chapterNumber)
                       ? `Chapter ${chapter.chapterNumber}`
                       : "Special chapter";
                     const isPending = pendingChapterId === chapter.chapterId;
@@ -317,7 +335,7 @@ const SeriesDetailRouteComponent = () => {
                         <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <h3 className="truncate text-sm font-medium">
-                              {chapter.title
+                              {hasText(chapter.title)
                                 ? `${chapterLabel}: ${chapter.title}`
                                 : chapterLabel}
                             </h3>
@@ -330,7 +348,8 @@ const SeriesDetailRouteComponent = () => {
                           <p className="meta">
                             {[
                               formatDate(chapter.publishedAt),
-                              chapter.pageCount
+                              chapter.pageCount !== null &&
+                              chapter.pageCount > 0
                                 ? pluralize(chapter.pageCount, "page")
                                 : null,
                             ]
@@ -388,7 +407,7 @@ const SeriesDetailRouteComponent = () => {
             <div className="panel h-fit">
               <div className="panel-header">
                 <h2 className="panel-title">Manage</h2>
-                {trackingState ? (
+                {Option.isSome(trackingState) ? (
                   <StatusBadge tone="success">Tracking</StatusBadge>
                 ) : (
                   <StatusBadge tone="neutral">Not tracked</StatusBadge>
@@ -475,18 +494,22 @@ const SeriesDetailRouteComponent = () => {
                   </Field>
                 </div>
 
-                {trackingState ? (
+                {Option.isSome(trackingState) ? (
                   <dl className="space-y-2">
                     <div className="flex items-baseline justify-between gap-3">
                       <dt className="meta">Last checked</dt>
                       <dd className="text-xs">
-                        {formatDateTime(trackingState.lastCheckedAt)}
+                        {formatDateTime(
+                          Option.getOrNull(trackingState.value.lastCheckedAt)
+                        )}
                       </dd>
                     </div>
                     <div className="flex items-baseline justify-between gap-3">
                       <dt className="meta">Next check</dt>
                       <dd className="text-xs">
-                        {formatDateTime(trackingState.nextCheckAt)}
+                        {formatDateTime(
+                          Option.getOrNull(trackingState.value.nextCheckAt)
+                        )}
                       </dd>
                     </div>
                   </dl>
@@ -524,7 +547,9 @@ const SeriesDetailRouteComponent = () => {
                     {isSavingTracking ? "Saving..." : "Save"}
                   </Button>
                   <Button
-                    disabled={!trackingState || isRefreshingTracking}
+                    disabled={
+                      Option.isNone(trackingState) || isRefreshingTracking
+                    }
                     onClick={() => {
                       void notifyMutation(
                         requestTrackingRefresh({

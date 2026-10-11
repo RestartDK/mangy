@@ -26,7 +26,7 @@ import {
   hasBrowserPushConfig,
   sendBrowserPush,
 } from "@mangy/push";
-import { Cause, Effect, Exit, Schema } from "effect";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 import { getPreferencesEffect } from "../notifications/service";
@@ -68,8 +68,8 @@ const defaultBrowserPushPreferences: BrowserPushPreferencesInput = {
   notifyOnTrackedSeriesUpdate: true,
 };
 
-const toIsoString = (value: Date | null): string | null =>
-  value ? value.toISOString() : null;
+const toIsoString = (value: Option.Option<Date>): Option.Option<string> =>
+  value.pipe(Option.map((date) => date.toISOString()));
 
 const browserPushEndpointProjection = Schema.Struct({
   id: NotificationEndpoint.fields.id,
@@ -268,13 +268,15 @@ const updateBrowserPushObservability = (
       {
         lastDeliveredAt:
           input.lastDeliveredAt === undefined
-            ? endpoint.lastDeliveredAt
+            ? Option.getOrNull(endpoint.lastDeliveredAt)
             : input.lastDeliveredAt,
         lastError:
-          input.lastError === undefined ? endpoint.lastError : input.lastError,
+          input.lastError === undefined
+            ? Option.getOrNull(endpoint.lastError)
+            : input.lastError,
         lastErrorAt:
           input.lastErrorAt === undefined
-            ? endpoint.lastErrorAt
+            ? Option.getOrNull(endpoint.lastErrorAt)
             : input.lastErrorAt,
         updatedAt: new Date(),
       }
@@ -319,7 +321,7 @@ const getBootstrap = (userId: string, profile: UserProfile) =>
         id: destination.id,
         isDefault: destination.is_default,
         isEnabled: destination.is_enabled,
-        komgaLibraryId: destination.komga_library_id ?? null,
+        komgaLibraryId: destination.komga_library_id,
         name: destination.name,
       })),
       notifications,
@@ -341,9 +343,13 @@ const getBrowserPushSettings = (userId: string) =>
       activeSubscriptionCount,
       isConfigured: hasBrowserPushConfig(),
       isEnabled: endpoint?.isEnabled ?? defaultBrowserPushPreferences.isEnabled,
-      lastDeliveredAt: toIsoString(endpoint?.lastDeliveredAt ?? null),
-      lastError: endpoint?.lastError ?? null,
-      lastErrorAt: toIsoString(endpoint?.lastErrorAt ?? null),
+      lastDeliveredAt: toIsoString(
+        endpoint === null ? Option.none() : endpoint.lastDeliveredAt
+      ),
+      lastError: endpoint === null ? Option.none() : endpoint.lastError,
+      lastErrorAt: toIsoString(
+        endpoint === null ? Option.none() : endpoint.lastErrorAt
+      ),
       notifyOnDownloadCompleted:
         endpoint?.notifyOnDownloadCompleted ??
         defaultBrowserPushPreferences.notifyOnDownloadCompleted,
@@ -655,7 +661,7 @@ const createDestination = (
           id: destination.id,
           isDefault: destination.is_default,
           isEnabled: destination.is_enabled,
-          komgaLibraryId: destination.komga_library_id ?? null,
+          komgaLibraryId: destination.komga_library_id,
           name: destination.name,
         };
       })

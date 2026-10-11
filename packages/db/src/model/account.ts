@@ -6,17 +6,17 @@ import { AccountIdSchema, UserIdSchema } from "./ids";
 export const accountTable = "account";
 
 export class Account extends Model.Class<Account>("Account")({
-  accessToken: Schema.NullOr(Schema.String),
-  accessTokenExpiresAt: Schema.NullOr(Schema.Date),
+  accessToken: Schema.OptionFromNullOr(Schema.String),
+  accessTokenExpiresAt: Schema.OptionFromNullOr(Schema.Date),
   accountId: Schema.String,
   createdAt: Schema.Date,
   id: AccountIdSchema,
-  idToken: Schema.NullOr(Schema.String),
-  password: Schema.NullOr(Schema.String),
+  idToken: Schema.OptionFromNullOr(Schema.String),
+  password: Schema.OptionFromNullOr(Schema.String),
   providerId: Schema.String,
-  refreshToken: Schema.NullOr(Schema.String),
-  refreshTokenExpiresAt: Schema.NullOr(Schema.Date),
-  scope: Schema.NullOr(Schema.String),
+  refreshToken: Schema.OptionFromNullOr(Schema.String),
+  refreshTokenExpiresAt: Schema.OptionFromNullOr(Schema.Date),
+  scope: Schema.OptionFromNullOr(Schema.String),
   updatedAt: Schema.Date,
   userId: UserIdSchema,
 }) {}

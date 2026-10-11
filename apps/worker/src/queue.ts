@@ -1,6 +1,14 @@
 import { column, decodeRows, runSql, table } from "@mangy/db";
 import { DownloadJob, downloadJobColumns } from "@mangy/db/model";
-import { Data, Duration, Effect, Layer, Schedule, Schema } from "effect";
+import {
+  Data,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Schedule,
+  Schema,
+} from "effect";
 import { PersistedQueue } from "effect/persistence";
 import { SqlClient } from "effect/sql";
 
@@ -95,7 +103,7 @@ const takeNextDownload = (
     const claimed = yield* loadClaimedDownloadJob(value.jobId);
     if (
       !claimed ||
-      claimed.queueId !== metadata.id ||
+      Option.getOrNull(claimed.queueId) !== metadata.id ||
       claimed.status === "cancelled" ||
       claimed.status === "completed"
     ) {
@@ -122,7 +130,7 @@ export const reconcileQueuedDownloadJobs = (queue: DownloadQueue) =>
 
     for (const { id, queueId: existingQueueId } of queued) {
       let queueId = existingQueueId;
-      if (queueId === null) {
+      if (Option.isNone(queueId)) {
         const generated = crypto.randomUUID();
         const updated = yield* decodeRows(
           Schema.Struct({ id: DownloadJob.fields.id }),
@@ -139,11 +147,11 @@ export const reconcileQueuedDownloadJobs = (queue: DownloadQueue) =>
           continue;
         }
 
-        queueId = generated;
+        queueId = Option.some(generated);
       }
 
       yield* queue
-        .offer({ jobId: id }, { id: queueId })
+        .offer({ jobId: id }, { id: Option.getOrThrow(queueId) })
         .pipe(Effect.ignoreCause);
     }
   });

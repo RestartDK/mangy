@@ -3,6 +3,9 @@ import type { CheerioAPI } from "cheerio";
 
 export const loadDocument = (html: string): CheerioAPI => load(html);
 
+export const hasText = (value: string | null | undefined): value is string =>
+  value !== null && value !== undefined && value.length > 0;
+
 export const normalizeText = (value: string | null | undefined): string =>
   value?.replaceAll(/\s+/gu, " ").trim() ?? "";
 

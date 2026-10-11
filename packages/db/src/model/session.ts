@@ -9,10 +9,10 @@ export class Session extends Model.Class<Session>("Session")({
   createdAt: Schema.Date,
   expiresAt: Schema.Date,
   id: SessionIdSchema,
-  ipAddress: Schema.NullOr(Schema.String),
+  ipAddress: Schema.OptionFromNullOr(Schema.String),
   token: Schema.String,
   updatedAt: Schema.Date,
-  userAgent: Schema.NullOr(Schema.String),
+  userAgent: Schema.OptionFromNullOr(Schema.String),
   userId: UserIdSchema,
 }) {}
 

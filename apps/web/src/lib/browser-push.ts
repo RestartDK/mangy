@@ -46,7 +46,12 @@ const serializePushSubscription = (
   const auth = serialized.keys?.auth;
   const p256dh = serialized.keys?.p256dh;
 
-  if (!(auth && p256dh)) {
+  if (
+    auth === undefined ||
+    auth.length === 0 ||
+    p256dh === undefined ||
+    p256dh.length === 0
+  ) {
     throw new Error("This browser returned an incomplete push subscription.");
   }
 

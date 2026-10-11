@@ -26,19 +26,23 @@ export const PageHeader = ({
     )}
   >
     <div className="min-w-0 space-y-1">
-      {breadcrumb ? <div className="pb-1">{breadcrumb}</div> : null}
+      {breadcrumb === undefined || breadcrumb === null ? null : (
+        <div className="pb-1">{breadcrumb}</div>
+      )}
       <h1 className="font-heading text-xl font-semibold tracking-tight break-words sm:text-2xl">
         {title}
       </h1>
-      {description ? (
+      {description === undefined || description.length === 0 ? null : (
         <p className="text-muted-foreground text-sm">{description}</p>
-      ) : null}
+      )}
     </div>
-    {action ? (
+    {action === undefined || action === null ? null : (
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
         {action}
       </div>
-    ) : null}
-    {meta ? <div className="w-full">{meta}</div> : null}
+    )}
+    {meta === undefined || meta === null ? null : (
+      <div className="w-full">{meta}</div>
+    )}
   </header>
 );

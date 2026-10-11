@@ -41,7 +41,7 @@ export const EmptyState = ({
         <p className="font-heading text-sm font-medium">{title}</p>
         <p className="meta mx-auto max-w-md">{description}</p>
       </div>
-      {action ? <div>{action}</div> : null}
+      {action === undefined || action === null ? null : <div>{action}</div>}
     </div>
   );
 };

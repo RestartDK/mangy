@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { RotateCcw, X } from "lucide-react";
 
@@ -100,22 +101,29 @@ const QueueList = ({
             <div className="min-w-0 space-y-1.5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <h3 className="text-sm font-medium break-words">
-                  {item.seriesTitle ?? "Queued chapter"}
+                  {Option.getOrElse(item.seriesTitle, () => "Queued chapter")}
                 </h3>
                 <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
               </div>
               <p className="meta truncate">
-                {item.chapterTitle ??
-                  item.chapterId ??
-                  "Chapter details pending"}
+                {Option.getOrElse(item.chapterTitle, () =>
+                  Option.getOrElse(
+                    item.chapterId,
+                    () => "Chapter details pending"
+                  )
+                )}
               </p>
               <p className="meta truncate">
-                {item.destinationName ?? "No destination"} · Attempt{" "}
-                {item.attempts} of {item.maxAttempts} ·{" "}
-                {formatDateTime(item.completedAt ?? item.updatedAt)}
+                {Option.getOrElse(item.destinationName, () => "No destination")}{" "}
+                · Attempt {item.attempts} of {item.maxAttempts} ·{" "}
+                {formatDateTime(
+                  Option.getOrElse(item.completedAt, () => item.updatedAt)
+                )}
               </p>
-              {item.errorMessage ? (
-                <p className="text-destructive text-xs">{item.errorMessage}</p>
+              {Option.isSome(item.errorMessage) ? (
+                <p className="text-destructive text-xs">
+                  {item.errorMessage.value}
+                </p>
               ) : null}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-3">

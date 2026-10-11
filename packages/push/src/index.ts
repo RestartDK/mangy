@@ -42,10 +42,22 @@ export class BrowserPushError extends Error {
 }
 
 const isConfigured = (): boolean =>
-  Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT);
+  env.VAPID_PUBLIC_KEY !== undefined &&
+  env.VAPID_PUBLIC_KEY.length > 0 &&
+  env.VAPID_PRIVATE_KEY !== undefined &&
+  env.VAPID_PRIVATE_KEY.length > 0 &&
+  env.VAPID_SUBJECT !== undefined &&
+  env.VAPID_SUBJECT.length > 0;
 
 const getConfiguredVapid = () => {
-  if (!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT)) {
+  if (
+    env.VAPID_PUBLIC_KEY === undefined ||
+    env.VAPID_PUBLIC_KEY.length === 0 ||
+    env.VAPID_PRIVATE_KEY === undefined ||
+    env.VAPID_PRIVATE_KEY.length === 0 ||
+    env.VAPID_SUBJECT === undefined ||
+    env.VAPID_SUBJECT.length === 0
+  ) {
     throw new BrowserPushError(
       "Browser push notifications are not configured yet.",
       { permanent: true }

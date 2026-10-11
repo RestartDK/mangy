@@ -17,7 +17,7 @@ export const sourceCapabilitiesSchema = Schema.Struct({
 export const sourceSchema = Schema.Struct({
   capabilities: sourceCapabilitiesSchema,
   description: Schema.String,
-  iconUrl: Schema.NullOr(Schema.String),
+  iconUrl: Schema.OptionFromNullOr(Schema.String),
   id: Schema.String,
   isEnabled: Schema.Boolean,
   languageCode: Schema.String,

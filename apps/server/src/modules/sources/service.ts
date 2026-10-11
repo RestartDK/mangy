@@ -49,7 +49,7 @@ const mapListResponse = (
 });
 
 const normalizeLimit = (limit: number | undefined): number => {
-  if (!limit || limit < 1) {
+  if (limit === undefined || Number.isNaN(limit) || limit < 1) {
     return 12;
   }
 

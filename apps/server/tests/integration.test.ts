@@ -27,7 +27,7 @@ import type {
 } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { serve } from "bun";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { SqlError } from "effect/sql";
 import { unzipSync } from "fflate";
@@ -52,7 +52,7 @@ const sessionCookieRegex = /better-auth\.session_token=(?<token>[^;]+)/u;
 const decoder = new TextDecoder();
 
 const extractSessionCookie = (header: string | null): string | null => {
-  if (!header) {
+  if (header === null || header.length === 0) {
     return null;
   }
 
@@ -215,7 +215,7 @@ const createApiClient = async (
         body: JSON.stringify(body),
         headers: {
           "content-type": "application/json",
-          ...(origin ? { origin } : {}),
+          ...(origin !== undefined && origin.length > 0 ? { origin } : {}),
         },
         method: "POST",
       })
@@ -223,7 +223,7 @@ const createApiClient = async (
 
   const setSessionCookie = (response: Response) => {
     const cookie = extractSessionCookie(response.headers.get("set-cookie"));
-    if (cookie) {
+    if (cookie !== null && cookie.length > 0) {
       headers.set("cookie", `better-auth.session_token=${cookie}`);
     }
   };
@@ -235,7 +235,8 @@ const createApiClient = async (
   });
   setSessionCookie(signUpResponse);
 
-  if (!headers.get("cookie")) {
+  const sessionCookie = headers.get("cookie");
+  if (sessionCookie === null || sessionCookie.length === 0) {
     const signInResponse = await authRequest("/api/auth/sign-in/email", {
       email,
       password,
@@ -246,7 +247,7 @@ const createApiClient = async (
   const apiFetch = async (path: string, init?: RequestInit) => {
     const requestHeaders = new Headers(init?.headers);
     const cookie = headers.get("cookie");
-    if (cookie) {
+    if (cookie !== null && cookie.length > 0) {
       requestHeaders.set("cookie", cookie);
     }
 
@@ -255,7 +256,7 @@ const createApiClient = async (
         ...init,
         headers: {
           ...Object.fromEntries(requestHeaders.entries()),
-          ...(origin ? { origin } : {}),
+          ...(origin !== undefined && origin.length > 0 ? { origin } : {}),
         },
       })
     );
@@ -776,7 +777,9 @@ describe("server and worker integration", () => {
 
       const claimedJob = await processNextDownloadJob("komga-worker");
       expect(claimedJob?.id).toBe(queuedJob.id);
-      expect(claimedJob?.destinationKomgaLibraryId).toBe(komgaLibraryId);
+      expect(
+        Option.getOrNull(claimedJob?.destinationKomgaLibraryId ?? Option.none())
+      ).toBe(komgaLibraryId);
       assert.ok(claimedJob, "Expected a claimed download job.");
 
       expect(scanRequests).toEqual([
@@ -805,7 +808,9 @@ describe("server and worker integration", () => {
       expect(artifact?.output_path).toContain(tempDirectory);
       expect(artifact?.output_path.endsWith(".cbz")).toBe(true);
       expect(artifact?.package_format).toBe("cbz");
-      expect(artifact?.imported_to_komga_at).toBeInstanceOf(Date);
+      expect(
+        Option.getOrNull(artifact?.imported_to_komga_at ?? Option.none())
+      ).toBeInstanceOf(Date);
     } finally {
       void komgaServer.stop(true);
     }

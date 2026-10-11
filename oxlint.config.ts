@@ -27,24 +27,6 @@ export default defineConfig({
         "require-await": "off",
       },
     },
-    {
-      // The TypeScript style guide permits implicit boolean coercion for
-      // strings/numbers and treats a nullish value as absent. Backend presence
-      // checks (headers, optional ids, env-gated features) use "" and
-      // null/undefined interchangeably. apps/web is owned by another track and
-      // keeps the rule at its default strictness.
-      files: ["apps/server/**", "apps/worker/**", "packages/**"],
-      rules: {
-        "typescript/strict-boolean-expressions": [
-          "error",
-          {
-            allowNullableBoolean: true,
-            allowNullableNumber: true,
-            allowNullableString: true,
-          },
-        ],
-      },
-    },
   ],
   rules: {
     // effect/http-api and effect/sql are the replacements for elysia and drizzle,

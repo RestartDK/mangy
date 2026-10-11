@@ -16,6 +16,7 @@ import type {
 } from "../types";
 import { BrowserUnavailableError, withBrowserPage } from "./shared/browser";
 import {
+  hasText,
   loadDocument,
   normalizeText,
   nullableText,
@@ -103,7 +104,7 @@ const parseSeriesId = (
   const [seriesKey, ...slugParts] = seriesId.split(":");
   const slug = slugParts.join(":");
 
-  if (!(seriesKey && slug)) {
+  if (!hasText(seriesKey) || !hasText(slug)) {
     throw new SourceParseError({
       message: `Invalid WeebCentral series id: ${seriesId}`,
     });
@@ -120,7 +121,7 @@ const parseSeriesContext = (url: string): WeebCentralSeriesContext => {
   const seriesKey = match?.groups?.seriesKey;
   const slug = match?.groups?.slug;
 
-  if (!(seriesKey && slug)) {
+  if (!hasText(seriesKey) || !hasText(slug)) {
     throw new SourceParseError({
       message: `Unable to parse WeebCentral series url: ${url}`,
     });
@@ -360,7 +361,7 @@ const applySearchFilters = (
   for (const key of ["official", "anime", "adult", "order", "sort"] as const) {
     const [value] = getFilterStrings(filters[key]);
 
-    if (value) {
+    if (hasText(value)) {
       searchParams.set(key, value);
     }
   }
@@ -512,14 +513,14 @@ const parseChapters = (html: string): SourceChapter[] => {
       const link = $(element);
       const href = link.attr("href");
 
-      if (!href) {
+      if (!hasText(href)) {
         return null;
       }
 
       const chapterUrl = resolveUrl(sourceBaseUrl, href);
       const chapterId = parseChapterId(chapterUrl);
 
-      if (!chapterId || seenChapterIds.has(chapterId)) {
+      if (!hasText(chapterId) || seenChapterIds.has(chapterId)) {
         return null;
       }
 
@@ -539,9 +540,11 @@ const parseChapters = (html: string): SourceChapter[] => {
         externalUrl: chapterUrl,
         isUnavailable: false,
         pageCount: null,
-        publishedAt: publishedAtValue ? new Date(publishedAtValue) : null,
+        publishedAt: hasText(publishedAtValue)
+          ? new Date(publishedAtValue)
+          : null,
         sourceOrder: chapterNumber ?? chapterId,
-        title: title && title !== chapterLabel ? title : null,
+        title: hasText(title) && title !== chapterLabel ? title : null,
         translatedLanguage: sourceLanguage,
         volumeNumber: null,
       } satisfies SourceChapter;
@@ -614,19 +617,18 @@ const parseSearchResultCard = (
   const details = card.children("section").last();
   const href = card.find('a[href*="/series/"]').first().attr("href");
 
-  if (!href) {
+  if (!hasText(href)) {
     return null;
   }
 
   const canonicalUrl = resolveUrl(sourceBaseUrl, href);
   const context = parseSeriesContext(canonicalUrl);
+  const coverImageSrc = card
+    .find('picture img[alt*="cover"]')
+    .first()
+    .attr("src");
   const coverImageUrl = nullableText(
-    card.find('picture img[alt*="cover"]').first().attr("src")
-      ? resolveUrl(
-          sourceBaseUrl,
-          card.find('picture img[alt*="cover"]').first().attr("src") ?? ""
-        )
-      : null
+    hasText(coverImageSrc) ? resolveUrl(sourceBaseUrl, coverImageSrc) : null
   );
   const title = cleanTitle(
     details.find('a[href*="/series/"]').last().text() ||

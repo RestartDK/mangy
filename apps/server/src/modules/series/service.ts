@@ -18,7 +18,11 @@ const createPageRequestHeaders = (
 ) => {
   const headers = new Headers(page.headers);
 
-  if (page.referer && !headers.has("referer")) {
+  if (
+    page.referer !== undefined &&
+    page.referer.length > 0 &&
+    !headers.has("referer")
+  ) {
     headers.set("referer", page.referer);
   }
 
@@ -31,7 +35,7 @@ const copyHeaderIfPresent = (
   headerName: string
 ): void => {
   const value = sourceHeaders.get(headerName);
-  if (value) {
+  if (value !== null && value.length > 0) {
     targetHeaders.set(headerName, value);
   }
 };

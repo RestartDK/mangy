@@ -1,3 +1,5 @@
+import { hasText } from "@/lib/format";
+
 interface SeriesMetaProps {
   status?: string | null;
   latestChapter?: string | null;
@@ -12,9 +14,9 @@ export const SeriesMeta = ({
   status,
 }: SeriesMetaProps) => {
   const items = [
-    latestChapter ? `Latest ${latestChapter}` : null,
-    status ? status.replaceAll("-", " ") : null,
-    language ? language.toUpperCase() : null,
+    hasText(latestChapter) ? `Latest ${latestChapter}` : null,
+    hasText(status) ? status.replaceAll("-", " ") : null,
+    hasText(language) ? language.toUpperCase() : null,
     contentRating,
   ].filter((item): item is string => Boolean(item));
 
