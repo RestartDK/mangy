@@ -1,25 +1,37 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { Effect, FileSystem } from "effect";
+import type { PlatformError } from "effect/PlatformError";
 
-export const ensureDirectory = async (path: string): Promise<void> => {
-  await mkdir(path, { recursive: true });
-};
+export const ensureDirectory = (
+  directoryPath: string
+): Effect.Effect<void, PlatformError, FileSystem.FileSystem> =>
+  Effect.gen(function* ensureDirectoryEffect() {
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.makeDirectory(directoryPath, { recursive: true });
+  });
 
-export const removePath = async (path: string): Promise<void> => {
-  await rm(path, { force: true, recursive: true });
-};
+export const removePath = (
+  filePath: string
+): Effect.Effect<void, PlatformError, FileSystem.FileSystem> =>
+  Effect.gen(function* removePathEffect() {
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.remove(filePath, { force: true, recursive: true });
+  });
 
-export const ensureEmptyDirectory = async (path: string): Promise<void> => {
-  await removePath(path);
-  await ensureDirectory(path);
-};
+export const removeDirectory = removePath;
 
-export const removeDirectory = async (path: string): Promise<void> => {
-  await removePath(path);
-};
+export const ensureEmptyDirectory = (
+  directoryPath: string
+): Effect.Effect<void, PlatformError, FileSystem.FileSystem> =>
+  Effect.gen(function* ensureEmptyDirectoryEffect() {
+    yield* removePath(directoryPath);
+    yield* ensureDirectory(directoryPath);
+  });
 
-export const writeBytes = async (
-  path: string,
+export const writeBytes = (
+  filePath: string,
   data: Uint8Array
-): Promise<void> => {
-  await writeFile(path, data);
-};
+): Effect.Effect<void, PlatformError, FileSystem.FileSystem> =>
+  Effect.gen(function* writeBytesEffect() {
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.writeFile(filePath, data);
+  });

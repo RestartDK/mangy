@@ -137,6 +137,8 @@
     "packages/downloader": {
       "name": "@mangy/downloader",
       "dependencies": {
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
         "fflate": "^0.8.3",
       },
       "devDependencies": {
