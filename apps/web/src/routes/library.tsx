@@ -24,12 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import { formatDateTime, getErrorMessage } from "@/lib/format";
+import { formatCause, formatDateTime } from "@/lib/format";
 import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -164,15 +159,21 @@ const LibraryRouteComponent = () => {
   const [seriesPendingRemoval, setSeriesPendingRemoval] =
     useState<LibraryRouteItem | null>(null);
 
-  const trackingItems = asyncResultValue(tracking) ?? [];
-  const error = asyncResultError(library) ?? asyncResultError(tracking);
-  const isLoading = asyncResultLoading(library) || asyncResultLoading(tracking);
+  const trackingItems = Option.getOrElse(AsyncResult.value(tracking), () => []);
+  const error = Option.orElse(AsyncResult.cause(library), () =>
+    AsyncResult.cause(tracking)
+  );
+  const isLoading =
+    AsyncResult.isInitial(library) || AsyncResult.isInitial(tracking);
 
   const trackingMap = new Map(
     trackingItems.map((item) => [`${item.sourceId}:${item.seriesId}`, item])
   );
 
-  const libraryItems = (asyncResultValue(library) ?? []).map((item) => ({
+  const libraryItems = Option.getOrElse(
+    AsyncResult.value(library),
+    () => []
+  ).map((item) => ({
     ...item,
     trackingState: trackingMap.get(`${item.sourceId}:${item.seriesId}`) ?? null,
   }));
@@ -251,14 +252,14 @@ const LibraryRouteComponent = () => {
     <AppShell>
       <PageHeader title="Library" />
 
-      {error === undefined ? null : (
+      {Option.isSome(error) ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load the library</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(error, "Try again in a moment.")}
+            {formatCause(error.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       {isLoading ? <LibrarySkeleton /> : null}
 

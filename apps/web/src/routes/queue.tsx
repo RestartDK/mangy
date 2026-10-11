@@ -21,12 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import { formatDateTime, getErrorMessage } from "@/lib/format";
+import { formatCause, formatDateTime } from "@/lib/format";
 import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -191,9 +186,9 @@ const QueueRouteComponent = () => {
   const retryDownload = useAtomSet(retryDownloadAtom, { mode: "promise" });
   const cancelResult = useAtomValue(cancelDownloadAtom);
   const retryResult = useAtomValue(retryDownloadAtom);
-  const jobs = asyncResultValue(downloads) ?? [];
-  const error = asyncResultError(downloads);
-  const isLoading = asyncResultLoading(downloads);
+  const jobs = Option.getOrElse(AsyncResult.value(downloads), () => []);
+  const error = AsyncResult.cause(downloads);
+  const isLoading = AsyncResult.isInitial(downloads);
   const isCancelling = AsyncResult.isWaiting(cancelResult);
   const isRetrying = AsyncResult.isWaiting(retryResult);
 
@@ -276,14 +271,14 @@ const QueueRouteComponent = () => {
     <AppShell>
       <PageHeader title="Queue" />
 
-      {error === undefined ? null : (
+      {Option.isSome(error) ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load the queue</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(error, "Try again in a moment.")}
+            {formatCause(error.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       {isLoading ? <QueueSkeleton /> : null}
 

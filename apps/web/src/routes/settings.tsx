@@ -53,15 +53,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import {
   subscribeCurrentBrowserToPush,
   unsubscribeCurrentBrowserFromPush,
 } from "@/lib/browser-push";
-import { formatDateTime, getErrorMessage, hasText } from "@/lib/format";
+import {
+  formatCause,
+  formatDateTime,
+  getErrorMessage,
+  hasText,
+} from "@/lib/format";
 import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -180,9 +180,13 @@ const SettingsRouteComponent = () => {
     SettingsBootstrap["destinations"][number] | null
   >(null);
 
-  const settings = asyncResultValue(settingsResult);
-  const pushSettings = asyncResultValue(pushSettingsResult);
-  const browserPushClientStateValue = asyncResultValue(clientStateResult);
+  const settings = Option.getOrUndefined(AsyncResult.value(settingsResult));
+  const pushSettings = Option.getOrUndefined(
+    AsyncResult.value(pushSettingsResult)
+  );
+  const browserPushClientStateValue = Option.getOrUndefined(
+    AsyncResult.value(clientStateResult)
+  );
 
   useEffect(() => {
     setHasMounted(true);
@@ -234,14 +238,15 @@ const SettingsRouteComponent = () => {
   ]);
 
   const isLoading =
-    asyncResultLoading(settingsResult) ||
-    asyncResultLoading(pushSettingsResult) ||
-    asyncResultLoading(clientStateResult);
+    AsyncResult.isInitial(settingsResult) ||
+    AsyncResult.isInitial(pushSettingsResult) ||
+    AsyncResult.isInitial(clientStateResult);
 
-  const pageError =
-    asyncResultError(settingsResult) ??
-    asyncResultError(pushSettingsResult) ??
-    asyncResultError(clientStateResult);
+  const pageError = Option.orElse(AsyncResult.cause(settingsResult), () =>
+    Option.orElse(AsyncResult.cause(pushSettingsResult), () =>
+      AsyncResult.cause(clientStateResult)
+    )
+  );
 
   const isCurrentBrowserPushEnabled =
     pushSettings?.isEnabled === true &&
@@ -383,14 +388,14 @@ const SettingsRouteComponent = () => {
     <AppShell>
       <PageHeader title="Settings" />
 
-      {pageError === undefined ? null : (
+      {Option.isSome(pageError) ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load settings</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(pageError, "Try again in a moment.")}
+            {formatCause(pageError.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       {isLoading ? <SettingsSkeleton /> : null}
 
@@ -662,8 +667,7 @@ const SettingsRouteComponent = () => {
               </span>
             </div>
 
-            {settings !== undefined &&
-            settings.destinations.length > 0 ? (
+            {settings !== undefined && settings.destinations.length > 0 ? (
               <div className="rows">
                 {settings.destinations.map((destination) => (
                   <div className="row" key={destination.id}>

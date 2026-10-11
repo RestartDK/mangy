@@ -1,5 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Option } from "effect";
+import { AsyncResult } from "effect/reactivity";
 import { useMemo } from "react";
 
 import { discoverIdle, sourceDiscover, sourcesQuery } from "@/atoms/sources";
@@ -18,12 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePreferredSource } from "@/hooks/use-preferred-source";
-import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import { getErrorMessage } from "@/lib/format";
+import { formatCause } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
 const DiscoverSkeleton = () => (
@@ -46,9 +43,9 @@ const DiscoverSkeleton = () => (
 );
 const DiscoverRouteComponent = () => {
   const sourcesResult = useAtomValue(sourcesQuery);
-  const sources = asyncResultValue(sourcesResult);
+  const sources = Option.getOrElse(AsyncResult.value(sourcesResult), () => []);
   const enabledSources = useMemo(
-    () => (sources ?? []).filter((source) => source.isEnabled),
+    () => sources.filter((source) => source.isEnabled),
     [sources]
   );
   const { selectedSourceId, setSelectedSourceId } =
@@ -61,12 +58,17 @@ const DiscoverRouteComponent = () => {
       ? discoverIdle
       : sourceDiscover({ limit: 10, sourceId: activeSource.id })
   );
-  const sections = asyncResultValue(discoverResult);
+  const sections = Option.getOrElse(
+    AsyncResult.value(discoverResult),
+    () => []
+  );
 
   const isLoading =
-    asyncResultLoading(sourcesResult) || asyncResultLoading(discoverResult);
-  const hasError =
-    asyncResultError(sourcesResult) ?? asyncResultError(discoverResult);
+    AsyncResult.isInitial(sourcesResult) ||
+    AsyncResult.isInitial(discoverResult);
+  const hasError = Option.orElse(AsyncResult.cause(sourcesResult), () =>
+    AsyncResult.cause(discoverResult)
+  );
 
   return (
     <AppShell>
@@ -91,14 +93,14 @@ const DiscoverRouteComponent = () => {
         title="Discover"
       />
 
-      {hasError === undefined ? null : (
+      {Option.isSome(hasError) ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load discovery</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(hasError, "Try again in a moment.")}
+            {formatCause(hasError.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       {isLoading ? <DiscoverSkeleton /> : null}
 
@@ -112,7 +114,7 @@ const DiscoverRouteComponent = () => {
 
       {!isLoading && activeSource ? (
         <div className="page-grid">
-          {sections !== undefined && sections.length > 0 ? (
+          {sections.length > 0 ? (
             sections.map((section) => (
               <SectionShelf key={section.id} section={section} />
             ))

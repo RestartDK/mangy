@@ -1,5 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { Option } from "effect";
+import { AsyncResult } from "effect/reactivity";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { chapterPages, seriesChapters, seriesDetail } from "@/atoms/series";
@@ -17,12 +19,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import { getErrorMessage, hasText, pluralize } from "@/lib/format";
+import { formatCause, hasText, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
 const ReaderSkeleton = () => (
@@ -41,17 +38,24 @@ const ReaderRouteComponent = () => {
     chapterPages({ chapterId, seriesId, sourceId })
   );
 
-  const series = asyncResultValue(detailResult);
-  const chapters = asyncResultValue(chaptersResult) ?? [];
-  const pages = asyncResultValue(pagesResult)?.pages ?? [];
-  const error =
-    asyncResultError(detailResult) ??
-    asyncResultError(chaptersResult) ??
-    asyncResultError(pagesResult);
+  const series = Option.getOrUndefined(AsyncResult.value(detailResult));
+  const chapters = Option.getOrElse(
+    AsyncResult.value(chaptersResult),
+    () => []
+  );
+  const pages = Option.getOrElse(
+    Option.map(AsyncResult.value(pagesResult), (value) => value.pages),
+    () => []
+  );
+  const error = Option.orElse(AsyncResult.cause(detailResult), () =>
+    Option.orElse(AsyncResult.cause(chaptersResult), () =>
+      AsyncResult.cause(pagesResult)
+    )
+  );
   const isLoading =
-    asyncResultLoading(detailResult) ||
-    asyncResultLoading(chaptersResult) ||
-    asyncResultLoading(pagesResult);
+    AsyncResult.isInitial(detailResult) ||
+    AsyncResult.isInitial(chaptersResult) ||
+    AsyncResult.isInitial(pagesResult);
 
   const chapterIndex = chapters.findIndex(
     (chapter) => chapter.chapterId === chapterId
@@ -152,16 +156,16 @@ const ReaderRouteComponent = () => {
 
       {isLoading ? <ReaderSkeleton /> : null}
 
-      {error === undefined ? null : (
+      {Option.isSome(error) ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load this chapter</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(error, "Try again in a moment.")}
+            {formatCause(error.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
-      {series && !isLoading && error === undefined ? (
+      {series && !isLoading && Option.isNone(error) ? (
         <div className="flex flex-col items-center gap-6">
           {pages.length > 0 ? (
             <div className="w-full max-w-4xl space-y-2">
