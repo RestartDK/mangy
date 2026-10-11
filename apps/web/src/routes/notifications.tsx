@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { toast } from "sonner";
 
@@ -19,12 +20,7 @@ import type { StatusTone } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import { formatDateTime, getErrorMessage } from "@/lib/format";
+import { formatCause, formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 import { cn } from "@/lib/utils";
 
@@ -57,11 +53,15 @@ const NotificationsRouteComponent = () => {
   const markAllRead = useAtomSet(markAllNotificationsRead, { mode: "promise" });
   const markAllResult = useAtomValue(markAllNotificationsRead);
   const markReadResult = useAtomValue(markNotificationRead);
-  const unreadCount = asyncResultValue(preferences)?.unreadCount ?? 0;
-  const items = asyncResultValue(notifications) ?? [];
-  const error =
-    asyncResultError(notifications) ?? asyncResultError(preferences);
-  const isLoading = asyncResultLoading(notifications);
+  const unreadCount = Option.match(AsyncResult.value(preferences), {
+    onNone: () => 0,
+    onSome: (value) => value.unreadCount,
+  });
+  const items = Option.getOrElse(AsyncResult.value(notifications), () => []);
+  const error = Option.orElse(AsyncResult.cause(notifications), () =>
+    AsyncResult.cause(preferences)
+  );
+  const isLoading = AsyncResult.isInitial(notifications);
   const isMarkingAllRead = AsyncResult.isWaiting(markAllResult);
   const isMarkingRead = AsyncResult.isWaiting(markReadResult);
 
@@ -109,14 +109,14 @@ const NotificationsRouteComponent = () => {
         title="Notifications"
       />
 
-      {error === undefined ? null : (
+      {Option.isSome(error) ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load notifications</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(error, "Try again in a moment.")}
+            {formatCause(error.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       {isLoading ? <NotificationsSkeleton /> : null}
 

@@ -1,6 +1,7 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { SourceFilterDefinition } from "@mangy/contract";
 import { createFileRoute } from "@tanstack/react-router";
+import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import {
   ArrowDown,
@@ -50,12 +51,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePreferredSource } from "@/hooks/use-preferred-source";
-import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import { getErrorMessage, hasText, pluralize } from "@/lib/format";
+import { formatCause, hasText, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 import {
   findSelectFilter,
@@ -219,9 +215,9 @@ const ResultGridSkeleton = () => (
 );
 const SearchRouteComponent = () => {
   const sourcesResult = useAtomValue(sourcesQuery);
-  const sources = asyncResultValue(sourcesResult);
+  const sources = Option.getOrElse(AsyncResult.value(sourcesResult), () => []);
   const enabledSources = useMemo(
-    () => (sources ?? []).filter((source) => source.isEnabled),
+    () => sources.filter((source) => source.isEnabled),
     [sources]
   );
   const { selectedSourceId: sourceId, setSelectedSourceId: setSourceId } =
@@ -237,7 +233,7 @@ const SearchRouteComponent = () => {
       ? sourceFiltersIdle
       : sourceFilters({ sourceId })
   );
-  const definitionsValue = asyncResultValue(filtersResult);
+  const definitionsValue = AsyncResult.value(filtersResult);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -249,7 +245,10 @@ const SearchRouteComponent = () => {
     };
   }, [queryInput]);
 
-  const definitions = useMemo(() => definitionsValue ?? [], [definitionsValue]);
+  const definitions = useMemo(
+    () => Option.getOrElse(definitionsValue, () => []),
+    [definitionsValue]
+  );
   const drawerDefinitions = definitions.filter(
     (definition) => !TOOLBAR_FILTER_KEYS.has(definition.key)
   );
@@ -292,7 +291,7 @@ const SearchRouteComponent = () => {
   const isSearchEnabled =
     sourceId !== undefined &&
     sourceId !== "" &&
-    !asyncResultLoading(filtersResult);
+    !AsyncResult.isInitial(filtersResult);
   const searchAtom = isSearchEnabled
     ? searchPagesWithHistory({
         filters: effectiveFilters,
@@ -306,13 +305,16 @@ const SearchRouteComponent = () => {
   const isOrderAscending =
     hasText(orderAscendingValue) &&
     effectiveFilters.order === orderAscendingValue;
-  const pages = asyncResultValue(searchResult)?.items ?? [];
+  const pages = Option.getOrElse(
+    Option.map(AsyncResult.value(searchResult), (value) => value.items),
+    () => []
+  );
   const results = pages.flatMap((page) => page.items);
   const total = pages.at(0)?.total ?? null;
   const hasNextPage = pages.at(-1)?.hasNextPage ?? false;
   const isSearching = AsyncResult.isWaiting(searchResult);
-  const searchError = asyncResultError(searchResult);
-  const filtersUnavailable = asyncResultError(filtersResult) !== undefined;
+  const searchError = AsyncResult.cause(searchResult);
+  const filtersUnavailable = Option.isSome(AsyncResult.cause(filtersResult));
 
   const applyFilterValue = (
     definition: SourceFilterDefinition,
@@ -337,8 +339,8 @@ const SearchRouteComponent = () => {
     resultsLabel = `${pluralize(total ?? results.length, "result")} for “${query}”`;
   }
 
-  const showSkeleton = Boolean(sourceId) && asyncResultLoading(searchResult);
-  const showError = searchError !== undefined;
+  const showSkeleton = Boolean(sourceId) && AsyncResult.isInitial(searchResult);
+  const showError = Option.isSome(searchError);
 
   if (!showSkeleton && isSearching) {
     resultsLabel = "Searching…";
@@ -352,10 +354,7 @@ const SearchRouteComponent = () => {
         <Alert variant="destructive">
           <AlertTitle>Unable to load sources</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(
-              asyncResultError(sourcesResult),
-              "Try again in a moment."
-            )}
+            {formatCause(sourcesResult.cause, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -364,8 +363,8 @@ const SearchRouteComponent = () => {
         <Alert variant="destructive">
           <AlertTitle>Unable to load filters</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(
-              asyncResultError(filtersResult),
+            {formatCause(
+              filtersResult.cause,
               "Try another source or reload the page."
             )}
           </AlertDescription>
@@ -527,11 +526,11 @@ const SearchRouteComponent = () => {
         </div>
       ) : null}
 
-      {showError ? (
+      {Option.isSome(searchError) ? (
         <Alert variant="destructive">
           <AlertTitle>Search failed</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(searchError, "Try again in a moment.")}
+            {formatCause(searchError.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -540,7 +539,7 @@ const SearchRouteComponent = () => {
 
       {showSkeleton ||
       showError ||
-      asyncResultLoading(sourcesResult) ||
+      AsyncResult.isInitial(sourcesResult) ||
       hasText(sourceId) ? null : (
         <EmptyState
           description="No enabled sources are connected yet."

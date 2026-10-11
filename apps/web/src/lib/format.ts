@@ -1,3 +1,5 @@
+import { Cause } from "effect";
+
 export const hasText = (value: string | null | undefined): value is string =>
   value !== null && value !== undefined && value.length > 0;
 
@@ -43,6 +45,11 @@ export const getErrorMessage = (error: unknown, fallback: string): string => {
 
   return fallback;
 };
+
+export const formatCause = (
+  cause: Cause.Cause<unknown>,
+  fallback: string
+): string => getErrorMessage(Cause.squash(cause), fallback);
 
 export const getInitials = (value: string | null | undefined): string => {
   if (!hasText(value)) {

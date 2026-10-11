@@ -39,14 +39,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
-  asyncResultError,
-  asyncResultLoading,
-  asyncResultValue,
-} from "@/lib/async-result";
-import {
+  formatCause,
   formatDate,
   formatDateTime,
-  getErrorMessage,
   hasText,
   pluralize,
 } from "@/lib/format";
@@ -105,19 +100,29 @@ const SeriesDetailRouteComponent = () => {
   const [isTracked, setIsTracked] = useState(false);
   const [autoDownload, setAutoDownload] = useState(false);
 
-  const series = asyncResultValue(detailResult);
-  const chapters = asyncResultValue(chaptersResult) ?? [];
-  const libraryState = asyncResultValue(libraryStateResult);
-  const error =
-    asyncResultError(detailResult) ?? asyncResultError(chaptersResult);
+  const series = Option.getOrUndefined(AsyncResult.value(detailResult));
+  const chapters = Option.getOrElse(
+    AsyncResult.value(chaptersResult),
+    () => []
+  );
+  const libraryState = Option.getOrUndefined(
+    AsyncResult.value(libraryStateResult)
+  );
+  const error = Option.orElse(AsyncResult.cause(detailResult), () =>
+    AsyncResult.cause(chaptersResult)
+  );
   const isLoading =
-    asyncResultLoading(detailResult) || asyncResultLoading(chaptersResult);
-  const settings = asyncResultValue(settingsResult);
+    AsyncResult.isInitial(detailResult) ||
+    AsyncResult.isInitial(chaptersResult);
+  const settings = AsyncResult.value(settingsResult);
 
   const enabledDestinations = useMemo(
     () =>
-      settings?.destinations.filter((destination) => destination.isEnabled) ??
-      [],
+      Option.match(settings, {
+        onNone: () => [],
+        onSome: (value) =>
+          value.destinations.filter((destination) => destination.isEnabled),
+      }),
     [settings]
   );
   const trackingState = libraryState?.trackingState ?? Option.none();
@@ -216,8 +221,7 @@ const SeriesDetailRouteComponent = () => {
     {
       label: "Languages",
       value:
-        series === undefined ||
-        series.availableTranslatedLanguages.length === 0
+        series === undefined || series.availableTranslatedLanguages.length === 0
           ? null
           : series.availableTranslatedLanguages.join(", ").toUpperCase(),
     },
@@ -256,14 +260,14 @@ const SeriesDetailRouteComponent = () => {
 
       {isLoading ? <SeriesDetailSkeleton /> : null}
 
-      {error === undefined ? null : (
+      {Option.isSome(error) ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load this series</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(error, "Try again in a moment.")}
+            {formatCause(error.value, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       {series ? (
         <div className="page-grid">
@@ -414,8 +418,8 @@ const SeriesDetailRouteComponent = () => {
                 )}
               </div>
 
-              {asyncResultLoading(settingsResult) ||
-              asyncResultLoading(libraryStateResult) ? (
+              {AsyncResult.isInitial(settingsResult) ||
+              AsyncResult.isInitial(libraryStateResult) ? (
                 <div className="space-y-3 p-4">
                   <Skeleton className="h-16 w-full" />
                   <Skeleton className="h-10 w-full" />
@@ -424,7 +428,7 @@ const SeriesDetailRouteComponent = () => {
               ) : null}
 
               <div className="space-y-5 p-4">
-                {!asyncResultLoading(settingsResult) &&
+                {!AsyncResult.isInitial(settingsResult) &&
                 enabledDestinations.length === 0 ? (
                   <Alert>
                     <AlertTitle>No destination</AlertTitle>
