@@ -40,6 +40,10 @@ const keysFor = (payload: LiveStatePayload): readonly ReactivityKey[] => {
 // The live atom yields `Reactivity`, which only a runtime atom puts in the effect context.
 const liveRuntime = Atom.runtime(Layer.empty);
 
+// A dropped connection comes back with a fresh snapshot and no diff, so everything
+// is invalidated once on reconnect to catch up on what the client missed.
+let connected = false;
+
 export const liveUpdates = liveRuntime.atom(
   Effect.gen(function* liveUpdatesEffect() {
     const reactivity = yield* Reactivity.Reactivity;
@@ -53,6 +57,14 @@ export const liveUpdates = liveRuntime.atom(
       })
     );
     yield* Effect.sync(() => {
+      source.addEventListener("open", () => {
+        if (!connected) {
+          connected = true;
+          return;
+        }
+
+        reactivity.invalidateUnsafe(Object.values(reactivityKey));
+      });
       source.addEventListener("state", (event) => {
         if (
           !(event instanceof MessageEvent) ||

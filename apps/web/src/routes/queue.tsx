@@ -205,7 +205,7 @@ const QueueRouteComponent = () => {
         params: { jobId },
         reactivityKeys: [reactivityKey.downloads],
       }),
-      { failure: "Unable to retry job", success: "Job queued for retry" }
+      { failure: "Unable to retry job", success: "Job returned to the queue" }
     );
   };
 
