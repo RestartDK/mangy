@@ -18,7 +18,7 @@ export const SeriesMeta = ({
     hasText(status) ? status.replaceAll("-", " ") : null,
     hasText(language) ? language.toUpperCase() : null,
     contentRating,
-  ].filter((item): item is string => Boolean(item));
+  ].filter(hasText);
 
   if (items.length === 0) {
     return null;
