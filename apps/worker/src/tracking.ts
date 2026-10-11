@@ -7,19 +7,20 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  Chapter,
+  DownloadDestination,
+  DownloadJob,
+  LibraryEntry,
+  Series,
+  TrackedSeriesState,
   chapterColumns,
-  chapterRow,
   downloadDestinationColumns,
-  downloadDestinationRow,
   downloadJobColumns,
-  downloadJobRow,
   libraryEntryColumns,
-  libraryEntryRow,
   seriesColumns,
-  seriesRow,
   trackedSeriesStateColumns,
-  trackedSeriesStateRow,
 } from "@mangy/db/model";
+import type { ChapterId } from "@mangy/db/model";
 import { env } from "@mangy/env";
 import type { SourceChapter } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
@@ -83,21 +84,21 @@ export interface ClaimedTrackedSeries {
 }
 
 const claimedTrackedSeriesProjection = Schema.Struct({
-  autoDownload: libraryEntryRow.from.fields.auto_download,
-  checkFailureCount: trackedSeriesStateRow.from.fields.check_failure_count,
+  autoDownload: LibraryEntry.fields.autoDownload,
+  checkFailureCount: TrackedSeriesState.fields.checkFailureCount,
   downloadDestinationId: Schema.NullOr(
-    libraryEntryRow.from.fields.download_destination_id
+    LibraryEntry.fields.downloadDestinationId
   ),
-  downloadDestinationName: Schema.NullOr(downloadDestinationRow.from.fields.name),
-  id: trackedSeriesStateRow.from.fields.id,
+  downloadDestinationName: Schema.NullOr(DownloadDestination.fields.name),
+  id: TrackedSeriesState.fields.id,
   lastSeenChapterExternalId:
-    trackedSeriesStateRow.from.fields.last_seen_chapter_external_id,
-  libraryEntryId: libraryEntryRow.from.fields.id,
-  seriesExternalId: seriesRow.from.fields.external_id,
-  seriesRecordId: seriesRow.from.fields.id,
-  seriesSourceId: seriesRow.from.fields.source_id,
-  seriesTitle: seriesRow.from.fields.title,
-  userId: libraryEntryRow.from.fields.user_id,
+    TrackedSeriesState.fields.lastSeenChapterExternalId,
+  libraryEntryId: LibraryEntry.fields.id,
+  seriesExternalId: Series.fields.externalId,
+  seriesRecordId: Series.fields.id,
+  seriesSourceId: Series.fields.sourceId,
+  seriesTitle: Series.fields.title,
+  userId: LibraryEntry.fields.userId,
 });
 
 const upsertTrackedChapters = (seriesId: string, items: SourceChapter[]) =>
@@ -171,9 +172,9 @@ const queueTrackedChapters = (
     const chapterExternalIds = newChapters.map((item) => item.externalId);
     const storedChapters = yield* decodeRows(
       Schema.Struct({
-        external_id: chapterRow.from.fields.external_id,
-        id: chapterRow.from.fields.id,
-        is_downloaded: chapterRow.from.fields.is_downloaded,
+        external_id: Chapter.fields.externalId,
+        id: Chapter.fields.id,
+        is_downloaded: Chapter.fields.isDownloaded,
       }),
       yield* sql`SELECT ${column(chapterColumns, "id")},
           ${column(chapterColumns, "externalId")},
@@ -187,7 +188,7 @@ const queueTrackedChapters = (
     const activeJobs = storedChapterIds.length
       ? yield* decodeRows(
           Schema.Struct({
-            chapter_id: downloadJobRow.from.fields.chapter_id,
+            chapter_id: DownloadJob.fields.chapterId,
           }),
           yield* sql`SELECT ${column(downloadJobColumns, "chapterId")} FROM ${table("downloadJob")}
             WHERE ${column(downloadJobColumns, "userId")} = ${trackedSeries.userId}
@@ -199,7 +200,7 @@ const queueTrackedChapters = (
     const activeChapterIds = new Set(
       activeJobs
         .map((item) => item.chapter_id)
-        .filter((chapterId): chapterId is string => Boolean(chapterId))
+        .filter((chapterId): chapterId is ChapterId => Boolean(chapterId))
     );
     const chaptersByExternalId = new Map(
       storedChapters.map((item) => [item.external_id, item])
@@ -212,7 +213,7 @@ const queueTrackedChapters = (
         (
           item
         ): item is {
-          id: string;
+          id: ChapterId;
           external_id: string;
           is_downloaded: boolean;
         } => {

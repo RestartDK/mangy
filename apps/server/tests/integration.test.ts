@@ -6,17 +6,17 @@ import nodePath from "node:path";
 
 import { column, decodeRows, insertRow, runSql, table } from "@mangy/db";
 import {
+  DownloadArtifact,
+  Notification,
+  NotificationDelivery,
+  PushSubscription,
+  User,
   downloadArtifactColumns,
-  downloadArtifactRow,
   notificationColumns,
   notificationDeliveryColumns,
-  notificationDeliveryRow,
-  notificationRow,
   pushSubscriptionColumns,
-  pushSubscriptionRow,
   sourceColumns,
   userColumns,
-  userRow,
 } from "@mangy/db/model";
 import { setBrowserPushSenderForTests } from "@mangy/push";
 import type {
@@ -288,7 +288,7 @@ const createApiClient = async (
   };
 
   const [createdUser] = await query(
-    Schema.Struct({ id: userRow.from.fields.id }),
+    Schema.Struct({ id: User.fields.id }),
     (sql) =>
       sql`SELECT ${column(userColumns, "id")} FROM ${table("user")}
         WHERE ${column(userColumns, "email")} = ${email}
@@ -823,9 +823,9 @@ describe("server and worker integration", () => {
 
       const [artifact] = await query(
         Schema.Struct({
-          imported_to_komga_at: downloadArtifactRow.from.fields.imported_to_komga_at,
-          output_path: downloadArtifactRow.from.fields.output_path,
-          package_format: downloadArtifactRow.from.fields.package_format,
+          imported_to_komga_at: DownloadArtifact.fields.importedToKomgaAt,
+          output_path: DownloadArtifact.fields.outputPath,
+          package_format: DownloadArtifact.fields.packageFormat,
         }),
         (sql) =>
           sql`SELECT ${column(downloadArtifactColumns, "importedToKomgaAt")},
@@ -1017,8 +1017,8 @@ describe("server and worker integration", () => {
 
     const queuedDeliveries = await query(
       Schema.Struct({
-        id: notificationDeliveryRow.from.fields.id,
-        status: notificationDeliveryRow.from.fields.status,
+        id: NotificationDelivery.fields.id,
+        status: NotificationDelivery.fields.status,
       }),
       (sql) =>
         sql`SELECT ${table("notificationDelivery")}.${column(notificationDeliveryColumns, "id")},
@@ -1043,8 +1043,8 @@ describe("server and worker integration", () => {
 
     const savedSubscriptions = await query(
       Schema.Struct({
-        endpoint: pushSubscriptionRow.from.fields.endpoint,
-        is_active: pushSubscriptionRow.from.fields.is_active,
+        endpoint: PushSubscription.fields.endpoint,
+        is_active: PushSubscription.fields.isActive,
       }),
       (sql) =>
         sql`SELECT ${column(pushSubscriptionColumns, "endpoint")},
@@ -1073,7 +1073,7 @@ describe("server and worker integration", () => {
     expect(unsubscribeSettings.isEnabled).toBe(false);
 
     const inactiveSubscriptions = await query(
-      Schema.Struct({ is_active: pushSubscriptionRow.from.fields.is_active }),
+      Schema.Struct({ is_active: PushSubscription.fields.isActive }),
       (sql) =>
         sql`SELECT ${column(pushSubscriptionColumns, "isActive")} FROM ${table("pushSubscription")}
           WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId}`
@@ -1740,7 +1740,7 @@ describe("server and worker integration", () => {
     abortController.abort();
 
     const [storedNotification] = await query(
-      Schema.Struct({ id: notificationRow.from.fields.id }),
+      Schema.Struct({ id: Notification.fields.id }),
       (sql) =>
         sql`SELECT ${column(notificationColumns, "id")} FROM ${table("notification")}
           WHERE ${column(notificationColumns, "userId")} = ${userId}

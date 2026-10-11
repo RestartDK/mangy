@@ -1,12 +1,12 @@
 import { column, decodeRows, runSql, table } from "@mangy/db";
 import {
+  DownloadJob,
+  Notification,
+  TrackedSeriesState,
   downloadJobColumns,
-  downloadJobRow,
   libraryEntryColumns,
   notificationColumns,
-  notificationRow,
   trackedSeriesStateColumns,
-  trackedSeriesStateRow,
 } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
@@ -37,7 +37,7 @@ const getSnapshot = (
           Effect.gen(function* downloads() {
             const rows = yield* decodeRows(
               Schema.Struct({
-                updated_at: downloadJobRow.from.fields.updated_at,
+                updated_at: DownloadJob.fields.updatedAt,
               }),
               yield* sql`SELECT ${column(downloadJobColumns, "updatedAt")} FROM ${table("downloadJob")}
                 WHERE ${column(downloadJobColumns, "userId")} = ${userId}
@@ -49,7 +49,7 @@ const getSnapshot = (
           }),
           Effect.gen(function* notifications() {
             const rows = yield* decodeRows(
-              Schema.Struct({ updated_at: notificationRow.from.fields.updated_at }),
+              Schema.Struct({ updated_at: Notification.fields.updatedAt }),
               yield* sql`SELECT ${column(notificationColumns, "updatedAt")} FROM ${table("notification")}
                 WHERE ${column(notificationColumns, "userId")} = ${userId}
                 ORDER BY ${column(notificationColumns, "updatedAt")} DESC
@@ -60,7 +60,7 @@ const getSnapshot = (
           }),
           Effect.gen(function* unread() {
             const rows = yield* decodeRows(
-              Schema.Struct({ id: notificationRow.from.fields.id }),
+              Schema.Struct({ id: Notification.fields.id }),
               yield* sql`SELECT ${column(notificationColumns, "id")} FROM ${table("notification")}
                 WHERE ${column(notificationColumns, "userId")} = ${userId}
                   AND ${column(notificationColumns, "isRead")} = ${false}`
@@ -71,7 +71,7 @@ const getSnapshot = (
           Effect.gen(function* tracking() {
             const rows = yield* decodeRows(
               Schema.Struct({
-                updated_at: trackedSeriesStateRow.from.fields.updated_at,
+                updated_at: TrackedSeriesState.fields.updatedAt,
               }),
               yield* sql`SELECT ${table("trackedSeriesState")}.${column(trackedSeriesStateColumns, "updatedAt")}
                 FROM ${table("trackedSeriesState")}

@@ -10,15 +10,15 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  DownloadDestination,
+  DownloadJob,
+  NotificationEndpoint,
+  PushSubscription,
   downloadDestinationColumns,
-  downloadDestinationRow,
   downloadJobColumns,
-  downloadJobRow,
   libraryEntryColumns,
   notificationEndpointColumns,
-  notificationEndpointRow,
   pushSubscriptionColumns,
-  pushSubscriptionRow,
 } from "@mangy/db/model";
 import {
   BrowserPushError,
@@ -72,19 +72,17 @@ const toIsoString = (value: Date | null): string | null =>
   value ? value.toISOString() : null;
 
 const browserPushEndpointProjection = Schema.Struct({
-  id: notificationEndpointRow.from.fields.id,
-  is_enabled: notificationEndpointRow.from.fields.is_enabled,
-  last_delivered_at: notificationEndpointRow.from.fields.last_delivered_at,
-  last_error: notificationEndpointRow.from.fields.last_error,
-  last_error_at: notificationEndpointRow.from.fields.last_error_at,
+  id: NotificationEndpoint.fields.id,
+  is_enabled: NotificationEndpoint.fields.isEnabled,
+  last_delivered_at: NotificationEndpoint.fields.lastDeliveredAt,
+  last_error: NotificationEndpoint.fields.lastError,
+  last_error_at: NotificationEndpoint.fields.lastErrorAt,
   notify_on_download_completed:
-    notificationEndpointRow.from.fields.notify_on_download_completed,
-  notify_on_download_failed:
-    notificationEndpointRow.from.fields.notify_on_download_failed,
-  notify_on_system_warning:
-    notificationEndpointRow.from.fields.notify_on_system_warning,
+    NotificationEndpoint.fields.notifyOnDownloadCompleted,
+  notify_on_download_failed: NotificationEndpoint.fields.notifyOnDownloadFailed,
+  notify_on_system_warning: NotificationEndpoint.fields.notifyOnSystemWarning,
   notify_on_tracked_series_update:
-    notificationEndpointRow.from.fields.notify_on_tracked_series_update,
+    NotificationEndpoint.fields.notifyOnTrackedSeriesUpdate,
 });
 
 type BrowserPushEndpoint = Schema.Schema.Type<
@@ -132,7 +130,7 @@ const countActivePushSubscriptions = (userId: string) =>
   Effect.gen(function* countActivePushSubscriptionsEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
-      Schema.Struct({ id: pushSubscriptionRow.from.fields.id }),
+      Schema.Struct({ id: PushSubscription.fields.id }),
       yield* sql`SELECT ${column(pushSubscriptionColumns, "id")} FROM ${table("pushSubscription")}
         WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId}
           AND ${column(pushSubscriptionColumns, "isActive")} = ${true}`
@@ -204,7 +202,7 @@ const upsertBrowserPushEndpoint = (
     }
 
     const created = yield* decodeRows(
-      Schema.Struct({ id: notificationEndpointRow.from.fields.id }),
+      Schema.Struct({ id: NotificationEndpoint.fields.id }),
       yield* sql`INSERT INTO ${table("notificationEndpoint")} ${insertRow(
         sql,
         notificationEndpointColumns,
@@ -292,12 +290,12 @@ const getBootstrap = (userId: string, profile: UserProfile) =>
         Effect.gen(function* destinationRows() {
           return yield* decodeRows(
             Schema.Struct({
-              absolute_path: downloadDestinationRow.from.fields.absolute_path,
-              id: downloadDestinationRow.from.fields.id,
-              is_default: downloadDestinationRow.from.fields.is_default,
-              is_enabled: downloadDestinationRow.from.fields.is_enabled,
-              komga_library_id: downloadDestinationRow.from.fields.komga_library_id,
-              name: downloadDestinationRow.from.fields.name,
+              absolute_path: DownloadDestination.fields.absolutePath,
+              id: DownloadDestination.fields.id,
+              is_default: DownloadDestination.fields.isDefault,
+              is_enabled: DownloadDestination.fields.isEnabled,
+              komga_library_id: DownloadDestination.fields.komgaLibraryId,
+              name: DownloadDestination.fields.name,
             }),
             yield* sql`SELECT ${column(downloadDestinationColumns, "id")},
                 ${column(downloadDestinationColumns, "name")},
@@ -386,7 +384,7 @@ const savePushSubscription = (
         yield* upsertBrowserPushEndpoint(userId, { isEnabled: true });
 
         const existing = yield* decodeRows(
-          Schema.Struct({ id: pushSubscriptionRow.from.fields.id }),
+          Schema.Struct({ id: PushSubscription.fields.id }),
           yield* sql`SELECT ${column(pushSubscriptionColumns, "id")} FROM ${table("pushSubscription")}
             WHERE ${column(pushSubscriptionColumns, "endpoint")} = ${input.endpoint}
             LIMIT 1`
@@ -446,7 +444,7 @@ const removePushSubscription = (userId: string, input: { endpoint: string }) =>
             AND ${column(pushSubscriptionColumns, "endpoint")} = ${input.endpoint}`;
 
         const remainingSubscriptions = yield* decodeRows(
-          Schema.Struct({ id: pushSubscriptionRow.from.fields.id }),
+          Schema.Struct({ id: PushSubscription.fields.id }),
           yield* sql`SELECT ${column(pushSubscriptionColumns, "id")} FROM ${table("pushSubscription")}
             WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId}
               AND ${column(pushSubscriptionColumns, "isActive")} = ${true}
@@ -467,10 +465,10 @@ const sendTestBrowserPush = (userId: string) =>
     const sql = yield* SqlClient.SqlClient;
     const subscriptions = yield* decodeRows(
       Schema.Struct({
-        auth: pushSubscriptionRow.from.fields.auth,
-        endpoint: pushSubscriptionRow.from.fields.endpoint,
-        id: pushSubscriptionRow.from.fields.id,
-        p256dh: pushSubscriptionRow.from.fields.p256dh,
+        auth: PushSubscription.fields.auth,
+        endpoint: PushSubscription.fields.endpoint,
+        id: PushSubscription.fields.id,
+        p256dh: PushSubscription.fields.p256dh,
       }),
       yield* sql`SELECT ${column(pushSubscriptionColumns, "auth")},
           ${column(pushSubscriptionColumns, "endpoint")},
@@ -601,7 +599,7 @@ const createDestination = (
     return yield* sql.withTransaction(
       Effect.gen(function* createDestinationRow() {
         const existingDestinations = yield* decodeRows(
-          Schema.Struct({ id: downloadDestinationRow.from.fields.id }),
+          Schema.Struct({ id: DownloadDestination.fields.id }),
           yield* sql`SELECT ${column(downloadDestinationColumns, "id")} FROM ${table("downloadDestination")}
             WHERE ${column(downloadDestinationColumns, "userId")} = ${userId}`
         );
@@ -620,12 +618,12 @@ const createDestination = (
 
         const rows = yield* decodeRows(
           Schema.Struct({
-            absolute_path: downloadDestinationRow.from.fields.absolute_path,
-            id: downloadDestinationRow.from.fields.id,
-            is_default: downloadDestinationRow.from.fields.is_default,
-            is_enabled: downloadDestinationRow.from.fields.is_enabled,
-            komga_library_id: downloadDestinationRow.from.fields.komga_library_id,
-            name: downloadDestinationRow.from.fields.name,
+            absolute_path: DownloadDestination.fields.absolutePath,
+            id: DownloadDestination.fields.id,
+            is_default: DownloadDestination.fields.isDefault,
+            is_enabled: DownloadDestination.fields.isEnabled,
+            komga_library_id: DownloadDestination.fields.komgaLibraryId,
+            name: DownloadDestination.fields.name,
           }),
           yield* sql`INSERT INTO ${table("downloadDestination")} ${insertRow(
             sql,
@@ -672,9 +670,9 @@ const deleteDestination = (userId: string, destinationId: string) =>
       Effect.gen(function* deleteDestinationRow() {
         const destinations = yield* decodeRows(
           Schema.Struct({
-            id: downloadDestinationRow.from.fields.id,
-            is_default: downloadDestinationRow.from.fields.is_default,
-            is_enabled: downloadDestinationRow.from.fields.is_enabled,
+            id: DownloadDestination.fields.id,
+            is_default: DownloadDestination.fields.isDefault,
+            is_enabled: DownloadDestination.fields.isEnabled,
           }),
           yield* sql`SELECT ${column(downloadDestinationColumns, "id")},
               ${column(downloadDestinationColumns, "isDefault")},
@@ -692,7 +690,7 @@ const deleteDestination = (userId: string, destinationId: string) =>
         }
 
         const activeJobs = yield* decodeRows(
-          Schema.Struct({ id: downloadJobRow.from.fields.id }),
+          Schema.Struct({ id: DownloadJob.fields.id }),
           yield* sql`SELECT ${column(downloadJobColumns, "id")} FROM ${table("downloadJob")}
             WHERE ${column(downloadJobColumns, "userId")} = ${userId}
               AND ${column(downloadJobColumns, "downloadDestinationId")} = ${destinationId}

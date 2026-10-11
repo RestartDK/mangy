@@ -7,14 +7,14 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  DownloadDestination,
+  LibraryEntry,
+  Series,
+  TrackedSeriesState,
   downloadDestinationColumns,
-  downloadDestinationRow,
   libraryEntryColumns,
-  libraryEntryRow,
   seriesColumns,
-  seriesRow,
   trackedSeriesStateColumns,
-  trackedSeriesStateRow,
 } from "@mangy/db/model";
 import { env } from "@mangy/env";
 import { Effect, Schema } from "effect";
@@ -45,21 +45,19 @@ const createEmptySeriesState = (sourceId: string, seriesId: string) => ({
 });
 
 const seriesStateProjection = Schema.Struct({
-  autoDownload: Schema.NullOr(libraryEntryRow.from.fields.auto_download),
-  checkFailureCount: Schema.NullOr(
-    trackedSeriesStateRow.from.fields.check_failure_count
-  ),
-  downloadDestinationId: Schema.NullOr(downloadDestinationRow.from.fields.id),
-  downloadDestinationName: Schema.NullOr(downloadDestinationRow.from.fields.name),
-  isTracked: Schema.NullOr(libraryEntryRow.from.fields.is_tracked),
-  lastCheckedAt: trackedSeriesStateRow.from.fields.last_checked_at,
+  autoDownload: Schema.NullOr(LibraryEntry.fields.autoDownload),
+  checkFailureCount: Schema.NullOr(TrackedSeriesState.fields.checkFailureCount),
+  downloadDestinationId: Schema.NullOr(DownloadDestination.fields.id),
+  downloadDestinationName: Schema.NullOr(DownloadDestination.fields.name),
+  isTracked: Schema.NullOr(LibraryEntry.fields.isTracked),
+  lastCheckedAt: TrackedSeriesState.fields.lastCheckedAt,
   lastSeenChapterExternalId:
-    trackedSeriesStateRow.from.fields.last_seen_chapter_external_id,
-  libraryEntryId: Schema.NullOr(libraryEntryRow.from.fields.id),
-  nextCheckAt: trackedSeriesStateRow.from.fields.next_check_at,
-  seriesId: seriesRow.from.fields.external_id,
-  sourceId: seriesRow.from.fields.source_id,
-  trackingStateId: Schema.NullOr(trackedSeriesStateRow.from.fields.id),
+    TrackedSeriesState.fields.lastSeenChapterExternalId,
+  libraryEntryId: Schema.NullOr(LibraryEntry.fields.id),
+  nextCheckAt: TrackedSeriesState.fields.nextCheckAt,
+  seriesId: Series.fields.externalId,
+  sourceId: Series.fields.sourceId,
+  trackingStateId: Schema.NullOr(TrackedSeriesState.fields.id),
 });
 
 type SeriesStateRow = Schema.Schema.Type<typeof seriesStateProjection>;
@@ -135,15 +133,15 @@ const list = (userId: string) =>
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
       Schema.Struct({
-        auto_download: libraryEntryRow.from.fields.auto_download,
-        cover_image_url: Schema.NullOr(seriesRow.from.fields.cover_image_url),
-        destination_name: Schema.NullOr(downloadDestinationRow.from.fields.name),
-        external_id: seriesRow.from.fields.external_id,
-        id: libraryEntryRow.from.fields.id,
-        is_tracked: libraryEntryRow.from.fields.is_tracked,
-        source_id: seriesRow.from.fields.source_id,
-        title: seriesRow.from.fields.title,
-        updated_at: libraryEntryRow.from.fields.updated_at,
+        auto_download: LibraryEntry.fields.autoDownload,
+        cover_image_url: Schema.NullOr(Series.fields.coverImageUrl),
+        destination_name: Schema.NullOr(DownloadDestination.fields.name),
+        external_id: Series.fields.externalId,
+        id: LibraryEntry.fields.id,
+        is_tracked: LibraryEntry.fields.isTracked,
+        source_id: Series.fields.sourceId,
+        title: Series.fields.title,
+        updated_at: LibraryEntry.fields.updatedAt,
       }),
       yield* sql`SELECT ${table("libraryEntry")}.${column(libraryEntryColumns, "id")},
           ${table("series")}.${column(seriesColumns, "externalId")},
@@ -211,8 +209,8 @@ const resolveDestinationId = (
 
     const rows = yield* decodeRows(
       Schema.Struct({
-        id: downloadDestinationRow.from.fields.id,
-        is_enabled: downloadDestinationRow.from.fields.is_enabled,
+        id: DownloadDestination.fields.id,
+        is_enabled: DownloadDestination.fields.isEnabled,
       }),
       yield* sql`SELECT ${column(downloadDestinationColumns, "id")}, ${column(downloadDestinationColumns, "isEnabled")}
         FROM ${table("downloadDestination")}
@@ -241,8 +239,8 @@ const upsertTrackedState = (input: {
     const sql = yield* SqlClient.SqlClient;
     const currentRows = yield* decodeRows(
       Schema.Struct({
-        id: trackedSeriesStateRow.from.fields.id,
-        next_check_at: trackedSeriesStateRow.from.fields.next_check_at,
+        id: TrackedSeriesState.fields.id,
+        next_check_at: TrackedSeriesState.fields.nextCheckAt,
       }),
       yield* sql`SELECT ${column(trackedSeriesStateColumns, "id")}, ${column(trackedSeriesStateColumns, "nextCheckAt")}
         FROM ${table("trackedSeriesState")}
@@ -340,7 +338,7 @@ const updateSeriesState = (
     }
 
     const entries = yield* decodeRows(
-      Schema.Struct({ id: libraryEntryRow.from.fields.id }),
+      Schema.Struct({ id: LibraryEntry.fields.id }),
       yield* sql`INSERT INTO ${table("libraryEntry")} ${insertRow(
         sql,
         libraryEntryColumns,

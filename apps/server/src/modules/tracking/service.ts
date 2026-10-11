@@ -1,25 +1,25 @@
 import { column, decodeRows, runSql, table, updateRow } from "@mangy/db";
 import {
+  Series,
+  TrackedSeriesState,
   libraryEntryColumns,
   seriesColumns,
-  seriesRow,
   trackedSeriesStateColumns,
-  trackedSeriesStateRow,
 } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { Fragment } from "effect/sql/Statement";
 
 const trackedSeriesProjection = Schema.Struct({
-  checkFailureCount: trackedSeriesStateRow.from.fields.check_failure_count,
-  id: trackedSeriesStateRow.from.fields.id,
-  lastCheckedAt: trackedSeriesStateRow.from.fields.last_checked_at,
+  checkFailureCount: TrackedSeriesState.fields.checkFailureCount,
+  id: TrackedSeriesState.fields.id,
+  lastCheckedAt: TrackedSeriesState.fields.lastCheckedAt,
   lastSeenChapterExternalId:
-    trackedSeriesStateRow.from.fields.last_seen_chapter_external_id,
-  nextCheckAt: trackedSeriesStateRow.from.fields.next_check_at,
-  seriesId: seriesRow.from.fields.external_id,
-  sourceId: seriesRow.from.fields.source_id,
-  title: seriesRow.from.fields.title,
+    TrackedSeriesState.fields.lastSeenChapterExternalId,
+  nextCheckAt: TrackedSeriesState.fields.nextCheckAt,
+  seriesId: Series.fields.externalId,
+  sourceId: Series.fields.sourceId,
+  title: Series.fields.title,
 });
 
 type TrackedSeries = Schema.Schema.Type<typeof trackedSeriesProjection>;

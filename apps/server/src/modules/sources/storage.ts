@@ -7,9 +7,9 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  Series,
   chapterColumns,
   seriesColumns,
-  seriesRow,
   sourceColumns,
 } from "@mangy/db/model";
 import type {
@@ -106,9 +106,9 @@ const upsertSeriesItem = (sourceId: string, item: SourceSeries) =>
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
       Schema.Struct({
-        external_id: seriesRow.from.fields.external_id,
-        id: seriesRow.from.fields.id,
-        source_id: seriesRow.from.fields.source_id,
+        external_id: Series.fields.externalId,
+        id: Series.fields.id,
+        source_id: Series.fields.sourceId,
       }),
       yield* sql`INSERT INTO ${table("series")} ${insertRow(
         sql,
@@ -190,7 +190,7 @@ const findSeriesRecord = (sourceId: string, externalId: string) =>
   Effect.gen(function* findSeriesRecordEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
-      Schema.Struct({ id: seriesRow.from.fields.id }),
+      Schema.Struct({ id: Series.fields.id }),
       yield* sql`SELECT ${column(seriesColumns, "id")} FROM ${table("series")}
         WHERE ${column(seriesColumns, "sourceId")} = ${sourceId}
           AND ${column(seriesColumns, "externalId")} = ${externalId}`

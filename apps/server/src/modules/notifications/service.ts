@@ -7,9 +7,10 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  Notification,
+  NotificationEndpoint,
   notificationColumns,
   notificationEndpointColumns,
-  notificationEndpointRow,
   notificationRow,
 } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
@@ -40,12 +41,12 @@ const markRead = (userId: string, notificationId: string) =>
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
       Schema.Struct({
-        body: notificationRow.from.fields.body,
-        created_at: notificationRow.from.fields.created_at,
-        id: notificationRow.from.fields.id,
-        is_read: notificationRow.from.fields.is_read,
-        title: notificationRow.from.fields.title,
-        type: notificationRow.from.fields.type,
+        body: Notification.fields.body,
+        created_at: Notification.fields.createdAt,
+        id: Notification.fields.id,
+        is_read: Notification.fields.isRead,
+        title: Notification.fields.title,
+        type: Notification.fields.type,
       }),
       yield* sql`UPDATE ${table("notification")}
         SET ${updateRow(sql, notificationColumns, {
@@ -81,7 +82,7 @@ const markAllRead = (userId: string) =>
   Effect.gen(function* markAllReadEffect() {
     const sql = yield* SqlClient.SqlClient;
     const records = yield* decodeRows(
-      Schema.Struct({ id: notificationRow.from.fields.id }),
+      Schema.Struct({ id: Notification.fields.id }),
       yield* sql`UPDATE ${table("notification")}
         SET ${updateRow(sql, notificationColumns, {
           isRead: true,
@@ -103,7 +104,7 @@ const getPreferences = (userId: string) =>
         Effect.gen(function* inAppEndpoint() {
           const rows = yield* decodeRows(
             Schema.Struct({
-              is_enabled: notificationEndpointRow.from.fields.is_enabled,
+              is_enabled: NotificationEndpoint.fields.isEnabled,
             }),
             yield* sql`SELECT ${column(notificationEndpointColumns, "isEnabled")} FROM ${table("notificationEndpoint")}
               WHERE ${column(notificationEndpointColumns, "userId")} = ${userId}
@@ -137,7 +138,7 @@ const updatePreferences = (userId: string, input: { inAppEnabled: boolean }) =>
   Effect.gen(function* updatePreferencesEffect() {
     const sql = yield* SqlClient.SqlClient;
     const existing = yield* decodeRows(
-      Schema.Struct({ id: notificationEndpointRow.from.fields.id }),
+      Schema.Struct({ id: NotificationEndpoint.fields.id }),
       yield* sql`SELECT ${column(notificationEndpointColumns, "id")} FROM ${table("notificationEndpoint")}
         WHERE ${column(notificationEndpointColumns, "userId")} = ${userId}
           AND ${column(notificationEndpointColumns, "type")} = ${"inApp"}

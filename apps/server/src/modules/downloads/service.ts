@@ -7,15 +7,15 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  Chapter,
+  DownloadDestination,
+  DownloadJob,
+  Series,
   chapterColumns,
-  chapterRow,
   downloadDestinationColumns,
-  downloadDestinationRow,
   downloadJobColumns,
-  downloadJobRow,
   libraryEntryColumns,
   seriesColumns,
-  seriesRow,
 } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
@@ -27,26 +27,26 @@ import { SourcesStorage } from "../sources/storage";
 const activeJobStatuses = ["queued", "running", "retryableFailed"] as const;
 
 const jobProjection = Schema.Struct({
-  attempts: downloadJobRow.from.fields.attempts,
-  chapterId: Schema.NullOr(chapterRow.from.fields.external_id),
-  chapterTitle: Schema.NullOr(chapterRow.from.fields.title),
-  completedAt: downloadJobRow.from.fields.completed_at,
-  createdAt: downloadJobRow.from.fields.created_at,
-  destinationName: Schema.NullOr(downloadDestinationRow.from.fields.name),
-  errorMessage: downloadJobRow.from.fields.error_message,
-  id: downloadJobRow.from.fields.id,
-  maxAttempts: downloadJobRow.from.fields.max_attempts,
-  progressPercent: downloadJobRow.from.fields.progress_percent,
-  seriesId: Schema.NullOr(seriesRow.from.fields.external_id),
-  seriesTitle: Schema.NullOr(seriesRow.from.fields.title),
-  sourceId: Schema.NullOr(seriesRow.from.fields.source_id),
-  status: downloadJobRow.from.fields.status,
-  updatedAt: downloadJobRow.from.fields.updated_at,
+  attempts: DownloadJob.fields.attempts,
+  chapterId: Schema.NullOr(Chapter.fields.externalId),
+  chapterTitle: Schema.NullOr(Chapter.fields.title),
+  completedAt: DownloadJob.fields.completedAt,
+  createdAt: DownloadJob.fields.createdAt,
+  destinationName: Schema.NullOr(DownloadDestination.fields.name),
+  errorMessage: DownloadJob.fields.errorMessage,
+  id: DownloadJob.fields.id,
+  maxAttempts: DownloadJob.fields.maxAttempts,
+  progressPercent: DownloadJob.fields.progressPercent,
+  seriesId: Schema.NullOr(Series.fields.externalId),
+  seriesTitle: Schema.NullOr(Series.fields.title),
+  sourceId: Schema.NullOr(Series.fields.sourceId),
+  status: DownloadJob.fields.status,
+  updatedAt: DownloadJob.fields.updatedAt,
 });
 
-type DownloadJob = Schema.Schema.Type<typeof jobProjection>;
+type DownloadJobSummary = Schema.Schema.Type<typeof jobProjection>;
 
-const serializeJob = (row: DownloadJob) => ({
+const serializeJob = (row: DownloadJobSummary) => ({
   ...row,
   completedAt: row.completedAt ? row.completedAt.toISOString() : null,
   createdAt: row.createdAt.toISOString(),
@@ -120,9 +120,9 @@ const resolveDestination = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
       Schema.Struct({
-        id: downloadDestinationRow.from.fields.id,
-        isDefault: downloadDestinationRow.from.fields.is_default,
-        isEnabled: downloadDestinationRow.from.fields.is_enabled,
+        id: DownloadDestination.fields.id,
+        isDefault: DownloadDestination.fields.isDefault,
+        isEnabled: DownloadDestination.fields.isEnabled,
       }),
       yield* sql`SELECT ${column(downloadDestinationColumns, "id")} AS ${sql("id")},
           ${column(downloadDestinationColumns, "isDefault")} AS ${sql("isDefault")},
@@ -192,7 +192,7 @@ const enqueue = (
     });
 
     const chapterRows = yield* decodeRows(
-      Schema.Struct({ id: chapterRow.from.fields.id }),
+      Schema.Struct({ id: Chapter.fields.id }),
       yield* sql`SELECT ${column(chapterColumns, "id")} FROM ${table("chapter")}
         WHERE ${column(chapterColumns, "seriesId")} = ${seriesRecord.id}
           AND ${column(chapterColumns, "externalId")} = ${input.chapterId}`
@@ -211,7 +211,7 @@ const enqueue = (
     );
 
     const existingJobs = yield* decodeRows(
-      Schema.Struct({ id: downloadJobRow.from.fields.id }),
+      Schema.Struct({ id: DownloadJob.fields.id }),
       yield* sql`SELECT ${column(downloadJobColumns, "id")} FROM ${table("downloadJob")}
         WHERE ${column(downloadJobColumns, "userId")} = ${userId}
           AND ${column(downloadJobColumns, "chapterId")} = ${chapterRecord.id}
@@ -251,7 +251,7 @@ const enqueue = (
           )}`;
 
         const rows = yield* decodeRows(
-          Schema.Struct({ id: downloadJobRow.from.fields.id }),
+          Schema.Struct({ id: DownloadJob.fields.id }),
           yield* sql`INSERT INTO ${table("downloadJob")} ${insertRow(
             sql,
             downloadJobColumns,
@@ -376,7 +376,7 @@ const prioritize = (userId: string, jobId: string) =>
     }
 
     const earliestJobs = yield* decodeRows(
-      Schema.Struct({ created_at: downloadJobRow.from.fields.created_at }),
+      Schema.Struct({ created_at: DownloadJob.fields.createdAt }),
       yield* sql`SELECT ${column(downloadJobColumns, "createdAt")} FROM ${table("downloadJob")}
         WHERE ${column(downloadJobColumns, "userId")} = ${userId}
           AND ${column(downloadJobColumns, "status")} IN ${sql.in(activeJobStatuses)}

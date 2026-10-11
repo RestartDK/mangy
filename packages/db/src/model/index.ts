@@ -1,127 +1,91 @@
-import {
-  accountColumns,
-  accountRow,
-  accountTable,
-  sessionColumns,
-  sessionRow,
-  sessionTable,
-  userColumns,
-  userRow,
-  userTable,
-  verificationColumns,
-  verificationRow,
-  verificationTable,
-} from "./auth";
+import { accountColumns, accountTable } from "./account";
+import { chapterColumns, chapterTable } from "./chapter";
 import {
   downloadArtifactColumns,
-  downloadArtifactRow,
   downloadArtifactTable,
-  downloadJobColumns,
-  downloadJobRow,
-  downloadJobTable,
-} from "./downloads";
+} from "./download-artifact";
 import {
   downloadDestinationColumns,
-  downloadDestinationRow,
   downloadDestinationTable,
-  libraryEntryColumns,
-  libraryEntryRow,
-  libraryEntryTable,
-  trackedSeriesStateColumns,
-  trackedSeriesStateRow,
-  trackedSeriesStateTable,
-} from "./library";
+} from "./download-destination";
+import { downloadJobColumns, downloadJobTable } from "./download-job";
+import { libraryEntryColumns, libraryEntryTable } from "./library-entry";
+import { notificationColumns, notificationTable } from "./notification";
 import {
-  notificationColumns,
   notificationDeliveryColumns,
-  notificationDeliveryRow,
   notificationDeliveryTable,
-  notificationEndpointColumns,
-  notificationEndpointRow,
-  notificationEndpointTable,
-  notificationRow,
-  notificationTable,
-  pushSubscriptionColumns,
-  pushSubscriptionRow,
-  pushSubscriptionTable,
-} from "./notifications";
+} from "./notification-delivery";
 import {
-  chapterColumns,
-  chapterRow,
-  chapterTable,
-  seriesColumns,
-  seriesRow,
-  seriesTable,
-  sourceColumns,
-  sourceRow,
-  sourceTable,
-} from "./sources";
+  notificationEndpointColumns,
+  notificationEndpointTable,
+} from "./notification-endpoint";
+import {
+  pushSubscriptionColumns,
+  pushSubscriptionTable,
+} from "./push-subscription";
+import { seriesColumns, seriesTable } from "./series";
+import { sessionColumns, sessionTable } from "./session";
+import { sourceColumns, sourceTable } from "./source";
+import {
+  trackedSeriesStateColumns,
+  trackedSeriesStateTable,
+} from "./tracked-series-state";
+import { userColumns, userTable } from "./user";
+import { verificationColumns, verificationTable } from "./verification";
 
-export * from "./auth";
-export * from "./columns";
-export * from "./downloads";
+export * from "./user";
+export * from "./session";
+export * from "./account";
+export * from "./verification";
+export * from "./source";
+export * from "./series";
+export * from "./chapter";
+export * from "./download-destination";
+export * from "./library-entry";
+export * from "./tracked-series-state";
+export * from "./download-job";
+export * from "./download-artifact";
+export * from "./notification-endpoint";
+export * from "./push-subscription";
+export * from "./notification";
+export * from "./notification-delivery";
 export * from "./ids";
-export * from "./library";
-export * from "./notifications";
-export * from "./sources";
 
 export const modelTables = {
-  account: { columns: accountColumns, row: accountRow, table: accountTable },
-  chapter: { columns: chapterColumns, row: chapterRow, table: chapterTable },
+  account: { columns: accountColumns, table: accountTable },
+  chapter: { columns: chapterColumns, table: chapterTable },
   downloadArtifact: {
     columns: downloadArtifactColumns,
-    row: downloadArtifactRow,
     table: downloadArtifactTable,
   },
   downloadDestination: {
     columns: downloadDestinationColumns,
-    row: downloadDestinationRow,
     table: downloadDestinationTable,
   },
-  downloadJob: {
-    columns: downloadJobColumns,
-    row: downloadJobRow,
-    table: downloadJobTable,
-  },
-  libraryEntry: {
-    columns: libraryEntryColumns,
-    row: libraryEntryRow,
-    table: libraryEntryTable,
-  },
-  notification: {
-    columns: notificationColumns,
-    row: notificationRow,
-    table: notificationTable,
-  },
+  downloadJob: { columns: downloadJobColumns, table: downloadJobTable },
+  libraryEntry: { columns: libraryEntryColumns, table: libraryEntryTable },
+  notification: { columns: notificationColumns, table: notificationTable },
   notificationDelivery: {
     columns: notificationDeliveryColumns,
-    row: notificationDeliveryRow,
     table: notificationDeliveryTable,
   },
   notificationEndpoint: {
     columns: notificationEndpointColumns,
-    row: notificationEndpointRow,
     table: notificationEndpointTable,
   },
   pushSubscription: {
     columns: pushSubscriptionColumns,
-    row: pushSubscriptionRow,
     table: pushSubscriptionTable,
   },
-  series: { columns: seriesColumns, row: seriesRow, table: seriesTable },
-  session: { columns: sessionColumns, row: sessionRow, table: sessionTable },
-  source: { columns: sourceColumns, row: sourceRow, table: sourceTable },
+  series: { columns: seriesColumns, table: seriesTable },
+  session: { columns: sessionColumns, table: sessionTable },
+  source: { columns: sourceColumns, table: sourceTable },
   trackedSeriesState: {
     columns: trackedSeriesStateColumns,
-    row: trackedSeriesStateRow,
     table: trackedSeriesStateTable,
   },
-  user: { columns: userColumns, row: userRow, table: userTable },
-  verification: {
-    columns: verificationColumns,
-    row: verificationRow,
-    table: verificationTable,
-  },
+  user: { columns: userColumns, table: userTable },
+  verification: { columns: verificationColumns, table: verificationTable },
 } as const;
 
 export const columnsByModel: Record<
