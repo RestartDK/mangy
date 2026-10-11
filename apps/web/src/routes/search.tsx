@@ -56,6 +56,8 @@ import { requireAuth } from "@/lib/require-auth";
 import {
   findSelectFilter,
   getActiveFilters,
+  readStringList,
+  readStringValue,
   TOOLBAR_FILTER_KEYS,
   withoutFilter,
 } from "@/lib/search-filters";
@@ -110,9 +112,10 @@ const FilterField = ({
   onValueChange,
 }: FilterFieldProps) => {
   if (definition.type === "multiSelect") {
+    const storedSelection = filters[definition.key];
     const selected = new Set(
-      Array.isArray(filters[definition.key])
-        ? (filters[definition.key] as string[])
+      Array.isArray(storedSelection)
+        ? readStringList(storedSelection)
         : (definition.defaultValue ?? [])
     );
 
@@ -179,7 +182,7 @@ const FilterField = ({
           onValueChange(definition, value);
         }}
         value={
-          (filters[definition.key] as string | undefined) ??
+          readStringValue(filters[definition.key]) ??
           definition.defaultValue ??
           ""
         }
@@ -444,7 +447,7 @@ const SearchRouteComponent = () => {
               applyFilterValue(sortDefinition, value);
             }}
             value={
-              (effectiveFilters[sortDefinition.key] as string | undefined) ??
+              readStringValue(effectiveFilters[sortDefinition.key]) ??
               sortDefinition.defaultValue ??
               ""
             }
