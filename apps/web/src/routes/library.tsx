@@ -1,7 +1,12 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { AsyncResult } from "effect/reactivity";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { reactivityKey } from "@/atoms/keys";
+import { libraryQuery, removeLibrarySeries } from "@/atoms/library";
+import { trackingQuery } from "@/atoms/tracking";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -18,12 +23,14 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLibrary } from "@/hooks/use-library";
-import { useRemoveLibrarySeries } from "@/hooks/use-remove-library-series";
-import { useTracking } from "@/hooks/use-tracking";
+import {
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
+import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
-import { runMutation } from "@/lib/run-mutation";
 
 interface LibraryRouteItem {
   id: string;
@@ -139,25 +146,28 @@ const LibrarySkeleton = () => (
   </div>
 );
 const LibraryRouteComponent = () => {
-  const libraryQuery = useLibrary();
-  const trackingQuery = useTracking();
-  const removeLibrarySeries = useRemoveLibrarySeries();
+  const library = useAtomValue(libraryQuery);
+  const tracking = useAtomValue(trackingQuery);
+  const removeSeries = useAtomSet(removeLibrarySeries, { mode: "promise" });
+  const removeResult = useAtomValue(removeLibrarySeries);
+  const isRemoving = AsyncResult.isWaiting(removeResult);
   const [seriesPendingRemoval, setSeriesPendingRemoval] =
     useState<LibraryRouteItem | null>(null);
 
+  const trackingItems = asyncResultValue(tracking) ?? [];
+  const error = asyncResultError(library) ?? asyncResultError(tracking);
+  const isLoading = asyncResultLoading(library) || asyncResultLoading(tracking);
+
   const trackingMap = new Map(
-    (trackingQuery.data ?? []).map((item) => [
-      `${item.sourceId}:${item.seriesId}`,
-      item,
-    ])
+    trackingItems.map((item) => [`${item.sourceId}:${item.seriesId}`, item])
   );
 
-  const libraryItems = (libraryQuery.data ?? []).map((item) => ({
+  const libraryItems = (asyncResultValue(library) ?? []).map((item) => ({
     ...item,
     trackingState: trackingMap.get(`${item.sourceId}:${item.seriesId}`) ?? null,
   }));
 
-  const trackingOnlyItems = (trackingQuery.data ?? [])
+  const trackingOnlyItems = trackingItems
     .filter(
       (item) =>
         !libraryItems.some(
@@ -181,7 +191,27 @@ const LibraryRouteComponent = () => {
   const trackedItems = items.filter((item) => item.isTracked);
   const autoDownloadItems = items.filter((item) => item.autoDownload);
   const needsDestinationItems = items.filter((item) => !item.destinationName);
-  const isLoading = libraryQuery.isLoading || trackingQuery.isLoading;
+
+  const removePendingSeries = async (item: LibraryRouteItem): Promise<void> => {
+    const removed = await notifyMutation(
+      removeSeries({
+        query: { seriesId: item.seriesId, sourceId: item.sourceId },
+        reactivityKeys: [
+          reactivityKey.library,
+          reactivityKey.tracking,
+          reactivityKey.librarySeriesState,
+        ],
+      }),
+      {
+        failure: "Unable to remove series from library",
+        success: "Series removed from library",
+      }
+    );
+
+    if (removed) {
+      setSeriesPendingRemoval(null);
+    }
+  };
 
   const views = [
     { count: items.length, items, label: "All", value: "all" },
@@ -209,17 +239,14 @@ const LibraryRouteComponent = () => {
     <AppShell>
       <PageHeader title="Library" />
 
-      {libraryQuery.error || trackingQuery.error ? (
+      {error === undefined ? null : (
         <Alert variant="destructive">
           <AlertTitle>Unable to load the library</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(
-              libraryQuery.error ?? trackingQuery.error,
-              "Try again in a moment."
-            )}
+            {getErrorMessage(error, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
       {isLoading ? <LibrarySkeleton /> : null}
 
@@ -277,29 +304,19 @@ const LibraryRouteComponent = () => {
           <DialogFooter>
             <Button
               onClick={() => {
-                if (!seriesPendingRemoval) {
+                if (seriesPendingRemoval === null) {
                   return;
                 }
 
-                void runMutation(
-                  removeLibrarySeries.mutateAsync({
-                    seriesId: seriesPendingRemoval.seriesId,
-                    sourceId: seriesPendingRemoval.sourceId,
-                  }),
-                  {
-                    onSuccess: () => {
-                      setSeriesPendingRemoval(null);
-                    },
-                  }
-                );
+                void removePendingSeries(seriesPendingRemoval);
               }}
               type="button"
               variant="destructive"
             >
-              {removeLibrarySeries.isPending ? "Removing..." : "Remove"}
+              {isRemoving ? "Removing..." : "Remove"}
             </Button>
             <Button
-              disabled={removeLibrarySeries.isPending}
+              disabled={isRemoving}
               onClick={() => {
                 setSeriesPendingRemoval(null);
               }}
