@@ -679,6 +679,7 @@
   };
   "@mangy/auth" = copyPathToStore ./packages/auth;
   "@mangy/config" = copyPathToStore ./packages/config;
+  "@mangy/contract" = copyPathToStore ./packages/contract;
   "@mangy/db" = copyPathToStore ./packages/db;
   "@mangy/downloader" = copyPathToStore ./packages/downloader;
   "@mangy/env" = copyPathToStore ./packages/env;

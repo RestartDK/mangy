@@ -26,6 +26,7 @@
         "@effect/platform-bun": "catalog:",
         "@elysiajs/cors": "^1.4.2",
         "@mangy/auth": "workspace:*",
+        "@mangy/contract": "workspace:*",
         "@mangy/db": "workspace:*",
         "@mangy/env": "workspace:*",
         "@mangy/push": "workspace:*",
@@ -51,6 +52,7 @@
         "@fontsource-variable/figtree": "^5.3.0",
         "@fontsource-variable/noto-sans": "^5.3.0",
         "@mangy/auth": "workspace:*",
+        "@mangy/contract": "workspace:*",
         "@mangy/env": "workspace:*",
         "@phosphor-icons/react": "^2.1.10",
         "@tailwindcss/vite": "^4.3.3",
@@ -121,6 +123,17 @@
     "packages/config": {
       "name": "@mangy/config",
       "version": "0.0.0",
+    },
+    "packages/contract": {
+      "name": "@mangy/contract",
+      "dependencies": {
+        "@mangy/db": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@mangy/config": "workspace:*",
+        "typescript": "catalog:",
+      },
     },
     "packages/db": {
       "name": "@mangy/db",
@@ -405,6 +418,8 @@
     "@mangy/auth": ["@mangy/auth@workspace:packages/auth"],
 
     "@mangy/config": ["@mangy/config@workspace:packages/config"],
+
+    "@mangy/contract": ["@mangy/contract@workspace:packages/contract"],
 
     "@mangy/db": ["@mangy/db@workspace:packages/db"],
 

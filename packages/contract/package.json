@@ -1,0 +1,23 @@
+{
+  "name": "@mangy/contract",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc -b"
+  },
+  "dependencies": {
+    "@mangy/db": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@mangy/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
