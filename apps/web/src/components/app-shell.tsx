@@ -26,7 +26,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { useLiveUpdates } from "@/hooks/use-live-updates";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +71,6 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
   });
   const { data: session } = authClient.useSession();
 
-  useLiveUpdates(Boolean(session?.user.id));
   useAtomMount(liveUpdates);
 
   return (

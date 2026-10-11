@@ -1,29 +1,7 @@
-import { Layer, ManagedRuntime } from "effect";
-import type { Effect } from "effect";
+import { Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { HttpApiClient } from "effect/http-api";
-
-import { Api } from "./api";
 
 export const apiHttpClient = Layer.mergeAll(
   FetchHttpClient.layer,
   Layer.succeed(FetchHttpClient.RequestInit)({ credentials: "include" })
 );
-
-const makeRuntime = () => ManagedRuntime.make(apiHttpClient);
-
-export const makeApiClient = (baseUrl: string) => {
-  const runtime = makeRuntime();
-  const clientPromise = runtime.runPromise(
-    HttpApiClient.make(Api, { baseUrl })
-  );
-  type ApiClient = Awaited<typeof clientPromise>;
-
-  return {
-    async run<A, E>(
-      build: (client: ApiClient) => Effect.Effect<A, E>
-    ): Promise<A> {
-      return await runtime.runPromise(build(await clientPromise));
-    },
-  };
-};

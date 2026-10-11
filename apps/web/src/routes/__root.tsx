@@ -1,6 +1,4 @@
 import { RegistryProvider } from "@effect/atom-react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -13,15 +11,6 @@ import { Toaster } from "@/components/ui/sonner";
 
 import "../index.css";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 1000 * 60,
-    },
-  },
-});
-
 export type RouterAppContext = Record<string, never>;
 
 const RootComponent = () => (
@@ -33,15 +22,12 @@ const RootComponent = () => (
       disableTransitionOnChange
       enableSystem
     >
-      <QueryClientProvider client={queryClient}>
-        <RegistryProvider>
-          <div className="bg-background text-foreground min-h-svh">
-            <Outlet />
-          </div>
-          <Toaster />
-          <ReactQueryDevtools initialIsOpen={false} />
-        </RegistryProvider>
-      </QueryClientProvider>
+      <RegistryProvider>
+        <div className="bg-background text-foreground min-h-svh">
+          <Outlet />
+        </div>
+        <Toaster />
+      </RegistryProvider>
     </ThemeProvider>
     <TanStackRouterDevtools position="bottom-left" />
   </>
