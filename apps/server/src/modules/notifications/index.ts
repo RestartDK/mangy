@@ -1,123 +1,56 @@
-import { Elysia } from "elysia";
-import { z } from "zod";
+import { Api, BadRequest } from "@mangy/contract";
+import { Effect } from "effect";
+import { HttpApiBuilder } from "effect/http-api";
 
-import { getSessionUser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 
-import {
-  badRequestResponseSchema,
-  markAllNotificationsReadSchema,
-  notificationParamsSchema,
-  notificationPreferencesSchema,
-  notificationSchema,
-  unauthorizedResponseSchema,
-  updateNotificationPreferencesBody,
-} from "./model";
 import { NotificationsService } from "./service";
 
-export const notifications = new Elysia({ prefix: "/api/notifications" })
-  .get(
-    "/",
-    async ({ request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await NotificationsService.list(user.id);
-    },
-    {
-      response: {
-        200: z.array(notificationSchema),
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .get(
-    "/preferences",
-    async ({ request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await NotificationsService.getPreferences(user.id);
-    },
-    {
-      response: {
-        200: notificationPreferencesSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .patch(
-    "/preferences",
-    async ({ body, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await NotificationsService.updatePreferences(user.id, body);
-    },
-    {
-      body: updateNotificationPreferencesBody,
-      response: {
-        200: notificationPreferencesSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .patch(
-    "/:notificationId/read",
-    async ({ params, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await NotificationsService.markRead(
-          user.id,
-          params.notificationId
+export const NotificationsApiLive = HttpApiBuilder.group(
+  Api,
+  "notifications",
+  (handlers) =>
+    handlers.handleAll({
+      getPreferences: Effect.fn(function* getPreferencesHandler() {
+        const userId = yield* currentUser;
+        return yield* Effect.promise(
+          async () => await NotificationsService.getPreferences(userId)
         );
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to update notification",
-        };
-      }
-    },
-    {
-      params: notificationParamsSchema,
-      response: {
-        200: notificationSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  )
-  .post(
-    "/mark-all-read",
-    async ({ request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      return await NotificationsService.markAllRead(user.id);
-    },
-    {
-      response: {
-        200: markAllNotificationsReadSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
-  );
+      }),
+      list: Effect.fn(function* listHandler() {
+        const userId = yield* currentUser;
+        return yield* Effect.promise(
+          async () => await NotificationsService.list(userId)
+        );
+      }),
+      markAllRead: Effect.fn(function* markAllReadHandler() {
+        const userId = yield* currentUser;
+        return yield* Effect.promise(
+          async () => await NotificationsService.markAllRead(userId)
+        );
+      }),
+      markRead: Effect.fn(function* markReadHandler({ params }) {
+        const userId = yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: (cause) =>
+            new BadRequest({
+              message:
+                cause instanceof Error
+                  ? cause.message
+                  : "Unable to update notification",
+            }),
+          try: async () =>
+            await NotificationsService.markRead(userId, params.notificationId),
+        });
+      }),
+      updatePreferences: Effect.fn(function* updatePreferencesHandler({
+        payload,
+      }) {
+        const userId = yield* currentUser;
+        return yield* Effect.promise(
+          async () =>
+            await NotificationsService.updatePreferences(userId, payload)
+        );
+      }),
+    })
+);

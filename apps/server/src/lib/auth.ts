@@ -1,10 +1,9 @@
 import { getAuth } from "@mangy/auth";
+import { Unauthorized } from "@mangy/contract";
 import { UserIdSchema } from "@mangy/db/model/ids";
 import type { UserId } from "@mangy/db/model/ids";
 import { Effect, Schema } from "effect";
 import { HttpServerRequest } from "effect/http";
-
-import { Unauthorized } from "@/api/auth";
 
 /**
  * Extracts the authenticated user from a request's session
@@ -20,11 +19,11 @@ export const getSessionUser = async (request: Request) => {
 
 const decodeUserId = Schema.decodeUnknownEffect(UserIdSchema);
 
-export const currentUser: Effect.Effect<
-  UserId,
+export const currentSessionUser: Effect.Effect<
+  { email: string; id: UserId; name: string },
   Unauthorized,
   HttpServerRequest.HttpServerRequest
-> = Effect.gen(function* currentUserEffect() {
+> = Effect.gen(function* currentSessionUserEffect() {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const session = yield* Effect.promise(
     async () =>
@@ -34,5 +33,15 @@ export const currentUser: Effect.Effect<
     return yield* new Unauthorized({ message: "Unauthorized" });
   }
 
-  return yield* decodeUserId(session.user.id).pipe(Effect.orDie);
+  return {
+    email: session.user.email,
+    id: yield* decodeUserId(session.user.id).pipe(Effect.orDie),
+    name: session.user.name,
+  };
 });
+
+export const currentUser: Effect.Effect<
+  UserId,
+  Unauthorized,
+  HttpServerRequest.HttpServerRequest
+> = currentSessionUser.pipe(Effect.map((user) => user.id));
