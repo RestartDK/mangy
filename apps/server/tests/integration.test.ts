@@ -1405,6 +1405,43 @@ describe("server and worker integration", () => {
       )
     );
     expect(saveTrackingResponse.status).toBe(200);
+    const savedTrackingState = await readJson<{ libraryEntryId: string | null }>(
+      saveTrackingResponse
+    );
+
+    const populatedLibraryResponse = await apiFetch("/api/library", {
+      method: "GET",
+    });
+    expect({
+      entries: await readJson<
+        {
+          autoDownload: boolean;
+          coverImageUrl: string | null;
+          destinationName: string | null;
+          id: string;
+          isTracked: boolean;
+          seriesId: string;
+          sourceId: string;
+          title: string;
+          updatedAt: string;
+        }[]
+      >(populatedLibraryResponse).catch(() => null),
+      status: populatedLibraryResponse.status,
+    }).toMatchObject({
+      entries: [
+        {
+          autoDownload: true,
+          coverImageUrl: "https://example.test/cover.png",
+          destinationName: "Library Removal Destination",
+          id: savedTrackingState.libraryEntryId,
+          isTracked: true,
+          seriesId: seriesExternalId,
+          sourceId: adapterId,
+          title: "Library Removal Series",
+        },
+      ],
+      status: 200,
+    });
 
     const removeResponse = await apiFetch(
       `/api/library/series-state?sourceId=${adapterId}&seriesId=${seriesExternalId}`,
