@@ -9,10 +9,12 @@ import type {
   JoinConfig,
   ModelTarget,
 } from "better-auth/adapters";
-import { Effect, ManagedRuntime } from "effect";
+import { Effect, ManagedRuntime, Schema } from "effect";
 import { SqlClient, Statement } from "effect/sql";
 import type { SqlError } from "effect/sql/SqlError";
 import type { Fragment } from "effect/sql/Statement";
+
+import { decodeModelRows as decodeModelRowsEffect } from "./model-rows";
 
 type AdapterHelpers = Parameters<AdapterFactoryCustomizeAdapterCreator>[0];
 
@@ -64,16 +66,28 @@ const selectColumns = (
       );
 };
 
-const mapRow = (
-  model: string,
-  row: Record<string, unknown>
-): Record<string, unknown> =>
-  Object.fromEntries(
-    Object.entries(row).map(([field, value]) => [
+const rowValues = Schema.Record(Schema.String, Schema.Unknown);
+
+// better-auth's `update` is generic over an unconstrained `T`, so the payload is
+// parsed rather than narrowed: a value that is not a record of column values
+// fails here instead of being read as one.
+const mapRow = (model: string, row: unknown): Record<string, unknown> => {
+  const values = Schema.decodeUnknownSync(rowValues)(row);
+
+  return Object.fromEntries(
+    Object.entries(values).map(([field, value]) => [
       resolveColumn(model, field),
       value,
     ])
   );
+};
+
+const decodeModelRows = async <T>(
+  model: string,
+  fields: readonly string[] | undefined,
+  rows: readonly unknown[]
+): Promise<T[]> =>
+  await runtime.runPromise(decodeModelRowsEffect<T>(model, fields, rows));
 
 const matchesInsensitive = (where: CleanedWhere): boolean =>
   where.mode === "insensitive" &&
@@ -255,7 +269,11 @@ const makeAdapter = ({ getFieldName }: AdapterHelpers): CustomAdapter => {
             .insert(mapRow(modelKey, data))
             .returning(selectColumns(sql, modelKey))}`
       );
-      return rows[0] as T;
+      const [created] = await decodeModelRows<T>(modelKey, undefined, rows);
+      if (created === undefined) {
+        throw new Error(`Insert into "${model}" returned no row.`);
+      }
+      return created;
     },
 
     async delete({ model, modelKey = model, where }) {
@@ -299,6 +317,7 @@ const makeAdapter = ({ getFieldName }: AdapterHelpers): CustomAdapter => {
       join?: JoinConfig;
     }) {
       rejectNativeJoin(join);
+      const fields = resolveFields(modelKey, select);
       const rows = await run((sql) => {
         const order = sortBy
           ? sql` ORDER BY ${column(
@@ -313,14 +332,14 @@ const makeAdapter = ({ getFieldName }: AdapterHelpers): CustomAdapter => {
         return sql`SELECT ${selectColumns(
           sql,
           modelKey,
-          resolveFields(modelKey, select)
+          fields
         )} FROM ${sql(model)} WHERE ${buildWhere(
           sql,
           modelKey,
           where ?? []
         )}${order} LIMIT ${limit}${skip}`;
       });
-      return rows as T[];
+      return await decodeModelRows<T>(modelKey, fields, rows);
     },
 
     async findOne<T>({
@@ -335,19 +354,21 @@ const makeAdapter = ({ getFieldName }: AdapterHelpers): CustomAdapter => {
       join?: JoinConfig;
     }) {
       rejectNativeJoin(join);
+      const fields = resolveFields(modelKey, select);
       const rows = await run(
         (sql) =>
           sql`SELECT ${selectColumns(
             sql,
             modelKey,
-            resolveFields(modelKey, select)
+            fields
           )} FROM ${sql(model)} WHERE ${buildWhere(
             sql,
             modelKey,
             where
           )} LIMIT 1`
       );
-      return (rows[0] ?? null) as T | null;
+      const [found] = await decodeModelRows<T>(modelKey, fields, rows);
+      return found ?? null;
     },
 
     async update<T>({
@@ -359,14 +380,15 @@ const makeAdapter = ({ getFieldName }: AdapterHelpers): CustomAdapter => {
       const rows = await run(
         (sql) =>
           sql`UPDATE ${sql(model)} SET ${sql.update(
-            mapRow(modelKey, update as Record<string, unknown>)
+            mapRow(modelKey, update)
           )} WHERE ${buildWhere(
             sql,
             modelKey,
             where
           )} RETURNING ${selectColumns(sql, modelKey)}`
       );
-      return (rows[0] ?? null) as T | null;
+      const [updated] = await decodeModelRows<T>(modelKey, undefined, rows);
+      return updated ?? null;
     },
 
     async updateMany({ model, modelKey = model, where, update }) {
