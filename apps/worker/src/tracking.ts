@@ -357,38 +357,43 @@ export const processTrackedSeries = async (
     );
   }
 
-  const chapters = await adapter.getChapters(trackedSeries.seriesExternalId);
-  await runSql(upsertTrackedChapters(trackedSeries.seriesRecordId, chapters));
+  await runSql(
+    Effect.gen(function* processTrackedSeriesEffect() {
+      const chapters = yield* adapter.getChapters(
+        trackedSeries.seriesExternalId
+      );
+      yield* upsertTrackedChapters(trackedSeries.seriesRecordId, chapters);
 
-  const latestChapterExternalId =
-    chapters[0]?.externalId ?? trackedSeries.lastSeenChapterExternalId;
-  const newChapters = collectNewChapters(
-    chapters,
-    trackedSeries.lastSeenChapterExternalId
-  );
-
-  let notificationBody: string | null = null;
-
-  if (newChapters.length > 0) {
-    if (trackedSeries.autoDownload) {
-      const queuedCount = await runSql(
-        queueTrackedChapters(trackedSeries, newChapters)
+      const latestChapterExternalId =
+        chapters[0]?.externalId ?? trackedSeries.lastSeenChapterExternalId;
+      const newChapters = collectNewChapters(
+        chapters,
+        trackedSeries.lastSeenChapterExternalId
       );
 
-      if (queuedCount > 0) {
-        notificationBody = `${queuedCount} new ${pluralize(queuedCount, "chapter", "chapters")} queued${trackedSeries.downloadDestinationName ? ` to ${trackedSeries.downloadDestinationName}` : ""}.`;
-      }
-    } else {
-      notificationBody = `${newChapters.length} new ${pluralize(newChapters.length, "chapter", "chapters")} found. Auto-download is off.`;
-    }
-  }
+      let notificationBody: string | null = null;
 
-  await runSql(
-    completeTrackedSeriesCheck(
-      trackedSeries,
-      latestChapterExternalId,
-      notificationBody
-    )
+      if (newChapters.length > 0) {
+        if (trackedSeries.autoDownload) {
+          const queuedCount = yield* queueTrackedChapters(
+            trackedSeries,
+            newChapters
+          );
+
+          if (queuedCount > 0) {
+            notificationBody = `${queuedCount} new ${pluralize(queuedCount, "chapter", "chapters")} queued${trackedSeries.downloadDestinationName ? ` to ${trackedSeries.downloadDestinationName}` : ""}.`;
+          }
+        } else {
+          notificationBody = `${newChapters.length} new ${pluralize(newChapters.length, "chapter", "chapters")} found. Auto-download is off.`;
+        }
+      }
+
+      yield* completeTrackedSeriesCheck(
+        trackedSeries,
+        latestChapterExternalId,
+        notificationBody
+      );
+    })
   );
 };
 

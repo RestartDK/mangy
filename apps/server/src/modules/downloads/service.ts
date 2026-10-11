@@ -176,17 +176,13 @@ const enqueue = (
   Effect.gen(function* enqueueEffect() {
     const sql = yield* SqlClient.SqlClient;
     const adapter = SourcesService.getSourceOrThrow(input.sourceId);
-    const seriesItem = yield* Effect.promise(
-      async () => await adapter.getSeries(input.seriesId)
-    );
+    const seriesItem = yield* adapter.getSeries(input.seriesId);
     const seriesRecord = yield* Effect.promise(
       async () =>
         await SourcesStorage.upsertSeriesItem(input.sourceId, seriesItem)
     );
 
-    const chapters = yield* Effect.promise(
-      async () => await adapter.getChapters(input.seriesId)
-    );
+    const chapters = yield* adapter.getChapters(input.seriesId);
     yield* Effect.promise(async () => {
       await SourcesStorage.upsertChapters(seriesRecord.id, chapters);
     });

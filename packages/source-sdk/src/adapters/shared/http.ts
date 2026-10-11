@@ -144,20 +144,18 @@ const fetchText = (
   );
 };
 
-export const fetchHtmlPage = async (
+export const fetchHtmlPage = (
   input: string | URL,
   options: FetchRequestOptions = {}
-): Promise<FetchHtmlResult> =>
-  await Effect.runPromise(
-    retryTransient(
-      fetchText(input, {
-        accept:
-          options.accept ??
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        ...options,
-      }),
-      options.retries ?? defaultRetryCount
-    )
+): Effect.Effect<FetchHtmlResult, HttpError> =>
+  retryTransient(
+    fetchText(input, {
+      accept:
+        options.accept ??
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      ...options,
+    }),
+    options.retries ?? defaultRetryCount
   );
 
 export const resolveUrl = (baseUrl: string | URL, value: string): string => {

@@ -112,9 +112,7 @@ const query = async <A, I>(
 const createFakeAdapter = (config: {
   adapterId: string;
   chapters: SourceChapter[];
-  getPages?:
-    | ((chapterId: string) => Promise<{ pages: SourcePage[] }>)
-    | ((chapterId: string) => { pages: SourcePage[] });
+  getPages?: (chapterId: string) => Effect.Effect<{ pages: SourcePage[] }>;
   series: SourceSeries;
 }) => {
   const state = {
@@ -122,70 +120,55 @@ const createFakeAdapter = (config: {
     series: config.series,
   };
 
+  const listResponse = () => ({
+    hasNextPage: false,
+    items: [state.series],
+    page: 1,
+    pageSize: 1,
+    total: 1,
+  });
+
   const adapter: SourceAdapter = {
-    async getChapters(seriesId) {
-      if (seriesId !== state.series.externalId) {
-        throw new Error("Unexpected series requested in fake adapter.");
-      }
+    getChapters: (seriesId) =>
+      Effect.sync(() => {
+        if (seriesId !== state.series.externalId) {
+          throw new Error("Unexpected series requested in fake adapter.");
+        }
 
-      return [...state.chapters];
-    },
-    async getFilters() {
-      return [];
-    },
-    async getLatest() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
-    async getPages(chapterId) {
-      if (config.getPages) {
-        return await config.getPages(chapterId);
-      }
+        return [...state.chapters];
+      }),
+    getFilters: () => Effect.succeed([]),
+    getLatest: () => Effect.succeed(listResponse()),
+    getPages: (chapterId) =>
+      Effect.gen(function* getPagesEffect() {
+        if (config.getPages) {
+          return yield* config.getPages(chapterId);
+        }
 
-      const chapter = state.chapters.find(
-        (item) => item.externalId === chapterId
-      );
-      if (!chapter) {
-        throw new Error("Unexpected chapter requested in fake adapter.");
-      }
+        const chapter = state.chapters.find(
+          (item) => item.externalId === chapterId
+        );
+        if (!chapter) {
+          throw new Error("Unexpected chapter requested in fake adapter.");
+        }
 
-      return {
-        pages: Array.from({ length: chapter.pageCount ?? 1 }, (_, index) => ({
-          imageUrl: pngDataUrl,
-          index,
-        })),
-      };
-    },
-    async getPopular() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
-    async getSeries(seriesId) {
-      if (seriesId !== state.series.externalId) {
-        throw new Error("Unexpected series requested in fake adapter.");
-      }
+        return {
+          pages: Array.from({ length: chapter.pageCount ?? 1 }, (_, index) => ({
+            imageUrl: pngDataUrl,
+            index,
+          })),
+        };
+      }),
+    getPopular: () => Effect.succeed(listResponse()),
+    getSeries: (seriesId) =>
+      Effect.sync(() => {
+        if (seriesId !== state.series.externalId) {
+          throw new Error("Unexpected series requested in fake adapter.");
+        }
 
-      return state.series;
-    },
-    async getTrending() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
+        return state.series;
+      }),
+    getTrending: () => Effect.succeed(listResponse()),
     metadata: {
       capabilities: {
         supportsChapterFeed: true,
@@ -204,15 +187,7 @@ const createFakeAdapter = (config: {
       supportedLanguages: ["en"],
       websiteUrl: "https://example.test",
     },
-    async searchSeries() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
+    searchSeries: () => Effect.succeed(listResponse()),
   };
 
   return {
@@ -1578,7 +1553,7 @@ describe("server and worker integration", () => {
             throw new Error("Unexpected chapter requested in fake adapter.");
           }
 
-          return {
+          return Effect.succeed({
             pages: [
               {
                 headers: {
@@ -1589,7 +1564,7 @@ describe("server and worker integration", () => {
                 referer: requiredReferer,
               },
             ],
-          };
+          });
         },
         series,
       });

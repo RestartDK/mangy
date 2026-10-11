@@ -1,14 +1,6 @@
 import { column, decodeRows, runSql, table } from "@mangy/db";
 import { DownloadJob, downloadJobColumns } from "@mangy/db/model";
-import {
-  Data,
-  Duration,
-  Effect,
-  Layer,
-  Result,
-  Schedule,
-  Schema,
-} from "effect";
+import { Data, Duration, Effect, Layer, Schedule, Schema } from "effect";
 import { PersistedQueue } from "effect/persistence";
 import { SqlClient } from "effect/sql";
 
@@ -18,7 +10,7 @@ import {
   loadClaimedDownloadJob,
 } from "./jobs";
 import type { ClaimedDownloadJob } from "./jobs";
-import { CancelledError, runDownloadJob } from "./runner";
+import { runDownloadJob } from "./runner";
 
 const downloadQueueElement = Schema.Struct({ jobId: Schema.String });
 type DownloadQueueElement = Schema.Schema.Type<typeof downloadQueueElement>;
@@ -80,29 +72,19 @@ const runClaimedDownload = (claimed: ClaimedDownloadJob) =>
     const cancelled = { value: false };
     yield* watchForCancellation(claimed.id, cancelled).pipe(Effect.forkChild);
 
-    const outcome = yield* Effect.tryPromise({
-      catch: (cause) => new DownloadRunFailed({ cause }),
-      try: async () => {
-        await runDownloadJob(claimed, () => cancelled.value);
-      },
-    }).pipe(Effect.result);
+    yield* runDownloadJob(claimed, () => cancelled.value).pipe(
+      Effect.catchTag("CancelledError", () => Effect.interrupt),
+      Effect.tapError((error) =>
+        Effect.tryPromise({
+          catch: (cause) => new DownloadRunFailed({ cause }),
+          try: async () => {
+            await failDownloadJob(claimed, error);
+          },
+        }).pipe(Effect.ignoreCause)
+      )
+    );
 
-    if (Result.isSuccess(outcome)) {
-      return claimed;
-    }
-
-    if (outcome.failure.cause instanceof CancelledError) {
-      return yield* Effect.interrupt;
-    }
-
-    yield* Effect.tryPromise({
-      catch: (cause) => new DownloadRunFailed({ cause }),
-      try: async () => {
-        await failDownloadJob(claimed, outcome.failure.cause);
-      },
-    }).pipe(Effect.ignoreCause);
-
-    return yield* outcome.failure;
+    return claimed;
   });
 
 const takeNextDownload = (

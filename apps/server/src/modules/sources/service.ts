@@ -87,55 +87,67 @@ const list = Effect.gen(function* listEffect() {
 
 export const SourcesService = {
   async getDiscover(sourceId: string, limit?: number) {
-    const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const resolvedLimit = normalizeLimit(limit);
+    return await runSql(
+      Effect.gen(function* getDiscoverEffect() {
+        const adapter = SourcesService.getSourceOrThrow(sourceId);
+        const resolvedLimit = normalizeLimit(limit);
+        const sections: DiscoverSection[] = [];
 
-    const sections: DiscoverSection[] = [];
+        if (adapter.metadata.capabilities.supportsPopular) {
+          const popular = yield* adapter.getPopular(1, resolvedLimit);
+          yield* Effect.promise(async () => {
+            await SourcesStorage.upsertSeries(sourceId, popular.items);
+          });
+          sections.push({
+            id: "popular",
+            items: popular.items,
+            title: "Popular this month",
+            type: "popular",
+          });
+        }
 
-    if (adapter.metadata.capabilities.supportsPopular) {
-      const popular = await adapter.getPopular(1, resolvedLimit);
-      await SourcesStorage.upsertSeries(sourceId, popular.items);
-      sections.push({
-        id: "popular",
-        items: popular.items,
-        title: "Popular this month",
-        type: "popular",
-      });
-    }
+        if (
+          adapter.metadata.capabilities.supportsTrending &&
+          adapter.getTrending
+        ) {
+          const trending = yield* adapter.getTrending(1, resolvedLimit);
+          yield* Effect.promise(async () => {
+            await SourcesStorage.upsertSeries(sourceId, trending.items);
+          });
+          sections.push({
+            id: "trending",
+            items: trending.items,
+            title: "Trending now",
+            type: "trending",
+          });
+        }
 
-    if (adapter.metadata.capabilities.supportsTrending && adapter.getTrending) {
-      const trending = await adapter.getTrending(1, resolvedLimit);
-      await SourcesStorage.upsertSeries(sourceId, trending.items);
-      sections.push({
-        id: "trending",
-        items: trending.items,
-        title: "Trending now",
-        type: "trending",
-      });
-    }
+        if (adapter.metadata.capabilities.supportsLatest) {
+          const latest = yield* adapter.getLatest(1, resolvedLimit);
+          yield* Effect.promise(async () => {
+            await SourcesStorage.upsertSeries(sourceId, latest.items);
+          });
+          sections.push({
+            id: "latest",
+            items: latest.items,
+            title: "Latest updates",
+            type: "latest",
+          });
+        }
 
-    if (adapter.metadata.capabilities.supportsLatest) {
-      const latest = await adapter.getLatest(1, resolvedLimit);
-      await SourcesStorage.upsertSeries(sourceId, latest.items);
-      sections.push({
-        id: "latest",
-        items: latest.items,
-        title: "Latest updates",
-        type: "latest",
-      });
-    }
-
-    return sections.map((section) => ({
-      id: section.id,
-      items: section.items.map((item) => mapSeriesResponse(sourceId, item)),
-      title: section.title,
-      type: section.type,
-    }));
+        return sections.map((section) => ({
+          id: section.id,
+          items: section.items.map((item) => mapSeriesResponse(sourceId, item)),
+          title: section.title,
+          type: section.type,
+        }));
+      })
+    );
   },
 
   async getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
-    return await adapter.getFilters();
+    return await runSql(adapter.getFilters);
   },
 
   getSourceOrThrow(sourceId: string) {
@@ -154,9 +166,15 @@ export const SourcesService = {
   },
 
   async search(sourceId: string, input: SourceSearchInput) {
-    const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const result = await adapter.searchSeries(input);
-    await SourcesStorage.upsertSeries(sourceId, result.items);
-    return mapListResponse(sourceId, result);
+    return await runSql(
+      Effect.gen(function* searchEffect() {
+        const adapter = SourcesService.getSourceOrThrow(sourceId);
+        const result = yield* adapter.searchSeries(input);
+        yield* Effect.promise(async () => {
+          await SourcesStorage.upsertSeries(sourceId, result.items);
+        });
+        return mapListResponse(sourceId, result);
+      })
+    );
   },
 };

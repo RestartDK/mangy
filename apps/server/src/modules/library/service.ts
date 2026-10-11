@@ -181,9 +181,7 @@ const resolveSeriesRecord = (sourceId: string, seriesId: string) =>
     }
 
     const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const seriesItem = yield* Effect.promise(
-      async () => await adapter.getSeries(seriesId)
-    );
+    const seriesItem = yield* adapter.getSeries(seriesId);
 
     return yield* Effect.promise(
       async () => await SourcesStorage.upsertSeriesItem(sourceId, seriesItem)
@@ -252,9 +250,7 @@ const upsertTrackedState = (input: {
 
     if (!(input.isAlreadyTracked && input.hadTrackingState)) {
       const adapter = SourcesService.getSourceOrThrow(input.sourceId);
-      const chapters = yield* Effect.promise(
-        async () => await adapter.getChapters(input.seriesExternalId)
-      );
+      const chapters = yield* adapter.getChapters(input.seriesExternalId);
       yield* Effect.promise(async () => {
         await SourcesStorage.upsertChapters(input.seriesRecordId, chapters);
       });

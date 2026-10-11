@@ -1,4 +1,6 @@
+import { runSql } from "@mangy/db";
 import type { SourceChapter, SourcePage } from "@mangy/source-sdk";
+import { Effect } from "effect";
 
 import { SourcesService } from "../sources/service";
 import { SourcesStorage } from "../sources/storage";
@@ -109,15 +111,21 @@ const toPageResponse = (
 
 export const SeriesService = {
   async getChapters(sourceId: string, seriesId: string) {
-    const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const seriesItem = await adapter.getSeries(seriesId);
-    const seriesRecord = await SourcesStorage.upsertSeriesItem(
-      sourceId,
-      seriesItem
+    return await runSql(
+      Effect.gen(function* getChaptersEffect() {
+        const adapter = SourcesService.getSourceOrThrow(sourceId);
+        const seriesItem = yield* adapter.getSeries(seriesId);
+        const seriesRecord = yield* Effect.promise(
+          async () =>
+            await SourcesStorage.upsertSeriesItem(sourceId, seriesItem)
+        );
+        const chapters = yield* adapter.getChapters(seriesId);
+        yield* Effect.promise(async () => {
+          await SourcesStorage.upsertChapters(seriesRecord.id, chapters);
+        });
+        return chapters.map(toChapterResponse);
+      })
     );
-    const chapters = await adapter.getChapters(seriesId);
-    await SourcesStorage.upsertChapters(seriesRecord.id, chapters);
-    return chapters.map(toChapterResponse);
   },
 
   async getPages(
@@ -135,23 +143,36 @@ export const SeriesService = {
       );
     }
 
-    const seriesItem = await adapter.getSeries(seriesId);
-    await SourcesStorage.upsertSeriesItem(sourceId, seriesItem);
+    return await runSql(
+      Effect.gen(function* getPagesEffect() {
+        const seriesItem = yield* adapter.getSeries(seriesId);
+        yield* Effect.promise(
+          async () =>
+            await SourcesStorage.upsertSeriesItem(sourceId, seriesItem)
+        );
+        const pageList = yield* adapter.getPages(chapterId);
 
-    const pageList = await adapter.getPages(chapterId);
-
-    return {
-      pages: pageList.pages.map((item) =>
-        toPageResponse(requestUrl, sourceId, seriesId, chapterId, item)
-      ),
-    };
+        return {
+          pages: pageList.pages.map((item) =>
+            toPageResponse(requestUrl, sourceId, seriesId, chapterId, item)
+          ),
+        };
+      })
+    );
   },
 
   async getSeries(sourceId: string, seriesId: string) {
-    const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const seriesItem = await adapter.getSeries(seriesId);
-    await SourcesStorage.upsertSeriesItem(sourceId, seriesItem);
-    return toSeriesResponse(sourceId, seriesItem);
+    return await runSql(
+      Effect.gen(function* getSeriesEffect() {
+        const adapter = SourcesService.getSourceOrThrow(sourceId);
+        const seriesItem = yield* adapter.getSeries(seriesId);
+        yield* Effect.promise(
+          async () =>
+            await SourcesStorage.upsertSeriesItem(sourceId, seriesItem)
+        );
+        return toSeriesResponse(sourceId, seriesItem);
+      })
+    );
   },
 
   async proxyPageImage(sourceId: string, chapterId: string, pageIndex: number) {
@@ -164,7 +185,7 @@ export const SeriesService = {
       );
     }
 
-    const pageList = await adapter.getPages(chapterId);
+    const pageList = await runSql(adapter.getPages(chapterId));
     const page = pageList.pages.find((item) => item.index === pageIndex);
 
     if (!page) {

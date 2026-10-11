@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
+import { Effect } from "effect";
+
+import { BrowserUnavailableError } from "../src/adapters/shared/browser";
 import { createWeebCentralSourceAdapter } from "../src/adapters/weeb-central";
 
 const fixture = async (name: string): Promise<string> =>
@@ -63,12 +66,14 @@ describe("WeebCentral adapter", () => {
 
   test("parses filters and rich search results", async () => {
     const adapter = createWeebCentralSourceAdapter();
-    const filters = await adapter.getFilters();
-    const searchResult = await adapter.searchSeries({
-      page: 1,
-      pageSize: 2,
-      query: "one piece",
-    });
+    const filters = await Effect.runPromise(adapter.getFilters);
+    const searchResult = await Effect.runPromise(
+      adapter.searchSeries({
+        page: 1,
+        pageSize: 2,
+        query: "one piece",
+      })
+    );
 
     expect(filters.length).toBeGreaterThanOrEqual(7);
     expect(filters[0]).toMatchObject({
@@ -92,20 +97,22 @@ describe("WeebCentral adapter", () => {
   test("parses series details, chapters, and browser-backed page extraction", async () => {
     const adapter = createWeebCentralSourceAdapter({
       renderChapterPageImages() {
-        return [
+        return Effect.succeed([
           "https://temp.compsci88.com/manga/One-Piece/1178-001.png",
           "https://temp.compsci88.com/manga/One-Piece/1178-002.png",
-        ];
+        ]);
       },
     });
 
-    const series = await adapter.getSeries(
-      "01J76XY7E9FNDZ1DBBM6PBJPFK:One-Piece"
+    const series = await Effect.runPromise(
+      adapter.getSeries("01J76XY7E9FNDZ1DBBM6PBJPFK:One-Piece")
     );
-    const chapters = await adapter.getChapters(
-      "01J76XY7E9FNDZ1DBBM6PBJPFK:One-Piece"
+    const chapters = await Effect.runPromise(
+      adapter.getChapters("01J76XY7E9FNDZ1DBBM6PBJPFK:One-Piece")
     );
-    const pages = await adapter.getPages("01KMRF9PB6E2R9KVZQ3SDWQZNG");
+    const pages = await Effect.runPromise(
+      adapter.getPages("01KMRF9PB6E2R9KVZQ3SDWQZNG")
+    );
 
     expect(series).toMatchObject({
       authorNames: ["ODA Eiichiro"],
@@ -144,11 +151,15 @@ describe("WeebCentral adapter", () => {
   test("falls back to the chapter images endpoint when browser rendering is unavailable", async () => {
     const adapter = createWeebCentralSourceAdapter({
       renderChapterPageImages() {
-        throw new Error("browser unavailable");
+        return Effect.fail(
+          new BrowserUnavailableError({ message: "browser unavailable" })
+        );
       },
     });
 
-    const pages = await adapter.getPages("01KMRF9PB6E2R9KVZQ3SDWQZNG");
+    const pages = await Effect.runPromise(
+      adapter.getPages("01KMRF9PB6E2R9KVZQ3SDWQZNG")
+    );
 
     expect(pages.pages).toHaveLength(3);
     expect(pages.pages[2]).toMatchObject({
