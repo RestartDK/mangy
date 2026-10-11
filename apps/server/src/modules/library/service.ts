@@ -149,7 +149,7 @@ const list = (userId: string) =>
           ${table("series")}.${column(seriesColumns, "coverImageUrl")},
           ${table("libraryEntry")}.${column(libraryEntryColumns, "isTracked")},
           ${table("libraryEntry")}.${column(libraryEntryColumns, "autoDownload")},
-          ${table("downloadDestination")}.${column(downloadDestinationColumns, "name")},
+          ${table("downloadDestination")}.${column(downloadDestinationColumns, "name")} AS ${sql("destination_name")},
           ${table("libraryEntry")}.${column(libraryEntryColumns, "updatedAt")}
         FROM ${table("libraryEntry")}
         INNER JOIN ${table("series")} ON ${table("libraryEntry")}.${column(libraryEntryColumns, "seriesId")} = ${table("series")}.${column(seriesColumns, "id")}
