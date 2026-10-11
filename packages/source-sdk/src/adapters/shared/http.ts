@@ -69,24 +69,22 @@ const request = (
 ): Effect.Effect<Response, HttpError> =>
   Effect.tryPromise({
     catch: (cause) => toHttpError(input, cause),
-    try: (signal) =>
-      fetch(input, {
+    try: async (signal) =>
+      await fetch(input, {
         headers: createRequestHeaders(options),
         redirect: "follow",
         signal,
       }),
   }).pipe(
-    Effect.flatMap((response) =>
-      response.ok
-        ? Effect.succeed(response)
-        : Effect.fail(
-            new HttpError({
-              message: `Request failed with status ${response.status} for ${String(input)}`,
-              retryable: response.status >= 500 || response.status === 429,
-              status: response.status,
-              url: String(input),
-            })
-          )
+    Effect.filterOrFail(
+      (response) => response.ok,
+      (response) =>
+        new HttpError({
+          message: `Request failed with status ${response.status} for ${String(input)}`,
+          retryable: response.status >= 500 || response.status === 429,
+          status: response.status,
+          url: String(input),
+        })
     )
   );
 
@@ -96,16 +94,17 @@ const withAttemptTimeout = <A>(
   timeoutMs: number
 ): Effect.Effect<A, HttpError> =>
   effect.pipe(
-    Effect.timeout(Duration.millis(timeoutMs)),
-    Effect.catchTag("TimeoutError", () =>
-      Effect.fail(
-        new HttpError({
-          message: `Request timed out after ${timeoutMs}ms for ${String(input)}`,
-          retryable: true,
-          url: String(input),
-        })
-      )
-    )
+    Effect.timeoutOrElse({
+      duration: Duration.millis(timeoutMs),
+      orElse: () =>
+        Effect.fail(
+          new HttpError({
+            message: `Request timed out after ${timeoutMs}ms for ${String(input)}`,
+            retryable: true,
+            url: String(input),
+          })
+        ),
+    })
   );
 
 const retryPolicy = (times: number): Schedule.Schedule<Duration.Duration> =>
@@ -136,7 +135,7 @@ const fetchText = (
       Effect.flatMap((response) =>
         Effect.tryPromise({
           catch: (cause) => toHttpError(input, cause),
-          try: () => response.text(),
+          try: async () => await response.text(),
         }).pipe(Effect.map((html) => ({ html, response })))
       )
     ),
@@ -145,11 +144,11 @@ const fetchText = (
   );
 };
 
-export const fetchHtmlPage = (
+export const fetchHtmlPage = async (
   input: string | URL,
   options: FetchRequestOptions = {}
 ): Promise<FetchHtmlResult> =>
-  Effect.runPromise(
+  await Effect.runPromise(
     retryTransient(
       fetchText(input, {
         accept:

@@ -1,10 +1,19 @@
 import { z } from "zod";
 
 export const downloadJobSchema = z.object({
-  id: z.string(),
-  sourceId: z.string().nullable(),
-  seriesId: z.string().nullable(),
+  attempts: z.number().int(),
   chapterId: z.string().nullable(),
+  chapterTitle: z.string().nullable(),
+  completedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  destinationName: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+  id: z.string(),
+  maxAttempts: z.number().int(),
+  progressPercent: z.number().int(),
+  seriesId: z.string().nullable(),
+  seriesTitle: z.string().nullable(),
+  sourceId: z.string().nullable(),
   status: z.enum([
     "queued",
     "running",
@@ -12,23 +21,14 @@ export const downloadJobSchema = z.object({
     "completed",
     "cancelled",
   ]),
-  progressPercent: z.number().int(),
-  attempts: z.number().int(),
-  maxAttempts: z.number().int(),
-  errorMessage: z.string().nullable(),
-  seriesTitle: z.string().nullable(),
-  chapterTitle: z.string().nullable(),
-  destinationName: z.string().nullable(),
-  completedAt: z.string().datetime().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export const enqueueDownloadBody = z.object({
-  sourceId: z.string(),
-  seriesId: z.string(),
   chapterId: z.string(),
   downloadDestinationId: z.string().optional(),
+  seriesId: z.string(),
+  sourceId: z.string(),
 });
 
 export const downloadJobParamsSchema = z.object({

@@ -10,6 +10,7 @@ import {
 } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
+import type { SqlError } from "effect/sql";
 import { Elysia } from "elysia";
 
 import { getSessionUser } from "@/lib/auth";
@@ -23,7 +24,11 @@ interface LiveSnapshot {
 
 const getSnapshot = (
   userId: string
-): Effect.Effect<LiveSnapshot, unknown, SqlClient.SqlClient> =>
+): Effect.Effect<
+  LiveSnapshot,
+  Schema.SchemaError | SqlError.SqlError,
+  SqlClient.SqlClient
+> =>
   Effect.gen(function* getSnapshotEffect() {
     const sql = yield* SqlClient.SqlClient;
     const [downloadRecord, notificationRecord, unreadRecord, trackingRecord] =
@@ -84,14 +89,15 @@ const getSnapshot = (
 
     return {
       downloadsUpdatedAt: downloadRecord?.updated_at?.toISOString() ?? null,
+      notificationsUnreadCount: unreadRecord,
       notificationsUpdatedAt:
         notificationRecord?.updated_at?.toISOString() ?? null,
-      notificationsUnreadCount: unreadRecord,
       trackingUpdatedAt: trackingRecord?.updated_at?.toISOString() ?? null,
     };
   });
 
-const loadSnapshot = (userId: string) => runSql(getSnapshot(userId));
+const loadSnapshot = async (userId: string) =>
+  await runSql(getSnapshot(userId));
 
 const hasSnapshotChanged = (left: LiveSnapshot, right: LiveSnapshot): boolean =>
   left.downloadsUpdatedAt !== right.downloadsUpdatedAt ||
@@ -128,14 +134,15 @@ export const live = new Elysia({ prefix: "/api/live" }).get(
           controller.enqueue(encoder.encode(formatSseEvent(event, data)));
         };
 
+        const abortController = new AbortController();
+
         const cleanup = () => {
           if (isClosed) {
             return;
           }
 
           isClosed = true;
-          clearInterval(pollInterval);
-          clearInterval(heartbeatInterval);
+          abortController.abort();
           controller.close();
         };
 
@@ -170,16 +177,27 @@ export const live = new Elysia({ prefix: "/api/live" }).get(
           }
         };
 
+        const pollAndCleanupOnFailure = async () => {
+          try {
+            await poll();
+          } catch {
+            cleanup();
+          }
+        };
+
         send("connected", { snapshot: initialSnapshot });
 
         const pollInterval = setInterval(() => {
-          poll().catch(() => {
-            cleanup();
-          });
+          void pollAndCleanupOnFailure();
         }, 1500);
         const heartbeatInterval = setInterval(() => {
           send("heartbeat", { timestamp: Date.now() });
         }, 15_000);
+
+        abortController.signal.addEventListener("abort", () => {
+          clearInterval(pollInterval);
+          clearInterval(heartbeatInterval);
+        });
 
         request.signal.addEventListener("abort", cleanup, { once: true });
       },

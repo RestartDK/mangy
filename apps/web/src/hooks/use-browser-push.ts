@@ -10,8 +10,8 @@ import {
 
 export const useBrowserPushClientState = () =>
   useQuery({
-    queryKey: ["browserPushClientState"],
     queryFn: getBrowserPushClientState,
+    queryKey: ["browserPushClientState"],
     retry: false,
   });
 
@@ -31,19 +31,19 @@ export const useConnectCurrentBrowserPush = () => {
 
       return data;
     },
-    onSuccess: async () => {
-      toast.success("Browser notifications enabled on this browser");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["browserPushClientState"] }),
-        queryClient.invalidateQueries({ queryKey: ["browserPushSettings"] }),
-      ]);
-    },
     onError: (error) => {
       toast.error(
         error instanceof Error
           ? error.message
           : "Unable to connect this browser for notifications"
       );
+    },
+    onSuccess: async () => {
+      toast.success("Browser notifications enabled on this browser");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["browserPushClientState"] }),
+        queryClient.invalidateQueries({ queryKey: ["browserPushSettings"] }),
+      ]);
     },
   });
 };
@@ -66,19 +66,19 @@ export const useDisconnectCurrentBrowserPush = () => {
 
       return data;
     },
-    onSuccess: async () => {
-      toast.success("Browser notifications disabled on this browser");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["browserPushClientState"] }),
-        queryClient.invalidateQueries({ queryKey: ["browserPushSettings"] }),
-      ]);
-    },
     onError: (error) => {
       toast.error(
         error instanceof Error
           ? error.message
           : "Unable to disconnect this browser"
       );
+    },
+    onSuccess: async () => {
+      toast.success("Browser notifications disabled on this browser");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["browserPushClientState"] }),
+        queryClient.invalidateQueries({ queryKey: ["browserPushSettings"] }),
+      ]);
     },
   });
 };

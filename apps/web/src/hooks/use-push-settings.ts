@@ -10,7 +10,6 @@ export type PushSettings = NonNullable<PushSettingsResponse>;
 
 export const usePushSettings = () =>
   useQuery({
-    queryKey: ["browserPushSettings"],
     queryFn: async () => {
       const { data, error } = await api.api.settings.push.get();
       if (error) {
@@ -27,10 +26,11 @@ export const usePushSettings = () =>
           lastErrorAt: null,
           notifyOnDownloadCompleted: true,
           notifyOnDownloadFailed: true,
-          notifyOnTrackedSeriesUpdate: true,
           notifyOnSystemWarning: true,
+          notifyOnTrackedSeriesUpdate: true,
           vapidPublicKey: null,
         }
       );
     },
+    queryKey: ["browserPushSettings"],
   });

@@ -1,9 +1,10 @@
-import { type CheerioAPI, load } from "cheerio";
+import { load } from "cheerio";
+import type { CheerioAPI } from "cheerio";
 
 export const loadDocument = (html: string): CheerioAPI => load(html);
 
 export const normalizeText = (value: string | null | undefined): string =>
-  value?.replace(/\s+/g, " ").trim() ?? "";
+  value?.replaceAll(/\s+/gu, " ").trim() ?? "";
 
 export const nullableText = (
   value: string | null | undefined

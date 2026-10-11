@@ -20,18 +20,18 @@ export const useUpdateBrowserPushPreferences = () => {
 
       return data;
     },
-    onSuccess: async () => {
-      toast.success("Browser notification settings updated");
-      await queryClient.invalidateQueries({
-        queryKey: ["browserPushSettings"],
-      });
-    },
     onError: (error) => {
       toast.error(
         error instanceof Error
           ? error.message
           : "Unable to update browser notification settings"
       );
+    },
+    onSuccess: async () => {
+      toast.success("Browser notification settings updated");
+      await queryClient.invalidateQueries({
+        queryKey: ["browserPushSettings"],
+      });
     },
   });
 };

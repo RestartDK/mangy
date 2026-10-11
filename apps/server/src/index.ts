@@ -19,11 +19,11 @@ const configuredOrigins = env.CORS_ORIGIN.split(",")
 const trustedDevOrigins = [
   "http://localhost:3001",
   "http://127.0.0.1:3001",
-  /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:3001$/,
-  /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/,
-  /^http:\/\/100\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/,
-  /^http:\/\/172\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/,
-  /^http:\/\/[a-z0-9-]+\.local:3001$/i,
+  /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:3001$/u,
+  /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/u,
+  /^http:\/\/100\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/u,
+  /^http:\/\/172\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/u,
+  /^http:\/\/[a-z0-9-]+\.local:3001$/iu,
 ] as const;
 
 const corsOrigins =
@@ -35,10 +35,10 @@ export const createApp = () =>
   new Elysia()
     .use(
       cors({
-        origin: corsOrigins,
-        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true,
+        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        origin: corsOrigins,
       })
     )
     .mount(auth.handler)

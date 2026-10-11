@@ -3,21 +3,32 @@ import path from "node:path";
 
 import { BunRuntime } from "@effect/platform-bun";
 import { PgClient } from "@effect/sql-pg";
-import { Config, Effect } from "effect";
+import { Config, Data, Effect } from "effect";
 import { Migrator, SqlClient, Statement } from "effect/sql";
+import type { SqlError } from "effect/sql";
 
 const migrationsDirectory = path.join(import.meta.dir, "migrations");
 const statementBreakpoint = "--> statement-breakpoint";
 
+class MigrationFileError extends Data.TaggedError("MigrationFileError")<{
+  readonly path: string;
+  readonly cause: unknown;
+}> {}
+
 const loadMigrations = Effect.gen(function* loadMigrations() {
   const entries = yield* Effect.tryPromise({
-    catch: (cause) => new Error(`Cannot read ${migrationsDirectory}`, { cause }),
-    try: () => readdir(migrationsDirectory),
+    catch: (cause) =>
+      new MigrationFileError({ cause, path: migrationsDirectory }),
+    try: async () => await readdir(migrationsDirectory),
   });
 
   const record: Record<
     string,
-    Effect.Effect<void, unknown, SqlClient.SqlClient>
+    Effect.Effect<
+      void,
+      MigrationFileError | SqlError.SqlError,
+      SqlClient.SqlClient
+    >
   > = {};
 
   const files = entries.filter((entry) => entry.endsWith(".sql")).toSorted();
@@ -31,8 +42,13 @@ const loadMigrations = Effect.gen(function* loadMigrations() {
     record[`${index + 1}_${name}`] = Effect.gen(function* loadMigration() {
       const sql = yield* SqlClient.SqlClient;
       const contents = yield* Effect.tryPromise({
-        catch: (cause) => new Error(`Cannot read ${file}`, { cause }),
-        try: () => readFile(path.join(migrationsDirectory, file), "utf-8"),
+        catch: (cause) =>
+          new MigrationFileError({
+            cause,
+            path: path.join(migrationsDirectory, file),
+          }),
+        try: async () =>
+          await readFile(path.join(migrationsDirectory, file), "utf-8"),
       });
 
       for (const statement of contents.split(statementBreakpoint)) {
@@ -60,7 +76,10 @@ const program = Effect.gen(function* program() {
   );
 });
 
-program.pipe(
-  Effect.provide(PgClient.layerConfig({ url: Config.Redacted("DATABASE_URL") })),
-  BunRuntime.runMain
+BunRuntime.runMain(
+  program.pipe(
+    Effect.provide(
+      PgClient.layerConfig({ url: Config.Redacted("DATABASE_URL") })
+    )
+  )
 );

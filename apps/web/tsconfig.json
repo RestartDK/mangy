@@ -1,9 +1,12 @@
 {
   "compilerOptions": {
     "strict": true,
+    "allowJs": true,
+    "noEmit": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
     "target": "ESNext",
+    "lib": ["ESNext", "DOM", "WebWorker"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "verbatimModuleSyntax": true,
@@ -14,5 +17,6 @@
       "@/*": ["./src/*", "../server/src/*"],
       "@server/*": ["../server/src/*"]
     }
-  }
+  },
+  "exclude": ["dist"]
 }

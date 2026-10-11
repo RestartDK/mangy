@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
@@ -20,15 +20,16 @@ import { useSeriesDetail } from "@/hooks/use-series-detail";
 import { getErrorMessage, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
-export const Route = createFileRoute(
-  "/series/$sourceId/$seriesId/read/$chapterId"
-)({
-  beforeLoad: requireAuth,
-  component: ReaderRouteComponent,
-});
-
-function ReaderRouteComponent() {
-  const { chapterId, seriesId, sourceId } = Route.useParams();
+const ReaderSkeleton = () => (
+  <div className="flex flex-col items-center gap-2">
+    <Skeleton className="h-[70vh] w-full max-w-4xl" />
+    <Skeleton className="h-[70vh] w-full max-w-4xl" />
+  </div>
+);
+const ReaderRouteComponent = () => {
+  const { chapterId, seriesId, sourceId } = useParams({
+    from: "/series/$sourceId/$seriesId/read/$chapterId",
+  });
   const {
     chapters,
     error: seriesError,
@@ -40,10 +41,10 @@ function ReaderRouteComponent() {
   const chapterIndex = chapters.findIndex(
     (chapter) => chapter.chapterId === chapterId
   );
-  const chapter = chapterIndex >= 0 ? chapters[chapterIndex] : null;
+  const chapter = chapterIndex === -1 ? null : chapters[chapterIndex];
   const newerChapter = chapterIndex > 0 ? chapters[chapterIndex - 1] : null;
   const olderChapter =
-    chapterIndex >= 0 && chapterIndex < chapters.length - 1
+    chapterIndex !== -1 && chapterIndex < chapters.length - 1
       ? chapters[chapterIndex + 1]
       : null;
 
@@ -200,11 +201,11 @@ function ReaderRouteComponent() {
       ) : null}
     </AppShell>
   );
-}
+};
 
-const ReaderSkeleton = () => (
-  <div className="flex flex-col items-center gap-2">
-    <Skeleton className="h-[70vh] w-full max-w-4xl" />
-    <Skeleton className="h-[70vh] w-full max-w-4xl" />
-  </div>
-);
+export const Route = createFileRoute(
+  "/series/$sourceId/$seriesId/read/$chapterId"
+)({
+  beforeLoad: requireAuth,
+  component: ReaderRouteComponent,
+});

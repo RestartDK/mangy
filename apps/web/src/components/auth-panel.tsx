@@ -1,4 +1,5 @@
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
+import type { SubmitEvent } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,9 @@ const fieldIds = {
   password: "auth-password",
 } as const;
 
+const isAuthMode = (value: string): value is AuthMode =>
+  value === "signIn" || value === "signUp";
+
 export const AuthPanel = () => {
   const [mode, setMode] = useState<AuthMode>("signIn");
   const [name, setName] = useState("");
@@ -28,42 +32,40 @@ export const AuthPanel = () => {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
 
-    try {
-      if (mode === "signUp") {
-        await authClient.signUp.email(
-          { name, email, password },
-          {
-            onSuccess: () => {
-              window.location.assign("/");
-            },
-            onError: (error) => {
-              toast.error(
-                error.error.message || "Unable to create your account."
-              );
-            },
-          }
-        );
-        return;
-      }
-
-      await authClient.signIn.email(
-        { email, password },
+    if (mode === "signUp") {
+      await authClient.signUp.email(
+        { email, name, password },
         {
+          onError: (error) => {
+            toast.error(
+              error.error.message || "Unable to create your account."
+            );
+            setIsSubmitting(false);
+          },
           onSuccess: () => {
             window.location.assign("/");
           },
-          onError: (error) => {
-            toast.error(error.error.message || "Unable to sign in.");
-          },
         }
       );
-    } finally {
-      setIsSubmitting(false);
+      return;
     }
+
+    await authClient.signIn.email(
+      { email, password },
+      {
+        onError: (error) => {
+          toast.error(error.error.message || "Unable to sign in.");
+          setIsSubmitting(false);
+        },
+        onSuccess: () => {
+          window.location.assign("/");
+        },
+      }
+    );
   };
 
   let submitLabel = "Create account";
@@ -78,7 +80,11 @@ export const AuthPanel = () => {
     <Card className="w-full max-w-sm">
       <CardHeader className="gap-4">
         <Tabs
-          onValueChange={(value) => setMode(value as AuthMode)}
+          onValueChange={(value) => {
+            if (isAuthMode(value)) {
+              setMode(value);
+            }
+          }}
           value={mode}
         >
           <TabsList className="grid w-full grid-cols-2">
@@ -88,7 +94,12 @@ export const AuthPanel = () => {
         </Tabs>
       </CardHeader>
       <CardContent>
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form
+          className="space-y-5"
+          onSubmit={(event) => {
+            void handleSubmit(event);
+          }}
+        >
           <FieldGroup className="gap-4">
             {mode === "signUp" ? (
               <Field className="gap-2">
@@ -96,7 +107,9 @@ export const AuthPanel = () => {
                 <Input
                   className="h-9 text-sm"
                   id={fieldIds.name}
-                  onChange={(event) => setName(event.target.value)}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                  }}
                   required
                   value={name}
                 />
@@ -108,7 +121,9 @@ export const AuthPanel = () => {
               <Input
                 className="h-9 text-sm"
                 id={fieldIds.email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                }}
                 required
                 type="email"
                 value={email}
@@ -121,7 +136,9 @@ export const AuthPanel = () => {
                 className="h-9 text-sm"
                 id={fieldIds.password}
                 minLength={8}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                }}
                 required
                 type="password"
                 value={password}

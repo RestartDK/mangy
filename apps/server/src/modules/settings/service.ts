@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { isAbsolute } from "node:path";
+import path from "node:path";
 
 import {
   column,
@@ -68,9 +68,8 @@ const defaultBrowserPushPreferences: BrowserPushPreferencesInput = {
   notifyOnTrackedSeriesUpdate: true,
 };
 
-const toIsoString = (value: Date | null): string | null => {
-  return value ? value.toISOString() : null;
-};
+const toIsoString = (value: Date | null): string | null =>
+  value ? value.toISOString() : null;
 
 const browserPushEndpointProjection = Schema.Struct({
   id: notificationEndpointRow.from.fields.id,
@@ -293,12 +292,12 @@ const getBootstrap = (userId: string, profile: UserProfile) =>
         Effect.gen(function* destinationRows() {
           return yield* decodeRows(
             Schema.Struct({
-              id: downloadDestinationRow.from.fields.id,
-              name: downloadDestinationRow.from.fields.name,
               absolute_path: downloadDestinationRow.from.fields.absolute_path,
-              komga_library_id: downloadDestinationRow.from.fields.komga_library_id,
+              id: downloadDestinationRow.from.fields.id,
               is_default: downloadDestinationRow.from.fields.is_default,
               is_enabled: downloadDestinationRow.from.fields.is_enabled,
+              komga_library_id: downloadDestinationRow.from.fields.komga_library_id,
+              name: downloadDestinationRow.from.fields.name,
             }),
             yield* sql`SELECT ${column(downloadDestinationColumns, "id")},
                 ${column(downloadDestinationColumns, "name")},
@@ -318,12 +317,12 @@ const getBootstrap = (userId: string, profile: UserProfile) =>
 
     return {
       destinations: destinations.map((destination) => ({
-        id: destination.id,
-        name: destination.name,
         absolutePath: destination.absolute_path,
-        komgaLibraryId: destination.komga_library_id ?? null,
+        id: destination.id,
         isDefault: destination.is_default,
         isEnabled: destination.is_enabled,
+        komgaLibraryId: destination.komga_library_id ?? null,
+        name: destination.name,
       })),
       notifications,
       profile,
@@ -353,12 +352,12 @@ const getBrowserPushSettings = (userId: string) =>
       notifyOnDownloadFailed:
         endpoint?.notifyOnDownloadFailed ??
         defaultBrowserPushPreferences.notifyOnDownloadFailed,
-      notifyOnTrackedSeriesUpdate:
-        endpoint?.notifyOnTrackedSeriesUpdate ??
-        defaultBrowserPushPreferences.notifyOnTrackedSeriesUpdate,
       notifyOnSystemWarning:
         endpoint?.notifyOnSystemWarning ??
         defaultBrowserPushPreferences.notifyOnSystemWarning,
+      notifyOnTrackedSeriesUpdate:
+        endpoint?.notifyOnTrackedSeriesUpdate ??
+        defaultBrowserPushPreferences.notifyOnTrackedSeriesUpdate,
       vapidPublicKey: getBrowserPushPublicKey(),
     };
   });
@@ -402,25 +401,25 @@ const savePushSubscription = (
           lastSeenAt: new Date(),
           p256dh: input.keys.p256dh,
           updatedAt: new Date(),
-          userAgent: input.userAgent?.trim() || null,
+          userAgent: input.userAgent?.trim() ?? null,
           userId,
         };
 
         const [existingSubscription] = existing;
-        if (existingSubscription) {
-          yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
-            sql,
-            pushSubscriptionColumns,
-            values
-          )}
-            WHERE ${column(pushSubscriptionColumns, "id")} = ${existingSubscription.id}`;
-        } else {
-          yield* sql`INSERT INTO ${table("pushSubscription")} ${insertRow(
-            sql,
-            pushSubscriptionColumns,
-            { id: crypto.randomUUID(), ...values }
-          )}`;
-        }
+        const subscriptionStatement = existingSubscription
+          ? sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
+              sql,
+              pushSubscriptionColumns,
+              values
+            )}
+              WHERE ${column(pushSubscriptionColumns, "id")} = ${existingSubscription.id}`
+          : sql`INSERT INTO ${table("pushSubscription")} ${insertRow(
+              sql,
+              pushSubscriptionColumns,
+              { id: crypto.randomUUID(), ...values }
+            )}`;
+
+        yield* subscriptionStatement;
       })
     );
 
@@ -491,8 +490,8 @@ const sendTestBrowserPush = (userId: string) =>
 
     for (const subscription of subscriptions) {
       const outcome = yield* Effect.exit(
-        Effect.promise(() =>
-          sendBrowserPush(
+        Effect.promise(async () => {
+          await sendBrowserPush(
             {
               endpoint: subscription.endpoint,
               keys: {
@@ -507,8 +506,8 @@ const sendTestBrowserPush = (userId: string) =>
               type: "systemWarning",
               url: "/notifications",
             }
-          )
-        )
+          );
+        })
       );
 
       if (Exit.isSuccess(outcome)) {
@@ -540,28 +539,24 @@ const sendTestBrowserPush = (userId: string) =>
 
       lastError = pushError;
 
-      if (pushError.statusCode === 404 || pushError.statusCode === 410) {
-        yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
-          sql,
-          pushSubscriptionColumns,
-          {
-            isActive: false,
-            lastError: pushError.message,
-            updatedAt: new Date(),
-          }
-        )}
-          WHERE ${column(pushSubscriptionColumns, "id")} = ${subscription.id}`;
-      } else {
-        yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
-          sql,
-          pushSubscriptionColumns,
-          {
-            lastError: pushError.message,
-            updatedAt: new Date(),
-          }
-        )}
-          WHERE ${column(pushSubscriptionColumns, "id")} = ${subscription.id}`;
-      }
+      const subscriptionIsGone =
+        pushError.statusCode === 404 || pushError.statusCode === 410;
+
+      yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
+        sql,
+        pushSubscriptionColumns,
+        subscriptionIsGone
+          ? {
+              isActive: false,
+              lastError: pushError.message,
+              updatedAt: new Date(),
+            }
+          : {
+              lastError: pushError.message,
+              updatedAt: new Date(),
+            }
+      )}
+        WHERE ${column(pushSubscriptionColumns, "id")} = ${subscription.id}`;
     }
 
     if (deliveredCount > 0) {
@@ -595,11 +590,13 @@ const createDestination = (
   Effect.gen(function* createDestinationEffect() {
     const sql = yield* SqlClient.SqlClient;
     const absolutePath = input.absolutePath.trim();
-    if (!isAbsolute(absolutePath)) {
+    if (!path.isAbsolute(absolutePath)) {
       throw new Error("Destination paths must be absolute.");
     }
 
-    yield* Effect.promise(() => mkdir(absolutePath, { recursive: true }));
+    yield* Effect.promise(
+      async () => await mkdir(absolutePath, { recursive: true })
+    );
 
     return yield* sql.withTransaction(
       Effect.gen(function* createDestinationRow() {
@@ -623,21 +620,21 @@ const createDestination = (
 
         const rows = yield* decodeRows(
           Schema.Struct({
-            id: downloadDestinationRow.from.fields.id,
-            name: downloadDestinationRow.from.fields.name,
             absolute_path: downloadDestinationRow.from.fields.absolute_path,
-            komga_library_id: downloadDestinationRow.from.fields.komga_library_id,
+            id: downloadDestinationRow.from.fields.id,
             is_default: downloadDestinationRow.from.fields.is_default,
             is_enabled: downloadDestinationRow.from.fields.is_enabled,
+            komga_library_id: downloadDestinationRow.from.fields.komga_library_id,
+            name: downloadDestinationRow.from.fields.name,
           }),
           yield* sql`INSERT INTO ${table("downloadDestination")} ${insertRow(
             sql,
             downloadDestinationColumns,
             {
-              id: crypto.randomUUID(),
               absolutePath,
+              id: crypto.randomUUID(),
               isDefault: shouldBeDefault,
-              komgaLibraryId: input.komgaLibraryId?.trim() || null,
+              komgaLibraryId: input.komgaLibraryId?.trim() ?? null,
               name: input.name.trim(),
               userId,
             }
@@ -656,12 +653,12 @@ const createDestination = (
         }
 
         return {
-          id: destination.id,
-          name: destination.name,
           absolutePath: destination.absolute_path,
-          komgaLibraryId: destination.komga_library_id ?? null,
+          id: destination.id,
           isDefault: destination.is_default,
           isEnabled: destination.is_enabled,
+          komgaLibraryId: destination.komga_library_id ?? null,
+          name: destination.name,
         };
       })
     );
@@ -753,36 +750,6 @@ const deleteDestination = (userId: string, destinationId: string) =>
   });
 
 export const SettingsService = {
-  async getBootstrap(userId: string, profile: UserProfile) {
-    return await runSql(getBootstrap(userId, profile));
-  },
-
-  async getBrowserPushSettings(userId: string) {
-    return await runSql(getBrowserPushSettings(userId));
-  },
-
-  async updateBrowserPushPreferences(
-    userId: string,
-    input: BrowserPushPreferencesInput
-  ) {
-    return await runSql(updateBrowserPushPreferences(userId, input));
-  },
-
-  async savePushSubscription(
-    userId: string,
-    input: BrowserPushSubscriptionInput
-  ) {
-    return await runSql(savePushSubscription(userId, input));
-  },
-
-  async removePushSubscription(userId: string, input: { endpoint: string }) {
-    return await runSql(removePushSubscription(userId, input));
-  },
-
-  async sendTestBrowserPush(userId: string) {
-    return await runSql(sendTestBrowserPush(userId));
-  },
-
   async createDestination(
     userId: string,
     input: {
@@ -797,5 +764,35 @@ export const SettingsService = {
 
   async deleteDestination(userId: string, destinationId: string) {
     return await runSql(deleteDestination(userId, destinationId));
+  },
+
+  async getBootstrap(userId: string, profile: UserProfile) {
+    return await runSql(getBootstrap(userId, profile));
+  },
+
+  async getBrowserPushSettings(userId: string) {
+    return await runSql(getBrowserPushSettings(userId));
+  },
+
+  async removePushSubscription(userId: string, input: { endpoint: string }) {
+    return await runSql(removePushSubscription(userId, input));
+  },
+
+  async savePushSubscription(
+    userId: string,
+    input: BrowserPushSubscriptionInput
+  ) {
+    return await runSql(savePushSubscription(userId, input));
+  },
+
+  async sendTestBrowserPush(userId: string) {
+    return await runSql(sendTestBrowserPush(userId));
+  },
+
+  async updateBrowserPushPreferences(
+    userId: string,
+    input: BrowserPushPreferencesInput
+  ) {
+    return await runSql(updateBrowserPushPreferences(userId, input));
   },
 };

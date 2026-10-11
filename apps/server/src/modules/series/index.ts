@@ -17,7 +17,7 @@ import {
 import { SeriesService, SeriesServiceError } from "./service";
 
 const getAuthenticatedUser = async (request: Request) =>
-  getSessionUser(request);
+  await getSessionUser(request);
 
 const handleSeriesError = (
   error: unknown,

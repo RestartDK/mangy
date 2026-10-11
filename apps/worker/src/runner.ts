@@ -6,12 +6,12 @@ import {
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 
 import {
-  type ClaimedDownloadJob,
   cancelRunningDownloadJob,
   completeDownloadJob,
   isDownloadJobCancelled,
   updateDownloadJobProgress,
 } from "./jobs";
+import type { ClaimedDownloadJob } from "./jobs";
 import { scanKomgaLibrary } from "./komga";
 
 export class CancelledError extends Error {
@@ -79,7 +79,9 @@ export const runDownloadJob = async (
           throw new CancelledError();
         }
       },
-      onProgress: ({ percent }) => updateDownloadJobProgress(job.id, percent),
+      onProgress: async ({ percent }) => {
+        await updateDownloadJobProgress(job.id, percent);
+      },
       outputPath,
       pages,
     });

@@ -19,17 +19,17 @@ export const useEnqueueDownload = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to queue chapter"
+      );
+    },
     onSuccess: async () => {
       toast.success("Chapter added to the queue");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["downloads"] }),
         queryClient.invalidateQueries({ queryKey: ["library"] }),
       ]);
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to queue chapter"
-      );
     },
   });
 };

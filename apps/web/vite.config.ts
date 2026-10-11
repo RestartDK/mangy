@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => {
   return {
     envDir,
     plugins: [tailwindcss(), tanstackRouter({}), react()],
+    preview: {
+      host: "0.0.0.0",
+      port: 3001,
+    },
     resolve: {
       alias: {
         "@": resolvePath("./src"),
@@ -24,15 +28,11 @@ export default defineConfig(({ mode }) => {
       port: 3001,
       proxy: {
         "/api": {
-          target: backendOrigin,
           changeOrigin: true,
           secure: false,
+          target: backendOrigin,
         },
       },
-    },
-    preview: {
-      host: "0.0.0.0",
-      port: 3001,
     },
   };
 });

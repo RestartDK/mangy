@@ -1,16 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import nodePath from "node:path";
 
 import { serve } from "bun";
 import { unzipSync } from "fflate";
 
-import {
-  type DownloadProgress,
-  downloadPagesToCbz,
-  prepareChapterOutputFile,
-} from "./index";
+import { downloadPagesToCbz, prepareChapterOutputFile } from "./index";
+import type { DownloadProgress } from "./index";
 
 const cbzExtensionPattern = /\.cbz$/u;
 const cleanupPaths = new Set<string>();
@@ -24,7 +21,9 @@ afterEach(async () => {
 
 describe("CBZ downloads", () => {
   test("prepares a sanitized .cbz output path without creating a chapter folder", async () => {
-    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-cbz-path-"));
+    const tempDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-cbz-path-")
+    );
     cleanupPaths.add(tempDirectory);
 
     const outputPath = await prepareChapterOutputFile({
@@ -37,14 +36,16 @@ describe("CBZ downloads", () => {
     });
 
     expect(outputPath.endsWith(".cbz")).toBe(true);
-    expect(basename(outputPath)).toBe("Chapter 7 - A B C [chapter id one].cbz");
-    await expect(
-      stat(outputPath.replace(cbzExtensionPattern, ""))
-    ).rejects.toThrow();
+    expect(nodePath.basename(outputPath)).toBe(
+      "Chapter 7 - A B C [chapter id one].cbz"
+    );
+    expect(stat(outputPath.replace(cbzExtensionPattern, ""))).rejects.toThrow();
   });
 
   test("writes downloaded pages into a valid CBZ archive", async () => {
-    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-cbz-test-"));
+    const tempDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-cbz-test-")
+    );
     cleanupPaths.add(tempDirectory);
 
     const imageBytes = {
@@ -102,7 +103,7 @@ describe("CBZ downloads", () => {
       const archiveBytes = new Uint8Array(await readFile(outputPath));
       const files = unzipSync(archiveBytes);
 
-      expect(Object.keys(files).sort()).toEqual(["001.png", "002.webp"]);
+      expect(Object.keys(files).toSorted()).toEqual(["001.png", "002.webp"]);
       expect(files["001.png"]).toEqual(imageBytes.png);
       expect(files["002.webp"]).toEqual(imageBytes.webp);
       expect(result).toEqual({
@@ -112,7 +113,7 @@ describe("CBZ downloads", () => {
       expect(progressEvents.map((event) => event.percent)).toEqual([50, 100]);
       expect(imageRequests).toEqual(["/first.png", "/second.webp"]);
     } finally {
-      server.stop(true);
+      void server.stop(true);
     }
   });
 });

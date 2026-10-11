@@ -118,23 +118,23 @@ export interface SourceSearchInput {
 
 export interface SourceAdapter {
   metadata: SourceMetadata;
-  getFilters(): Promise<SourceFilterDefinition[]>;
-  getPopular(
+  getFilters: () => Promise<SourceFilterDefinition[]>;
+  getPopular: (
     page?: number,
     pageSize?: number
-  ): Promise<SourceListResponse<SourceSeries>>;
-  getLatest(
+  ) => Promise<SourceListResponse<SourceSeries>>;
+  getLatest: (
     page?: number,
     pageSize?: number
-  ): Promise<SourceListResponse<SourceSeries>>;
-  getTrending?(
+  ) => Promise<SourceListResponse<SourceSeries>>;
+  getTrending?: (
     page?: number,
     pageSize?: number
-  ): Promise<SourceListResponse<SourceSeries>>;
-  searchSeries(
+  ) => Promise<SourceListResponse<SourceSeries>>;
+  searchSeries: (
     input: SourceSearchInput
-  ): Promise<SourceListResponse<SourceSeries>>;
-  getSeries(seriesId: string): Promise<SourceSeries>;
-  getChapters(seriesId: string): Promise<SourceChapter[]>;
-  getPages(chapterId: string): Promise<SourcePageList>;
+  ) => Promise<SourceListResponse<SourceSeries>>;
+  getSeries: (seriesId: string) => Promise<SourceSeries>;
+  getChapters: (seriesId: string) => Promise<SourceChapter[]>;
+  getPages: (chapterId: string) => Promise<SourcePageList>;
 }

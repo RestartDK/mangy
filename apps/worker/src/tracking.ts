@@ -48,17 +48,17 @@ const getNextCheckAt = (multiplier = 1): Date =>
   new Date(Date.now() + getTrackingPollIntervalMs() * multiplier);
 
 const mapChapterValues = (seriesId: string, item: SourceChapter) => ({
-  seriesId,
-  externalId: item.externalId,
-  title: item.title,
   chapterNumber: item.chapterNumber,
-  volumeNumber: item.volumeNumber,
-  translatedLanguage: item.translatedLanguage,
+  externalId: item.externalId,
   externalUrl: item.externalUrl,
-  sourceOrder: item.sourceOrder,
+  isUnavailable: item.isUnavailable,
   pageCount: item.pageCount,
   publishedAt: item.publishedAt,
-  isUnavailable: item.isUnavailable,
+  seriesId,
+  sourceOrder: item.sourceOrder,
+  title: item.title,
+  translatedLanguage: item.translatedLanguage,
+  volumeNumber: item.volumeNumber,
 });
 
 const pluralize = (count: number, singular: string, plural: string): string =>
@@ -114,16 +114,16 @@ const upsertTrackedChapters = (seriesId: string, items: SourceChapter[]) =>
           sql,
           chapterColumns,
           {
-            title: item.title,
             chapterNumber: item.chapterNumber,
-            volumeNumber: item.volumeNumber,
-            translatedLanguage: item.translatedLanguage,
             externalUrl: item.externalUrl,
-            sourceOrder: item.sourceOrder,
+            isUnavailable: item.isUnavailable,
             pageCount: item.pageCount,
             publishedAt: item.publishedAt,
-            isUnavailable: item.isUnavailable,
+            sourceOrder: item.sourceOrder,
+            title: item.title,
+            translatedLanguage: item.translatedLanguage,
             updatedAt: new Date(),
+            volumeNumber: item.volumeNumber,
           }
         )}`;
     }
@@ -171,8 +171,8 @@ const queueTrackedChapters = (
     const chapterExternalIds = newChapters.map((item) => item.externalId);
     const storedChapters = yield* decodeRows(
       Schema.Struct({
-        id: chapterRow.from.fields.id,
         external_id: chapterRow.from.fields.external_id,
+        id: chapterRow.from.fields.id,
         is_downloaded: chapterRow.from.fields.is_downloaded,
       }),
       yield* sql`SELECT ${column(chapterColumns, "id")},
@@ -206,7 +206,7 @@ const queueTrackedChapters = (
     );
 
     const queueableChapters = [...newChapters]
-      .reverse()
+      .toReversed()
       .map((item) => chaptersByExternalId.get(item.externalId))
       .filter(
         (
@@ -232,9 +232,9 @@ const queueTrackedChapters = (
       sql,
       downloadJobColumns,
       queueableChapters.map((item) => ({
-        id: crypto.randomUUID(),
         chapterId: item.id,
         downloadDestinationId: trackedSeries.downloadDestinationId,
+        id: crypto.randomUUID(),
         progressPercent: 0,
         seriesId: trackedSeries.seriesRecordId,
         userId: trackedSeries.userId,

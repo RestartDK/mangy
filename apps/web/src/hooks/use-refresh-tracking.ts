@@ -19,6 +19,13 @@ export const useRefreshTracking = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to request a tracking refresh"
+      );
+    },
     onSuccess: async (_, variables) => {
       toast.success("Tracking refresh queued");
       await Promise.all([
@@ -32,13 +39,6 @@ export const useRefreshTracking = () => {
           ],
         }),
       ]);
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to request a tracking refresh"
-      );
     },
   });
 };

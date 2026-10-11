@@ -30,14 +30,16 @@ const filterCacheTtlMs = 1000 * 60 * 60;
 const pageImageSelector = 'img[alt^="Page"]';
 const searchDisplayMode = "Full Display";
 const browserReadingStyle = "long_strip";
-const pageImagePattern = /https?:\/\/temp\.compsci88\.com\/manga\/[^"'\s<>]+/gi;
-const trailingCommaPattern = /,$/;
-const titleSuffixPattern = /\s*\|\s*Weeb Central$/i;
-const chapterNumberPattern = /chapter\s+([0-9]+(?:\.[0-9]+)?)/i;
-const titlePrefixPattern = /^chapter\s+[0-9]+(?:\.[0-9]+)?[:\s-]*/i;
-const chapterPathPattern = /\/chapters\/(?<chapterId>[A-Z0-9]+)/i;
+const pageImagePattern =
+  /https?:\/\/temp\.compsci88\.com\/manga\/[^"'\s<>]+/giu;
+const trailingCommaPattern = /,$/u;
+const titleSuffixPattern = /\s*\|\s*Weeb Central$/iu;
+const chapterNumberPattern =
+  /chapter\s+(?<chapterNumber>[0-9]+(?:\.[0-9]+)?)/iu;
+const titlePrefixPattern = /^chapter\s+[0-9]+(?:\.[0-9]+)?[:\s-]*/iu;
+const chapterPathPattern = /\/chapters\/(?<chapterId>[A-Z0-9]+)/iu;
 const seriesPathPattern =
-  /\/series\/(?<seriesKey>[A-Z0-9]+)(?:\/(?<slug>[^/?#]+))?/i;
+  /\/series\/(?<seriesKey>[A-Z0-9]+)(?:\/(?<slug>[^/?#]+))?/iu;
 
 const imageRequestHeaders = {
   Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -62,7 +64,7 @@ interface BrowserImageElement {
 }
 
 interface BrowserDocumentLike {
-  querySelectorAll(selector: string): ArrayLike<BrowserImageElement>;
+  querySelectorAll: (selector: string) => Iterable<BrowserImageElement>;
 }
 
 interface WeebCentralSeriesContext {
@@ -154,18 +156,23 @@ const mapStatus = (value: string | null | undefined): SourceSeriesStatus => {
   const normalized = normalizeText(value).toLowerCase();
 
   switch (normalized) {
-    case "ongoing":
+    case "ongoing": {
       return "ongoing";
+    }
     case "complete":
-    case "completed":
+    case "completed": {
       return "completed";
-    case "hiatus":
+    }
+    case "hiatus": {
       return "hiatus";
+    }
     case "canceled":
-    case "cancelled":
+    case "cancelled": {
       return "cancelled";
-    default:
+    }
+    default: {
       return "unknown";
+    }
   }
 };
 
@@ -201,8 +208,8 @@ const inferPublicationDemographic = (tags: string[]): string | null => {
 const parseSelectOptions = (
   $: CheerioAPI,
   name: string
-): SourceFilterOption[] => {
-  return $(`input[name="${name}"]`)
+): SourceFilterOption[] =>
+  $(`input[name="${name}"]`)
     .toArray()
     .map((element) => {
       const input = $(element);
@@ -217,17 +224,13 @@ const parseSelectOptions = (
       };
     })
     .filter((option) => option.label.length > 0 && option.value.length > 0);
-};
 
 const getDefaultSelectValue = (
   $: CheerioAPI,
   name: string
-): string | undefined => {
-  return (
-    nullableText($(`input[name="${name}"][checked]`).first().attr("value")) ??
-    undefined
-  );
-};
+): string | undefined =>
+  nullableText($(`input[name="${name}"][checked]`).first().attr("value")) ??
+  undefined;
 
 const getCachedFilters = async (): Promise<SourceFilterDefinition[]> => {
   if (cachedFilters && cachedFilters.expiresAt > Date.now()) {
@@ -328,7 +331,7 @@ const applySearchFilters = (
   }
 
   for (const key of ["official", "anime", "adult", "order", "sort"] as const) {
-    const value = getFilterStrings(filters[key])[0];
+    const [value] = getFilterStrings(filters[key]);
 
     if (value) {
       searchParams.set(key, value);
@@ -342,127 +345,11 @@ const applySearchFilters = (
   }
 };
 
-const parseSearchResultCard = (
-  $: CheerioAPI,
-  element: Parameters<CheerioAPI>[0]
-): SourceSeries | null => {
-  const card = $(element);
-  const details = card.children("section").last();
-  const href = card.find('a[href*="/series/"]').first().attr("href");
-
-  if (!href) {
-    return null;
-  }
-
-  const canonicalUrl = resolveUrl(sourceBaseUrl, href);
-  const context = parseSeriesContext(canonicalUrl);
-  const coverImageUrl = nullableText(
-    card.find('picture img[alt*="cover"]').first().attr("src")
-      ? resolveUrl(
-          sourceBaseUrl,
-          card.find('picture img[alt*="cover"]').first().attr("src") ?? ""
-        )
-      : null
-  );
-  const title = cleanTitle(
-    details.find('a[href*="/series/"]').last().text() ||
-      card.find("h2").first().text(),
-    context.slug.replace(/-/g, " ")
-  );
-  const tags = uniqueStrings(
-    details
-      .find("strong")
-      .filter((_, strong) =>
-        normalizeText($(strong).text()).startsWith("Tag(s)")
-      )
-      .parent()
-      .find("span")
-      .toArray()
-      .map((tag) =>
-        normalizeText($(tag).text()).replace(trailingCommaPattern, "")
-      )
-  );
-  const authorNames = uniqueStrings(
-    details
-      .find("strong")
-      .filter((_, strong) =>
-        normalizeText($(strong).text()).startsWith("Author")
-      )
-      .parent()
-      .find("a")
-      .toArray()
-      .map((author) => $(author).text())
-  );
-  const status = mapStatus(
-    details
-      .find("strong")
-      .filter((_, strong) =>
-        normalizeText($(strong).text()).startsWith("Status")
-      )
-      .parent()
-      .find("span")
-      .last()
-      .text()
-  );
-
-  return {
-    artistNames: [],
-    authorNames,
-    availableTranslatedLanguages: [sourceLanguage],
-    canonicalUrl: context.canonicalUrl,
-    contentRating: inferContentRating(tags),
-    coverImageUrl,
-    description: null,
-    externalId: context.externalId,
-    latestChapter: null,
-    originalLanguage: null,
-    publicationDemographic: inferPublicationDemographic(tags),
-    status,
-    tags,
-    title,
-  };
-};
-
 const cleanTitle = (
   value: string | null | undefined,
   fallback: string
-): string => {
-  return (normalizeText(value) || fallback)
-    .replace(titleSuffixPattern, "")
-    .trim();
-};
-
-const searchSeriesList = async (
-  input: SourceSearchInput,
-  sort: string,
-  order = "Descending"
-): Promise<SourceListResponse<SourceSeries>> => {
-  const page = normalizePage(input.page);
-  const pageSize = normalizePageSize(input.pageSize);
-  const searchParams = new URLSearchParams();
-
-  searchParams.set("limit", String(pageSize));
-  searchParams.set("offset", String((page - 1) * pageSize));
-  searchParams.set("text", input.query?.trim() ?? "");
-  applySearchFilters(searchParams, input.filters, sort, order);
-
-  const { html } = await fetchHtmlPage(
-    new URL(`search/data?${searchParams.toString()}`, sourceBaseUrl)
-  );
-  const $ = loadDocument(html);
-  const items = $("article")
-    .toArray()
-    .map((element) => parseSearchResultCard($, element))
-    .filter((item): item is SourceSeries => item !== null);
-
-  return {
-    hasNextPage: items.length === pageSize,
-    items,
-    page,
-    pageSize,
-    total: null,
-  };
-};
+): string =>
+  (normalizeText(value) || fallback).replace(titleSuffixPattern, "").trim();
 
 const getDetailValue = ($: CheerioAPI, label: string): string | null => {
   const strong = $("strong")
@@ -525,7 +412,7 @@ const parseLatestChapterLabel = ($: CheerioAPI): string | null => {
     $("#chapter-list a[href*='/chapters/'] span.grow span").first().text()
   );
   const match = chapterNumberPattern.exec(latestLinkText);
-  return match?.[1] ?? null;
+  return match?.groups?.chapterNumber ?? null;
 };
 
 const fetchSeriesDetail = async (
@@ -573,7 +460,7 @@ const parseSeriesDetail = (
     publicationDemographic: inferPublicationDemographic(tags),
     status: mapStatus(getDetailValue($, "Status:")),
     tags,
-    title: cleanTitle($("title").text(), context.slug.replace(/-/g, " ")),
+    title: cleanTitle($("title").text(), context.slug.replaceAll("-", " ")),
   };
 };
 
@@ -609,7 +496,7 @@ const parseChapters = (html: string): SourceChapter[] => {
         link.find("span.grow span").first().text() || link.text()
       );
       const chapterNumber =
-        chapterNumberPattern.exec(chapterLabel)?.[1] ?? null;
+        chapterNumberPattern.exec(chapterLabel)?.groups?.chapterNumber ?? null;
       const title = nullableText(chapterLabel.replace(titlePrefixPattern, ""));
       const publishedAtValue = nullableText(link.find("time").attr("datetime"));
 
@@ -628,7 +515,7 @@ const parseChapters = (html: string): SourceChapter[] => {
     })
     .filter((chapter) => chapter !== null);
 
-  return chapters as SourceChapter[];
+  return chapters;
 };
 
 const parsePageImageUrls = (html: string): string[] => {
@@ -649,10 +536,12 @@ const parsePageImageUrls = (html: string): string[] => {
   );
 };
 
-const renderChapterPageImages = (chapterId: string): Promise<string[]> => {
+const renderChapterPageImages = async (
+  chapterId: string
+): Promise<string[]> => {
   const chapterUrl = createChapterUrl(chapterId);
 
-  return withBrowserPage(
+  return await withBrowserPage(
     chapterUrl,
     async (page) => {
       const imageUrls = await page.evaluate((selector: string) => {
@@ -660,8 +549,8 @@ const renderChapterPageImages = (chapterId: string): Promise<string[]> => {
           document: BrowserDocumentLike;
         };
 
-        return Array.from(pageDocument.document.querySelectorAll(selector))
-          .map((image) => image.src || image.dataset?.src || "")
+        return [...pageDocument.document.querySelectorAll(selector)]
+          .map((image) => image.src ?? image.dataset?.src ?? "")
           .filter((value) => value.includes("/manga/"));
       }, pageImageSelector);
 
@@ -679,6 +568,119 @@ const renderChapterPageImages = (chapterId: string): Promise<string[]> => {
   );
 };
 
+const parseSearchResultCard = (
+  $: CheerioAPI,
+  element: Parameters<CheerioAPI>[0]
+): SourceSeries | null => {
+  const card = $(element);
+  const details = card.children("section").last();
+  const href = card.find('a[href*="/series/"]').first().attr("href");
+
+  if (!href) {
+    return null;
+  }
+
+  const canonicalUrl = resolveUrl(sourceBaseUrl, href);
+  const context = parseSeriesContext(canonicalUrl);
+  const coverImageUrl = nullableText(
+    card.find('picture img[alt*="cover"]').first().attr("src")
+      ? resolveUrl(
+          sourceBaseUrl,
+          card.find('picture img[alt*="cover"]').first().attr("src") ?? ""
+        )
+      : null
+  );
+  const title = cleanTitle(
+    details.find('a[href*="/series/"]').last().text() ||
+      card.find("h2").first().text(),
+    context.slug.replaceAll("-", " ")
+  );
+  const tags = uniqueStrings(
+    details
+      .find("strong")
+      .filter((_, strong) =>
+        normalizeText($(strong).text()).startsWith("Tag(s)")
+      )
+      .parent()
+      .find("span")
+      .toArray()
+      .map((tag) =>
+        normalizeText($(tag).text()).replace(trailingCommaPattern, "")
+      )
+  );
+  const authorNames = uniqueStrings(
+    details
+      .find("strong")
+      .filter((_, strong) =>
+        normalizeText($(strong).text()).startsWith("Author")
+      )
+      .parent()
+      .find("a")
+      .toArray()
+      .map((author) => $(author).text())
+  );
+  const status = mapStatus(
+    details
+      .find("strong")
+      .filter((_, strong) =>
+        normalizeText($(strong).text()).startsWith("Status")
+      )
+      .parent()
+      .find("span")
+      .last()
+      .text()
+  );
+
+  return {
+    artistNames: [],
+    authorNames,
+    availableTranslatedLanguages: [sourceLanguage],
+    canonicalUrl: context.canonicalUrl,
+    contentRating: inferContentRating(tags),
+    coverImageUrl,
+    description: null,
+    externalId: context.externalId,
+    latestChapter: null,
+    originalLanguage: null,
+    publicationDemographic: inferPublicationDemographic(tags),
+    status,
+    tags,
+    title,
+  };
+};
+
+const searchSeriesList = async (
+  input: SourceSearchInput,
+  sort: string,
+  order = "Descending"
+): Promise<SourceListResponse<SourceSeries>> => {
+  const page = normalizePage(input.page);
+  const pageSize = normalizePageSize(input.pageSize);
+  const searchParams = new URLSearchParams();
+
+  searchParams.set("limit", String(pageSize));
+  searchParams.set("offset", String((page - 1) * pageSize));
+  searchParams.set("text", input.query?.trim() ?? "");
+  applySearchFilters(searchParams, input.filters, sort, order);
+
+  const { html } = await fetchHtmlPage(
+    new URL(`search/data?${searchParams.toString()}`, sourceBaseUrl)
+  );
+  const $ = loadDocument(html);
+  const items = $("article")
+    .toArray()
+    .map((element) => parseSearchResultCard($, element))
+    .filter((item): item is SourceSeries => item !== null);
+
+  return {
+    hasNextPage: items.length === pageSize,
+    items,
+    page,
+    pageSize,
+    total: null,
+  };
+};
+
 export const createWeebCentralSourceAdapter = (
   dependencies: Partial<WeebCentralDependencies> = {}
 ): SourceAdapter => {
@@ -686,57 +688,21 @@ export const createWeebCentralSourceAdapter = (
     dependencies.renderChapterPageImages ?? renderChapterPageImages;
 
   return {
-    metadata: {
-      capabilities: {
-        supportsChapterFeed: true,
-        supportsFilters: true,
-        supportsLatest: true,
-        supportsPageFetch: true,
-        supportsPopular: true,
-        supportsSearch: true,
-        supportsSeriesDetails: true,
-        supportsTrending: false,
-      },
-      description:
-        "WeebCentral adapter with normalized search, discovery, chapter feeds, and browser-assisted page extraction.",
-      iconUrl: new URL("/static/images/brand.png", sourceBaseUrl).toString(),
-      id: "weebCentral",
-      languageCode: sourceLanguage,
-      name: "WeebCentral",
-      supportedLanguages: [sourceLanguage],
-      websiteUrl: sourceBaseUrl,
+    async getChapters(seriesId) {
+      const { html } = await fetchHtmlPage(createFullChapterListUrl(seriesId));
+      return parseChapters(html);
     },
-    getFilters() {
-      return getCachedFilters();
+    async getFilters() {
+      return await getCachedFilters();
     },
-    getPopular(page, pageSize) {
-      return searchSeriesList(
-        {
-          page,
-          pageSize,
-        },
-        "Popularity"
-      );
-    },
-    getLatest(page, pageSize) {
-      return searchSeriesList(
+    async getLatest(page, pageSize) {
+      return await searchSeriesList(
         {
           page,
           pageSize,
         },
         "Latest Updates"
       );
-    },
-    searchSeries(input) {
-      return searchSeriesList(input, "Best Match", "Ascending");
-    },
-    async getSeries(seriesId) {
-      const { context, html } = await fetchSeriesDetail(seriesId);
-      return parseSeriesDetail(html, context);
-    },
-    async getChapters(seriesId) {
-      const { html } = await fetchHtmlPage(createFullChapterListUrl(seriesId));
-      return parseChapters(html);
     },
     async getPages(chapterId) {
       let imageUrls: string[] = [];
@@ -772,6 +738,42 @@ export const createWeebCentralSourceAdapter = (
       };
 
       return pageList;
+    },
+    async getPopular(page, pageSize) {
+      return await searchSeriesList(
+        {
+          page,
+          pageSize,
+        },
+        "Popularity"
+      );
+    },
+    async getSeries(seriesId) {
+      const { context, html } = await fetchSeriesDetail(seriesId);
+      return parseSeriesDetail(html, context);
+    },
+    metadata: {
+      capabilities: {
+        supportsChapterFeed: true,
+        supportsFilters: true,
+        supportsLatest: true,
+        supportsPageFetch: true,
+        supportsPopular: true,
+        supportsSearch: true,
+        supportsSeriesDetails: true,
+        supportsTrending: false,
+      },
+      description:
+        "WeebCentral adapter with normalized search, discovery, chapter feeds, and browser-assisted page extraction.",
+      iconUrl: new URL("/static/images/brand.png", sourceBaseUrl).toString(),
+      id: "weebCentral",
+      languageCode: sourceLanguage,
+      name: "WeebCentral",
+      supportedLanguages: [sourceLanguage],
+      websiteUrl: sourceBaseUrl,
+    },
+    async searchSeries(input) {
+      return await searchSeriesList(input, "Best Match", "Ascending");
     },
   };
 };

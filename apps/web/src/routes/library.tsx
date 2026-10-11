@@ -23,11 +23,7 @@ import { useRemoveLibrarySeries } from "@/hooks/use-remove-library-series";
 import { useTracking } from "@/hooks/use-tracking";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
-
-export const Route = createFileRoute("/library")({
-  beforeLoad: requireAuth,
-  component: LibraryRouteComponent,
-});
+import { runMutation } from "@/lib/run-mutation";
 
 interface LibraryRouteItem {
   id: string;
@@ -43,7 +39,106 @@ interface LibraryRouteItem {
   } | null;
 }
 
-function LibraryRouteComponent() {
+interface LibraryListProps {
+  items: LibraryRouteItem[];
+  onRemove: (item: LibraryRouteItem) => void;
+}
+
+const LibraryList = ({ items, onRemove }: LibraryListProps) => {
+  if (items.length === 0) {
+    return <EmptyState description="Nothing in this view." title="Empty" />;
+  }
+
+  return (
+    <div className="panel rows">
+      {items.map((item) => {
+        const lastCheckedAt = item.trackingState?.lastCheckedAt ?? null;
+        const nextCheckAt = item.trackingState?.nextCheckAt ?? null;
+        const state = [
+          item.isTracked ? "Tracked" : "Saved",
+          item.autoDownload ? "Auto-download on" : "Manual",
+        ].join(" · ");
+
+        return (
+          <div className="row" key={item.id}>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Link
+                  className="max-w-full truncate text-sm font-medium hover:underline"
+                  params={{
+                    seriesId: item.seriesId,
+                    sourceId: item.sourceId,
+                  }}
+                  title={item.title}
+                  to="/series/$sourceId/$seriesId"
+                >
+                  {item.title}
+                </Link>
+                {item.destinationName ? null : (
+                  <StatusBadge tone="warning">Needs destination</StatusBadge>
+                )}
+              </div>
+              <p className="meta truncate">
+                {state} · {item.destinationName ?? "No destination"}
+              </p>
+              {lastCheckedAt || nextCheckAt ? (
+                <p className="meta truncate">
+                  {[
+                    lastCheckedAt
+                      ? `Last checked ${formatDateTime(lastCheckedAt)}`
+                      : null,
+                    nextCheckAt ? `Next ${formatDateTime(nextCheckAt)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button asChild size="sm" variant="ghost">
+                <Link
+                  params={{
+                    seriesId: item.seriesId,
+                    sourceId: item.sourceId,
+                  }}
+                  to="/series/$sourceId/$seriesId"
+                >
+                  Manage
+                </Link>
+              </Button>
+              <Button
+                aria-label={`Remove ${item.title}`}
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => {
+                  onRemove(item);
+                }}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const LibrarySkeleton = () => (
+  <div className="panel rows">
+    {Array.from({ length: 5 }).map((_, index) => (
+      <div className="row" key={String(index)}>
+        <div className="w-full space-y-2">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+const LibraryRouteComponent = () => {
   const libraryQuery = useLibrary();
   const trackingQuery = useTracking();
   const removeLibrarySeries = useRemoveLibrarySeries();
@@ -71,16 +166,14 @@ function LibraryRouteComponent() {
         )
     )
     .map((item) => ({
-      id: item.id,
-      sourceId: item.sourceId,
-      seriesId: item.seriesId,
-      title: item.title,
-      coverImageUrl: null,
-      isTracked: true,
       autoDownload: false,
+      coverImageUrl: null,
       destinationName: null,
-      updatedAt:
-        item.lastCheckedAt ?? item.nextCheckAt ?? new Date().toISOString(),
+      id: item.id,
+      isTracked: true,
+      seriesId: item.seriesId,
+      sourceId: item.sourceId,
+      title: item.title,
       trackingState: item,
     }));
 
@@ -188,15 +281,17 @@ function LibraryRouteComponent() {
                   return;
                 }
 
-                removeLibrarySeries
-                  .mutateAsync({
+                void runMutation(
+                  removeLibrarySeries.mutateAsync({
                     seriesId: seriesPendingRemoval.seriesId,
                     sourceId: seriesPendingRemoval.sourceId,
-                  })
-                  .then(() => {
-                    setSeriesPendingRemoval(null);
-                  })
-                  .catch(() => undefined);
+                  }),
+                  {
+                    onSuccess: () => {
+                      setSeriesPendingRemoval(null);
+                    },
+                  }
+                );
               }}
               type="button"
               variant="destructive"
@@ -218,104 +313,9 @@ function LibraryRouteComponent() {
       </Dialog>
     </AppShell>
   );
-}
-
-interface LibraryListProps {
-  items: LibraryRouteItem[];
-  onRemove: (item: LibraryRouteItem) => void;
-}
-
-const LibraryList = ({ items, onRemove }: LibraryListProps) => {
-  if (items.length === 0) {
-    return <EmptyState description="Nothing in this view." title="Empty" />;
-  }
-
-  return (
-    <div className="panel rows">
-      {items.map((item) => {
-        const lastCheckedAt = item.trackingState?.lastCheckedAt ?? null;
-        const nextCheckAt = item.trackingState?.nextCheckAt ?? null;
-        const state = [
-          item.isTracked ? "Tracked" : "Saved",
-          item.autoDownload ? "Auto-download on" : "Manual",
-        ].join(" · ");
-
-        return (
-          <div className="row" key={item.id}>
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <Link
-                  className="max-w-full truncate text-sm font-medium hover:underline"
-                  params={{
-                    seriesId: item.seriesId,
-                    sourceId: item.sourceId,
-                  }}
-                  title={item.title}
-                  to="/series/$sourceId/$seriesId"
-                >
-                  {item.title}
-                </Link>
-                {item.destinationName ? null : (
-                  <StatusBadge tone="warning">Needs destination</StatusBadge>
-                )}
-              </div>
-              <p className="meta truncate">
-                {state} · {item.destinationName ?? "No destination"}
-              </p>
-              {lastCheckedAt || nextCheckAt ? (
-                <p className="meta truncate">
-                  {[
-                    lastCheckedAt
-                      ? `Last checked ${formatDateTime(lastCheckedAt)}`
-                      : null,
-                    nextCheckAt ? `Next ${formatDateTime(nextCheckAt)}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button asChild size="sm" variant="ghost">
-                <Link
-                  params={{
-                    seriesId: item.seriesId,
-                    sourceId: item.sourceId,
-                  }}
-                  to="/series/$sourceId/$seriesId"
-                >
-                  Manage
-                </Link>
-              </Button>
-              <Button
-                aria-label={`Remove ${item.title}`}
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => {
-                  onRemove(item);
-                }}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
 };
 
-const LibrarySkeleton = () => (
-  <div className="panel rows">
-    {Array.from({ length: 5 }).map((_, index) => (
-      <div className="row" key={String(index)}>
-        <div className="w-full space-y-2">
-          <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-3 w-1/2" />
-        </div>
-      </div>
-    ))}
-  </div>
-);
+export const Route = createFileRoute("/library")({
+  beforeLoad: requireAuth,
+  component: LibraryRouteComponent,
+});

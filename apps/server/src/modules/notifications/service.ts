@@ -40,12 +40,12 @@ const markRead = (userId: string, notificationId: string) =>
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
       Schema.Struct({
-        id: notificationRow.from.fields.id,
-        type: notificationRow.from.fields.type,
-        title: notificationRow.from.fields.title,
         body: notificationRow.from.fields.body,
-        is_read: notificationRow.from.fields.is_read,
         created_at: notificationRow.from.fields.created_at,
+        id: notificationRow.from.fields.id,
+        is_read: notificationRow.from.fields.is_read,
+        title: notificationRow.from.fields.title,
+        type: notificationRow.from.fields.type,
       }),
       yield* sql`UPDATE ${table("notification")}
         SET ${updateRow(sql, notificationColumns, {
@@ -68,12 +68,12 @@ const markRead = (userId: string, notificationId: string) =>
     }
 
     return {
-      id: record.id,
-      type: record.type,
-      title: record.title,
       body: record.body,
-      isRead: record.is_read,
       createdAt: record.created_at.toISOString(),
+      id: record.id,
+      isRead: record.is_read,
+      title: record.title,
+      type: record.type,
     };
   });
 
@@ -145,25 +145,25 @@ const updatePreferences = (userId: string, input: { inAppEnabled: boolean }) =>
     );
 
     const [existingEndpoint] = existing;
-    if (existingEndpoint) {
-      yield* sql`UPDATE ${table("notificationEndpoint")}
+    const endpointStatement = existingEndpoint
+      ? sql`UPDATE ${table("notificationEndpoint")}
         SET ${updateRow(sql, notificationEndpointColumns, {
           isEnabled: input.inAppEnabled,
           updatedAt: new Date(),
         })}
-        WHERE ${column(notificationEndpointColumns, "id")} = ${existingEndpoint.id}`;
-    } else {
-      yield* sql`INSERT INTO ${table("notificationEndpoint")} ${insertRow(
-        sql,
-        notificationEndpointColumns,
-        {
-          id: crypto.randomUUID(),
-          isEnabled: input.inAppEnabled,
-          type: "inApp",
-          userId,
-        }
-      )}`;
-    }
+        WHERE ${column(notificationEndpointColumns, "id")} = ${existingEndpoint.id}`
+      : sql`INSERT INTO ${table("notificationEndpoint")} ${insertRow(
+          sql,
+          notificationEndpointColumns,
+          {
+            id: crypto.randomUUID(),
+            isEnabled: input.inAppEnabled,
+            type: "inApp",
+            userId,
+          }
+        )}`;
+
+    yield* endpointStatement;
 
     return yield* getPreferences(userId);
   });
@@ -171,20 +171,20 @@ const updatePreferences = (userId: string, input: { inAppEnabled: boolean }) =>
 export { getPreferences as getPreferencesEffect };
 
 export const NotificationsService = {
-  async list(userId: string) {
-    return await runSql(list(userId));
+  async getPreferences(userId: string) {
+    return await runSql(getPreferences(userId));
   },
 
-  async markRead(userId: string, notificationId: string) {
-    return await runSql(markRead(userId, notificationId));
+  async list(userId: string) {
+    return await runSql(list(userId));
   },
 
   async markAllRead(userId: string) {
     return await runSql(markAllRead(userId));
   },
 
-  async getPreferences(userId: string) {
-    return await runSql(getPreferences(userId));
+  async markRead(userId: string, notificationId: string) {
+    return await runSql(markRead(userId, notificationId));
   },
 
   async updatePreferences(userId: string, input: { inAppEnabled: boolean }) {

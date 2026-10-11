@@ -22,7 +22,7 @@ export const downloads = new Elysia({ prefix: "/api/downloads" })
         return { message: "Unauthorized" };
       }
 
-      return DownloadsService.list(user.id);
+      return await DownloadsService.list(user.id);
     },
     {
       response: {

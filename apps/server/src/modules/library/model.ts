@@ -1,52 +1,52 @@
 import { z } from "zod";
 
 export const libraryItemSchema = z.object({
-  id: z.string(),
-  sourceId: z.string(),
-  seriesId: z.string(),
-  title: z.string(),
-  coverImageUrl: z.string().url().nullable(),
-  isTracked: z.boolean(),
   autoDownload: z.boolean(),
+  coverImageUrl: z.url().nullable(),
   destinationName: z.string().nullable(),
-  updatedAt: z.string().datetime(),
+  id: z.string(),
+  isTracked: z.boolean(),
+  seriesId: z.string(),
+  sourceId: z.string(),
+  title: z.string(),
+  updatedAt: z.iso.datetime(),
 });
 
 export const librarySeriesQuerySchema = z.object({
-  sourceId: z.string(),
   seriesId: z.string(),
+  sourceId: z.string(),
 });
 
 export const removeLibrarySeriesResponseSchema = z.object({
-  sourceId: z.string(),
   seriesId: z.string(),
+  sourceId: z.string(),
 });
 
 export const trackedSeriesStateSummarySchema = z.object({
-  id: z.string(),
-  nextCheckAt: z.string().datetime().nullable(),
-  lastCheckedAt: z.string().datetime().nullable(),
-  lastSeenChapterExternalId: z.string().nullable(),
   checkFailureCount: z.number().int(),
+  id: z.string(),
+  lastCheckedAt: z.iso.datetime().nullable(),
+  lastSeenChapterExternalId: z.string().nullable(),
+  nextCheckAt: z.iso.datetime().nullable(),
 });
 
 export const librarySeriesStateSchema = z.object({
-  libraryEntryId: z.string().nullable(),
-  sourceId: z.string(),
-  seriesId: z.string(),
-  isTracked: z.boolean(),
   autoDownload: z.boolean(),
   downloadDestinationId: z.string().nullable(),
   downloadDestinationName: z.string().nullable(),
+  isTracked: z.boolean(),
+  libraryEntryId: z.string().nullable(),
+  seriesId: z.string(),
+  sourceId: z.string(),
   trackingState: trackedSeriesStateSummarySchema.nullable(),
 });
 
 export const updateLibrarySeriesStateBody = z.object({
-  sourceId: z.string(),
-  seriesId: z.string(),
-  isTracked: z.boolean(),
   autoDownload: z.boolean(),
   downloadDestinationId: z.string().nullable().optional(),
+  isTracked: z.boolean(),
+  seriesId: z.string(),
+  sourceId: z.string(),
 });
 
 export const unauthorizedResponseSchema = z.object({

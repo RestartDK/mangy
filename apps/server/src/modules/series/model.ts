@@ -21,19 +21,19 @@ export const seriesPageParamsSchema = z.object({
 
 export const chapterSchema = z.object({
   chapterId: z.string(),
-  title: z.string().nullable(),
   chapterNumber: z.string().nullable(),
-  volumeNumber: z.string().nullable(),
-  translatedLanguage: z.string().nullable(),
-  externalUrl: z.string().url().nullable(),
-  sourceOrder: z.string().nullable(),
-  pageCount: z.number().int().nullable(),
-  publishedAt: z.string().datetime().nullable(),
+  externalUrl: z.url().nullable(),
   isUnavailable: z.boolean(),
+  pageCount: z.number().int().nullable(),
+  publishedAt: z.iso.datetime().nullable(),
+  sourceOrder: z.string().nullable(),
+  title: z.string().nullable(),
+  translatedLanguage: z.string().nullable(),
+  volumeNumber: z.string().nullable(),
 });
 
 export const sourcePageSchema = z.object({
-  imageUrl: z.string().url(),
+  imageUrl: z.url(),
   index: z.number().int().min(0),
 });
 

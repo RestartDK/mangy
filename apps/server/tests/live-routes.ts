@@ -8,7 +8,7 @@ import { request as playwrightRequest } from "playwright";
 import { app } from "../src/index";
 
 const liveSourceTestsEnabled = process.env.LIVE_SOURCE_TESTS === "1";
-const sessionCookiePattern = /better-auth\.session_token=([^;]+)/;
+const sessionCookiePattern = /better-auth\.session_token=(?<token>[^;]+)/u;
 const liveSourceIds = ["mangaWorld", "weebCentral"] as const;
 
 const assert = (condition: unknown, message: string): asserts condition => {
@@ -44,15 +44,15 @@ const signUpAndGetSessionCookie = async (
   const sessionMatch = sessionCookiePattern.exec(setCookieHeader);
 
   assert(sessionMatch, "Sign-up did not return a Better Auth session cookie.");
-  return `better-auth.session_token=${sessionMatch[1]}`;
+  return `better-auth.session_token=${sessionMatch.groups?.token ?? ""}`;
 };
 
 if (liveSourceTestsEnabled) {
   const email = `live-routes-${crypto.randomUUID()}@example.com`;
   const password = "live-routes-password-123";
   const server = serve({
-    fetch(request) {
-      return app.handle(request);
+    async fetch(request) {
+      return await app.handle(request);
     },
     hostname: "127.0.0.1",
     port: 0,
@@ -80,7 +80,7 @@ if (liveSourceTestsEnabled) {
       sourcesResponse.status() === 200,
       `Sources route failed: ${sourcesResponse.status()} ${await sourcesResponse.text()}`
     );
-    const sources = (await sourcesResponse.json()) as Array<{ id: string }>;
+    const sources = (await sourcesResponse.json()) as { id: string }[];
 
     for (const sourceId of liveSourceIds) {
       assert(
@@ -119,9 +119,9 @@ if (liveSourceTestsEnabled) {
         `${sourceId} search route failed: ${searchResponse.status()} ${await searchResponse.text()}`
       );
       const searchResult = (await searchResponse.json()) as {
-        items: Array<{ seriesId: string; title: string }>;
+        items: { seriesId: string; title: string }[];
       };
-      const firstSeries = searchResult.items[0];
+      const [firstSeries] = searchResult.items;
 
       assert(firstSeries, `${sourceId} search did not return any live series.`);
 
@@ -140,10 +140,10 @@ if (liveSourceTestsEnabled) {
         chaptersResponse.status() === 200,
         `${sourceId} chapters route failed: ${chaptersResponse.status()} ${await chaptersResponse.text()}`
       );
-      const chapters = (await chaptersResponse.json()) as Array<{
+      const chapters = (await chaptersResponse.json()) as {
         chapterId: string;
         isUnavailable: boolean;
-      }>;
+      }[];
       const firstChapter = chapters.find((chapter) => !chapter.isUnavailable);
 
       assert(
@@ -159,9 +159,9 @@ if (liveSourceTestsEnabled) {
         `${sourceId} pages route failed: ${pagesResponse.status()} ${await pagesResponse.text()}`
       );
       const pageList = (await pagesResponse.json()) as {
-        pages: Array<{ imageUrl: string; index: number }>;
+        pages: { imageUrl: string; index: number }[];
       };
-      const firstPage = pageList.pages[0];
+      const [firstPage] = pageList.pages;
 
       assert(firstPage, `${sourceId} pages route returned an empty page list.`);
 
@@ -189,7 +189,7 @@ if (liveSourceTestsEnabled) {
     }
   } finally {
     await requestContext?.dispose();
-    server.stop(true);
+    void server.stop(true);
     await runSql(
       Effect.gen(function* deleteUserByEmail() {
         const sql = yield* SqlClient.SqlClient;

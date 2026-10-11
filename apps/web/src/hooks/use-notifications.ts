@@ -9,7 +9,6 @@ export type NotificationItem = NonNullable<NotificationsResponse>[number];
 
 export const useNotifications = () =>
   useQuery({
-    queryKey: ["notifications"],
     queryFn: async () => {
       const { data, error } = await api.api.notifications.get();
       if (error) {
@@ -18,5 +17,6 @@ export const useNotifications = () =>
 
       return data ?? [];
     },
+    queryKey: ["notifications"],
     refetchInterval: 5000,
   });

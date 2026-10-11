@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import assert from "node:assert";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import nodePath from "node:path";
 
 import { column, decodeRows, insertRow, runSql, table } from "@mangy/db";
 import {
@@ -28,6 +29,7 @@ import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { serve } from "bun";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
+import type { SqlError } from "effect/sql";
 import { unzipSync } from "fflate";
 
 import { claimNextDownloadJob } from "../../worker/src/jobs";
@@ -46,7 +48,7 @@ import { SourcesStorage } from "../src/modules/sources/storage";
 
 const pngDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9s8lJawAAAAASUVORK5CYII=";
-const sessionCookieRegex = /better-auth\.session_token=([^;]+)/;
+const sessionCookieRegex = /better-auth\.session_token=(?<token>[^;]+)/u;
 
 const decoder = new TextDecoder();
 
@@ -56,32 +58,34 @@ const extractSessionCookie = (header: string | null): string | null => {
   }
 
   const match = sessionCookieRegex.exec(header);
-  return match?.[1] ?? null;
+  return match?.groups?.token ?? null;
 };
 
-const deleteSource = (sourceId: string) =>
-  runSql(
+const deleteSource = async (sourceId: string) => {
+  await runSql(
     Effect.gen(function* deleteSourceEffect() {
       const sql = yield* SqlClient.SqlClient;
       yield* sql`DELETE FROM ${table("source")} WHERE ${column(sourceColumns, "id")} = ${sourceId}`;
     })
   );
+};
 
-const deleteUser = (userId: string) =>
-  runSql(
+const deleteUser = async (userId: string) => {
+  await runSql(
     Effect.gen(function* deleteUserEffect() {
       const sql = yield* SqlClient.SqlClient;
       yield* sql`DELETE FROM ${table("user")} WHERE ${column(userColumns, "id")} = ${userId}`;
     })
   );
+};
 
-const insertNotification = (input: {
+const insertNotification = async (input: {
   body: string;
   title: string;
   type: string;
   userId: string;
-}) =>
-  runSql(
+}) => {
+  await runSql(
     Effect.gen(function* insertNotificationEffect() {
       const sql = yield* SqlClient.SqlClient;
       yield* sql`INSERT INTO ${table("notification")} ${insertRow(
@@ -91,14 +95,15 @@ const insertNotification = (input: {
       )}`;
     })
   );
+};
 
-const query = <A, I>(
+const query = async <A, I>(
   schema: Schema.Codec<A, I>,
   build: (
     sql: SqlClient.SqlClient
-  ) => Effect.Effect<readonly unknown[], unknown, never>
+  ) => Effect.Effect<readonly unknown[], SqlError.SqlError>
 ): Promise<readonly A[]> =>
-  runSql(
+  await runSql(
     Effect.gen(function* queryEffect() {
       const sql = yield* SqlClient.SqlClient;
       return yield* decodeRows(schema, yield* build(sql));
@@ -119,24 +124,6 @@ const createFakeAdapter = (config: {
   };
 
   const adapter: SourceAdapter = {
-    metadata: {
-      capabilities: {
-        supportsChapterFeed: true,
-        supportsFilters: false,
-        supportsLatest: true,
-        supportsPageFetch: true,
-        supportsPopular: true,
-        supportsSearch: true,
-        supportsSeriesDetails: true,
-        supportsTrending: true,
-      },
-      description: "Deterministic test adapter",
-      id: config.adapterId,
-      languageCode: "en",
-      name: "Test Source",
-      supportedLanguages: ["en"],
-      websiteUrl: "https://example.test",
-    },
     async getChapters(seriesId) {
       if (seriesId !== state.series.externalId) {
         throw new Error("Unexpected series requested in fake adapter.");
@@ -200,6 +187,24 @@ const createFakeAdapter = (config: {
         total: 1,
       };
     },
+    metadata: {
+      capabilities: {
+        supportsChapterFeed: true,
+        supportsFilters: false,
+        supportsLatest: true,
+        supportsPageFetch: true,
+        supportsPopular: true,
+        supportsSearch: true,
+        supportsSeriesDetails: true,
+        supportsTrending: true,
+      },
+      description: "Deterministic test adapter",
+      id: config.adapterId,
+      languageCode: "en",
+      name: "Test Source",
+      supportedLanguages: ["en"],
+      websiteUrl: "https://example.test",
+    },
     async searchSeries() {
       return {
         hasNextPage: false,
@@ -230,8 +235,8 @@ const createApiClient = async (
   const headers = new Headers();
   const origin = options?.origin;
 
-  const authRequest = async (path: string, body: unknown) => {
-    return app.handle(
+  const authRequest = async (path: string, body: unknown) =>
+    await app.handle(
       new Request(`http://localhost${path}`, {
         body: JSON.stringify(body),
         headers: {
@@ -241,7 +246,6 @@ const createApiClient = async (
         method: "POST",
       })
     );
-  };
 
   const setSessionCookie = (response: Response) => {
     const cookie = extractSessionCookie(response.headers.get("set-cookie"));
@@ -272,7 +276,7 @@ const createApiClient = async (
       requestHeaders.set("cookie", cookie);
     }
 
-    return app.handle(
+    return await app.handle(
       new Request(`http://localhost${path}`, {
         ...init,
         headers: {
@@ -306,9 +310,8 @@ const jsonRequest = (body: unknown, init?: RequestInit): RequestInit => ({
   },
 });
 
-const readJson = async <T>(response: Response): Promise<T> => {
-  return (await response.json()) as T;
-};
+const readJson = async <T>(response: Response): Promise<T> =>
+  (await response.json()) as T;
 
 const readUntilChunk = async (
   reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -375,7 +378,7 @@ describe("server and worker integration", () => {
     );
 
     expect(userId).toBeString();
-    cleanupState.userIds.add(userId as string);
+    cleanupState.userIds.add(userId);
 
     const settingsBootstrapResponse = await apiFetch(
       "/api/settings/bootstrap",
@@ -389,7 +392,7 @@ describe("server and worker integration", () => {
   test("queue controls, worker processing, tracking automation, and notification APIs work together", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
-    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-test-"));
+    const tempDirectory = await mkdtemp(nodePath.join(tmpdir(), "mangy-test-"));
 
     cleanupState.sourceIds.add(adapterId);
     cleanupState.tempPaths.add(tempDirectory);
@@ -442,7 +445,7 @@ describe("server and worker integration", () => {
     );
 
     expect(userId).toBeString();
-    cleanupState.userIds.add(userId as string);
+    cleanupState.userIds.add(userId);
 
     const destinationResponse = await apiFetch(
       "/api/settings/destinations",
@@ -492,9 +495,8 @@ describe("server and worker integration", () => {
       }
     );
     expect(cancelResponse.status).toBe(200);
-    expect((await readJson<{ status: string }>(cancelResponse)).status).toBe(
-      "cancelled"
-    );
+    const body = await readJson<{ status: string }>(cancelResponse);
+    expect(body.status).toBe("cancelled");
 
     const retryResponse = await apiFetch(
       `/api/downloads/${queuedJob.id}/retry`,
@@ -503,20 +505,20 @@ describe("server and worker integration", () => {
       }
     );
     expect(retryResponse.status).toBe(200);
-    expect((await readJson<{ status: string }>(retryResponse)).status).toBe(
-      "queued"
-    );
+    const body2 = await readJson<{ status: string }>(retryResponse);
+    expect(body2.status).toBe("queued");
 
     const claimedJob = await claimNextDownloadJob("test-worker");
     expect(claimedJob?.id).toBe(queuedJob.id);
-    await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+    assert.ok(claimedJob, "Expected a claimed download job.");
+    await runDownloadJob(claimedJob);
 
     const downloadsResponse = await apiFetch("/api/downloads", {
       method: "GET",
     });
     expect(downloadsResponse.status).toBe(200);
     const downloads =
-      await readJson<Array<{ id: string; status: string }>>(downloadsResponse);
+      await readJson<{ id: string; status: string }[]>(downloadsResponse);
     expect(
       downloads.some(
         (job) => job.id === queuedJob.id && job.status === "completed"
@@ -528,13 +530,10 @@ describe("server and worker integration", () => {
       { method: "GET" }
     );
     expect(libraryStateResponse.status).toBe(200);
-    expect(
-      (
-        await readJson<{ downloadDestinationId: string | null }>(
-          libraryStateResponse
-        )
-      ).downloadDestinationId
-    ).toBe(destination.id);
+    const body3 = await readJson<{ downloadDestinationId: string | null }>(
+      libraryStateResponse
+    );
+    expect(body3.downloadDestinationId).toBe(destination.id);
 
     const saveTrackingResponse = await apiFetch(
       "/api/library/series-state",
@@ -587,15 +586,14 @@ describe("server and worker integration", () => {
 
     const claimedTrackedSeries = await claimDueTrackedSeries();
     expect(claimedTrackedSeries?.seriesExternalId).toBe(seriesExternalId);
-    await processTrackedSeries(
-      claimedTrackedSeries as NonNullable<typeof claimedTrackedSeries>
-    );
+    assert.ok(claimedTrackedSeries, "Expected a claimed tracked series.");
+    await processTrackedSeries(claimedTrackedSeries);
 
     const trackingResponse = await apiFetch("/api/tracking", { method: "GET" });
     expect(trackingResponse.status).toBe(200);
     const trackedSeries =
       await readJson<
-        Array<{ lastSeenChapterExternalId: string | null; seriesId: string }>
+        { lastSeenChapterExternalId: string | null; seriesId: string }[]
       >(trackingResponse);
     expect(
       trackedSeries.some(
@@ -610,7 +608,7 @@ describe("server and worker integration", () => {
     });
     expect(notificationsResponse.status).toBe(200);
     const notifications = await readJson<
-      Array<{ id: string; isRead: boolean; type: string }>
+      { id: string; isRead: boolean; type: string }[]
     >(notificationsResponse);
     expect(
       notifications.some((item) => item.type === "downloadCompleted")
@@ -619,7 +617,7 @@ describe("server and worker integration", () => {
       notifications.some((item) => item.type === "trackedSeriesUpdated")
     ).toBe(true);
 
-    const firstNotification = notifications[0];
+    const [firstNotification] = notifications;
     expect(firstNotification).toBeDefined();
 
     const markReadResponse = await apiFetch(
@@ -627,9 +625,8 @@ describe("server and worker integration", () => {
       { method: "PATCH" }
     );
     expect(markReadResponse.status).toBe(200);
-    expect((await readJson<{ isRead: boolean }>(markReadResponse)).isRead).toBe(
-      true
-    );
+    const body4 = await readJson<{ isRead: boolean }>(markReadResponse);
+    expect(body4.isRead).toBe(true);
 
     const preferencesResponse = await apiFetch(
       "/api/notifications/preferences",
@@ -638,20 +635,20 @@ describe("server and worker integration", () => {
       }
     );
     expect(preferencesResponse.status).toBe(200);
-    expect(
-      (await readJson<{ inAppEnabled: boolean }>(preferencesResponse))
-        .inAppEnabled
-    ).toBe(true);
+    const body5 = await readJson<{ inAppEnabled: boolean }>(
+      preferencesResponse
+    );
+    expect(body5.inAppEnabled).toBe(true);
 
     const updatePreferencesResponse = await apiFetch(
       "/api/notifications/preferences",
       jsonRequest({ inAppEnabled: false }, { method: "PATCH" })
     );
     expect(updatePreferencesResponse.status).toBe(200);
-    expect(
-      (await readJson<{ inAppEnabled: boolean }>(updatePreferencesResponse))
-        .inAppEnabled
-    ).toBe(false);
+    const body6 = await readJson<{ inAppEnabled: boolean }>(
+      updatePreferencesResponse
+    );
+    expect(body6.inAppEnabled).toBe(false);
 
     const markAllReadResponse = await apiFetch(
       "/api/notifications/mark-all-read",
@@ -660,10 +657,8 @@ describe("server and worker integration", () => {
       }
     );
     expect(markAllReadResponse.status).toBe(200);
-    expect(
-      (await readJson<{ updatedCount: number }>(markAllReadResponse))
-        .updatedCount
-    ).toBeGreaterThanOrEqual(1);
+    const body7 = await readJson<{ updatedCount: number }>(markAllReadResponse);
+    expect(body7.updatedCount).toBeGreaterThanOrEqual(1);
 
     const settingsBootstrapResponse = await apiFetch(
       "/api/settings/bootstrap",
@@ -682,7 +677,7 @@ describe("server and worker integration", () => {
       method: "GET",
     });
     const queuedAutoDownloads = await readJson<
-      Array<{ chapterId: string | null; status: string }>
+      { chapterId: string | null; status: string }[]
     >(queuedAutoDownloadResponse);
     expect(
       queuedAutoDownloads.some(
@@ -695,14 +690,16 @@ describe("server and worker integration", () => {
   test("worker triggers a Komga library scan after a destination download", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
-    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-komga-test-"));
+    const tempDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-komga-test-")
+    );
     const komgaLibraryId = `komga-library-${crypto.randomUUID()}`;
     const komgaApiKey = `komga-key-${crypto.randomUUID()}`;
-    const scanRequests: Array<{
+    const scanRequests: {
       apiKey: string | null;
       method: string;
       pathname: string;
-    }> = [];
+    }[] = [];
 
     cleanupState.sourceIds.add(adapterId);
     cleanupState.tempPaths.add(tempDirectory);
@@ -778,7 +775,7 @@ describe("server and worker integration", () => {
       );
 
       expect(userId).toBeString();
-      cleanupState.userIds.add(userId as string);
+      cleanupState.userIds.add(userId);
 
       const destinationResponse = await apiFetch(
         "/api/settings/destinations",
@@ -813,7 +810,8 @@ describe("server and worker integration", () => {
       const claimedJob = await claimNextDownloadJob("komga-worker");
       expect(claimedJob?.id).toBe(queuedJob.id);
       expect(claimedJob?.destinationKomgaLibraryId).toBe(komgaLibraryId);
-      await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+      assert.ok(claimedJob, "Expected a claimed download job.");
+      await runDownloadJob(claimedJob);
 
       expect(scanRequests).toEqual([
         {
@@ -843,18 +841,20 @@ describe("server and worker integration", () => {
       expect(artifact?.package_format).toBe("cbz");
       expect(artifact?.imported_to_komga_at).toBeInstanceOf(Date);
     } finally {
-      komgaServer.stop(true);
+      void komgaServer.stop(true);
     }
   });
 
   test("browser push settings and queued deliveries work together", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
-    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-push-test-"));
-    const sentPushes: Array<{
+    const tempDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-push-test-")
+    );
+    const sentPushes: {
       endpoint: string;
       payload: { body: string; title: string; url: string };
-    }> = [];
+    }[] = [];
 
     cleanupState.sourceIds.add(adapterId);
     cleanupState.tempPaths.add(tempDirectory);
@@ -918,19 +918,17 @@ describe("server and worker integration", () => {
     );
 
     expect(userId).toBeString();
-    cleanupState.userIds.add(userId as string);
+    cleanupState.userIds.add(userId);
 
     const pushSettingsResponse = await apiFetch("/api/settings/push", {
       method: "GET",
     });
     expect(pushSettingsResponse.status).toBe(200);
-    expect(
-      (
-        await readJson<{ activeSubscriptionCount: number; isEnabled: boolean }>(
-          pushSettingsResponse
-        )
-      ).activeSubscriptionCount
-    ).toBe(0);
+    const body8 = await readJson<{
+      activeSubscriptionCount: number;
+      isEnabled: boolean;
+    }>(pushSettingsResponse);
+    expect(body8.activeSubscriptionCount).toBe(0);
 
     const subscriptionEndpoint = `https://push.example/${crypto.randomUUID()}`;
     const subscribeResponse = await apiFetch(
@@ -949,13 +947,11 @@ describe("server and worker integration", () => {
       )
     );
     expect(subscribeResponse.status).toBe(200);
-    expect(
-      (
-        await readJson<{ activeSubscriptionCount: number; isEnabled: boolean }>(
-          subscribeResponse
-        )
-      ).activeSubscriptionCount
-    ).toBe(1);
+    const body9 = await readJson<{
+      activeSubscriptionCount: number;
+      isEnabled: boolean;
+    }>(subscribeResponse);
+    expect(body9.activeSubscriptionCount).toBe(1);
 
     const updatePushPreferencesResponse = await apiFetch(
       "/api/settings/push/preferences",
@@ -964,29 +960,24 @@ describe("server and worker integration", () => {
           isEnabled: true,
           notifyOnDownloadCompleted: true,
           notifyOnDownloadFailed: true,
-          notifyOnTrackedSeriesUpdate: false,
           notifyOnSystemWarning: true,
+          notifyOnTrackedSeriesUpdate: false,
         },
         { method: "PATCH" }
       )
     );
     expect(updatePushPreferencesResponse.status).toBe(200);
-    expect(
-      (
-        await readJson<{ notifyOnTrackedSeriesUpdate: boolean }>(
-          updatePushPreferencesResponse
-        )
-      ).notifyOnTrackedSeriesUpdate
-    ).toBe(false);
+    const body10 = await readJson<{ notifyOnTrackedSeriesUpdate: boolean }>(
+      updatePushPreferencesResponse
+    );
+    expect(body10.notifyOnTrackedSeriesUpdate).toBe(false);
 
     const sendTestResponse = await apiFetch("/api/settings/push/test", {
       method: "POST",
     });
     expect(sendTestResponse.status).toBe(200);
-    expect(
-      (await readJson<{ deliveredCount: number }>(sendTestResponse))
-        .deliveredCount
-    ).toBe(1);
+    const body11 = await readJson<{ deliveredCount: number }>(sendTestResponse);
+    expect(body11.deliveredCount).toBe(1);
     expect(sentPushes).toHaveLength(1);
     expect(sentPushes[0]?.payload.title).toBe("Browser notifications ready");
 
@@ -1021,7 +1012,8 @@ describe("server and worker integration", () => {
 
     const claimedJob = await claimNextDownloadJob("push-worker");
     expect(claimedJob?.id).toBe(queuedJob.id);
-    await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+    assert.ok(claimedJob, "Expected a claimed download job.");
+    await runDownloadJob(claimedJob);
 
     const queuedDeliveries = await query(
       Schema.Struct({
@@ -1033,7 +1025,7 @@ describe("server and worker integration", () => {
             ${table("notificationDelivery")}.${column(notificationDeliveryColumns, "status")}
           FROM ${table("notificationDelivery")}
           INNER JOIN ${table("notification")} ON ${table("notificationDelivery")}.${column(notificationDeliveryColumns, "notificationId")} = ${table("notification")}.${column(notificationColumns, "id")}
-          WHERE ${table("notification")}.${column(notificationColumns, "userId")} = ${userId as string}`
+          WHERE ${table("notification")}.${column(notificationColumns, "userId")} = ${userId}`
     );
 
     expect(queuedDeliveries).toHaveLength(1);
@@ -1041,9 +1033,8 @@ describe("server and worker integration", () => {
 
     const claimedPushDelivery = await claimNextPushDelivery("push-worker");
     expect(claimedPushDelivery?.notificationType).toBe("downloadCompleted");
-    await processPushDelivery(
-      claimedPushDelivery as NonNullable<typeof claimedPushDelivery>
-    );
+    assert.ok(claimedPushDelivery, "Expected a claimed push delivery.");
+    await processPushDelivery(claimedPushDelivery);
 
     expect(sentPushes).toHaveLength(2);
     expect(sentPushes[1]?.endpoint).toBe(subscriptionEndpoint);
@@ -1059,7 +1050,7 @@ describe("server and worker integration", () => {
         sql`SELECT ${column(pushSubscriptionColumns, "endpoint")},
             ${column(pushSubscriptionColumns, "isActive")}
           FROM ${table("pushSubscription")}
-          WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId as string}`
+          WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId}`
     );
     expect(savedSubscriptions).toHaveLength(1);
     expect(savedSubscriptions[0]?.is_active).toBe(true);
@@ -1085,7 +1076,7 @@ describe("server and worker integration", () => {
       Schema.Struct({ is_active: pushSubscriptionRow.from.fields.is_active }),
       (sql) =>
         sql`SELECT ${column(pushSubscriptionColumns, "isActive")} FROM ${table("pushSubscription")}
-          WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId as string}`
+          WHERE ${column(pushSubscriptionColumns, "userId")} = ${userId}`
     );
     expect(inactiveSubscriptions[0]?.is_active).toBe(false);
   });
@@ -1093,8 +1084,12 @@ describe("server and worker integration", () => {
   test("destinations can be removed and tracked auto-download is turned off safely", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
-    const primaryDirectory = await mkdtemp(join(tmpdir(), "mangy-delete-a-"));
-    const fallbackDirectory = await mkdtemp(join(tmpdir(), "mangy-delete-b-"));
+    const primaryDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-delete-a-")
+    );
+    const fallbackDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-delete-b-")
+    );
 
     cleanupState.sourceIds.add(adapterId);
     cleanupState.tempPaths.add(primaryDirectory);
@@ -1148,7 +1143,7 @@ describe("server and worker integration", () => {
     );
 
     expect(userId).toBeString();
-    cleanupState.userIds.add(userId as string);
+    cleanupState.userIds.add(userId);
 
     const primaryDestinationResponse = await apiFetch(
       "/api/settings/destinations",
@@ -1201,9 +1196,8 @@ describe("server and worker integration", () => {
       { method: "DELETE" }
     );
     expect(deleteResponse.status).toBe(200);
-    expect((await readJson<{ id: string }>(deleteResponse)).id).toBe(
-      primaryDestination.id
-    );
+    const body12 = await readJson<{ id: string }>(deleteResponse);
+    expect(body12.id).toBe(primaryDestination.id);
 
     const settingsBootstrapResponse = await apiFetch(
       "/api/settings/bootstrap",
@@ -1213,7 +1207,7 @@ describe("server and worker integration", () => {
     );
     expect(settingsBootstrapResponse.status).toBe(200);
     const settingsBootstrap = await readJson<{
-      destinations: Array<{ id: string; isDefault: boolean }>;
+      destinations: { id: string; isDefault: boolean }[];
     }>(settingsBootstrapResponse);
     expect(settingsBootstrap.destinations).toHaveLength(1);
     expect(settingsBootstrap.destinations[0]?.id).toBe(fallbackDestination.id);
@@ -1237,7 +1231,9 @@ describe("server and worker integration", () => {
   test("destinations with queued downloads cannot be removed", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
-    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-delete-job-"));
+    const tempDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-delete-job-")
+    );
 
     cleanupState.sourceIds.add(adapterId);
     cleanupState.tempPaths.add(tempDirectory);
@@ -1290,7 +1286,7 @@ describe("server and worker integration", () => {
     );
 
     expect(userId).toBeString();
-    cleanupState.userIds.add(userId as string);
+    cleanupState.userIds.add(userId);
 
     const destinationResponse = await apiFetch(
       "/api/settings/destinations",
@@ -1325,7 +1321,8 @@ describe("server and worker integration", () => {
       { method: "DELETE" }
     );
     expect(deleteResponse.status).toBe(400);
-    expect((await readJson<{ message: string }>(deleteResponse)).message).toBe(
+    const body13 = await readJson<{ message: string }>(deleteResponse);
+    expect(body13.message).toBe(
       "This destination is still used by queued or running downloads. Cancel or finish those jobs first."
     );
   });
@@ -1334,7 +1331,7 @@ describe("server and worker integration", () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
     const tempDirectory = await mkdtemp(
-      join(tmpdir(), "mangy-library-remove-")
+      nodePath.join(tmpdir(), "mangy-library-remove-")
     );
 
     cleanupState.sourceIds.add(adapterId);
@@ -1388,7 +1385,7 @@ describe("server and worker integration", () => {
     );
 
     expect(userId).toBeString();
-    cleanupState.userIds.add(userId as string);
+    cleanupState.userIds.add(userId);
 
     const destinationResponse = await apiFetch(
       "/api/settings/destinations",
@@ -1424,17 +1421,17 @@ describe("server and worker integration", () => {
       { method: "DELETE" }
     );
     expect(removeResponse.status).toBe(200);
-    expect(
-      (await readJson<{ sourceId: string; seriesId: string }>(removeResponse))
-        .seriesId
-    ).toBe(seriesExternalId);
+    const body14 = await readJson<{ sourceId: string; seriesId: string }>(
+      removeResponse
+    );
+    expect(body14.seriesId).toBe(seriesExternalId);
 
     const libraryResponse = await apiFetch("/api/library", {
       method: "GET",
     });
     expect(libraryResponse.status).toBe(200);
     expect(
-      await readJson<Array<{ seriesId: string }>>(libraryResponse)
+      await readJson<{ seriesId: string }[]>(libraryResponse)
     ).toHaveLength(0);
 
     const trackingResponse = await apiFetch("/api/tracking", {
@@ -1442,7 +1439,7 @@ describe("server and worker integration", () => {
     });
     expect(trackingResponse.status).toBe(200);
     expect(
-      await readJson<Array<{ seriesId: string }>>(trackingResponse)
+      await readJson<{ seriesId: string }[]>(trackingResponse)
     ).toHaveLength(0);
 
     const seriesStateResponse = await apiFetch(
@@ -1476,13 +1473,15 @@ describe("server and worker integration", () => {
   test("page endpoints and worker downloads honor page headers and referer metadata", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
-    const tempDirectory = await mkdtemp(join(tmpdir(), "mangy-pages-test-"));
+    const tempDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-pages-test-")
+    );
     const requiredReferer = "https://reader.example/chapter";
     const requiredToken = `token-${crypto.randomUUID()}`;
-    const imageRequests: Array<{
+    const imageRequests: {
       referer: string | null;
       token: string | null;
-    }> = [];
+    }[] = [];
     const pngBytes = Buffer.from(pngDataUrl.split(",")[1] ?? "", "base64");
 
     cleanupState.sourceIds.add(adapterId);
@@ -1580,7 +1579,7 @@ describe("server and worker integration", () => {
       );
 
       expect(userId).toBeString();
-      cleanupState.userIds.add(userId as string);
+      cleanupState.userIds.add(userId);
 
       const destinationResponse = await apiFetch(
         "/api/settings/destinations",
@@ -1602,7 +1601,7 @@ describe("server and worker integration", () => {
       );
       expect(pagesResponse.status).toBe(200);
       const pageList = await readJson<{
-        pages: Array<{ imageUrl: string; index: number }>;
+        pages: { imageUrl: string; index: number }[];
       }>(pagesResponse);
       expect(pageList.pages).toHaveLength(1);
       expect(pageList.pages[0]?.index).toBe(0);
@@ -1616,9 +1615,8 @@ describe("server and worker integration", () => {
       expect(proxiedImageResponse.headers.get("content-type")).toContain(
         "image/png"
       );
-      expect(
-        (await proxiedImageResponse.arrayBuffer()).byteLength
-      ).toBeGreaterThan(0);
+      const buffer = await proxiedImageResponse.arrayBuffer();
+      expect(buffer.byteLength).toBeGreaterThan(0);
 
       const queueResponse = await apiFetch(
         "/api/downloads",
@@ -1637,20 +1635,22 @@ describe("server and worker integration", () => {
 
       const claimedJob = await claimNextDownloadJob("metadata-worker");
       expect(claimedJob?.id).toBe(queuedJob.id);
-      await runDownloadJob(claimedJob as NonNullable<typeof claimedJob>);
+      assert.ok(claimedJob, "Expected a claimed download job.");
+      await runDownloadJob(claimedJob);
 
-      const downloadedFiles = (
-        await readdir(tempDirectory, { recursive: true })
-      ).filter((entry) => entry.endsWith(".cbz"));
+      const entries = await readdir(tempDirectory, { recursive: true });
+      const downloadedFiles = entries.filter((entry) => entry.endsWith(".cbz"));
       expect(downloadedFiles).toHaveLength(1);
 
-      const downloadedFile = downloadedFiles[0];
+      const [downloadedFile] = downloadedFiles;
       expect(downloadedFile).toBeString();
       if (!downloadedFile) {
         throw new Error("Expected the worker to write a CBZ file.");
       }
 
-      const archiveBytes = await readFile(join(tempDirectory, downloadedFile));
+      const archiveBytes = await readFile(
+        nodePath.join(tempDirectory, downloadedFile)
+      );
       const archiveFiles = unzipSync(new Uint8Array(archiveBytes));
       expect(Object.keys(archiveFiles)).toEqual(["001.png"]);
       expect(imageRequests.length).toBe(2);
@@ -1662,7 +1662,7 @@ describe("server and worker integration", () => {
         )
       ).toBe(true);
     } finally {
-      imageServer.stop(true);
+      void imageServer.stop(true);
     }
   });
 
@@ -1704,7 +1704,7 @@ describe("server and worker integration", () => {
     );
 
     expect(userId).toBeString();
-    cleanupState.userIds.add(userId as string);
+    cleanupState.userIds.add(userId);
 
     const abortController = new AbortController();
     const liveResponse = await apiFetch("/api/live/events", {
@@ -1720,23 +1720,21 @@ describe("server and worker integration", () => {
     const reader = liveResponse.body?.getReader();
     expect(reader).toBeDefined();
 
-    const connectedChunk = await readUntilChunk(
-      reader as ReadableStreamDefaultReader<Uint8Array>,
-      "event: connected"
-    );
+    if (!reader) {
+      throw new Error("The live endpoint did not return a stream body.");
+    }
+
+    const connectedChunk = await readUntilChunk(reader, "event: connected");
     expect(connectedChunk).toContain("event: connected");
 
     await insertNotification({
       body: "SSE notification body",
       title: "SSE notification",
       type: "systemWarning",
-      userId: userId as string,
+      userId,
     });
 
-    const stateChunk = await readUntilChunk(
-      reader as ReadableStreamDefaultReader<Uint8Array>,
-      "event: state"
-    );
+    const stateChunk = await readUntilChunk(reader, "event: state");
     expect(stateChunk).toContain('"notificationsChanged":true');
 
     abortController.abort();
@@ -1745,7 +1743,7 @@ describe("server and worker integration", () => {
       Schema.Struct({ id: notificationRow.from.fields.id }),
       (sql) =>
         sql`SELECT ${column(notificationColumns, "id")} FROM ${table("notification")}
-          WHERE ${column(notificationColumns, "userId")} = ${userId as string}
+          WHERE ${column(notificationColumns, "userId")} = ${userId}
             AND ${column(notificationColumns, "title")} = ${"SSE notification"}
           LIMIT 1`
     );

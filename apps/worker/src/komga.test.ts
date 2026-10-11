@@ -16,11 +16,11 @@ describe("Komga integration", () => {
   });
 
   test("requests a library scan with API key authentication", async () => {
-    const requests: Array<{
+    const requests: {
       authorization: string | null;
       path: string;
       xApiKey: string | null;
-    }> = [];
+    }[] = [];
     const server = serve({
       fetch(request) {
         const url = new URL(request.url);
@@ -55,15 +55,15 @@ describe("Komga integration", () => {
         },
       ]);
     } finally {
-      server.stop(true);
+      void server.stop(true);
     }
   });
 
   test("falls back to basic authentication when no API key is configured", async () => {
-    const requests: Array<{
+    const requests: {
       authorization: string | null;
       xApiKey: string | null;
-    }> = [];
+    }[] = [];
     const server = serve({
       fetch(request) {
         requests.push({
@@ -95,11 +95,11 @@ describe("Komga integration", () => {
         },
       ]);
     } finally {
-      server.stop(true);
+      void server.stop(true);
     }
   });
 
-  test("raises scan failures with the Komga response status", async () => {
+  test("raises scan failures with the Komga response status", () => {
     const server = serve({
       fetch() {
         return new Response("nope", { status: 503 });
@@ -116,11 +116,11 @@ describe("Komga integration", () => {
         username: undefined,
       });
 
-      await expect(
-        scanKomgaLibrary({ libraryId: "library-down" })
-      ).rejects.toThrow("Komga library scan failed with status 503.");
+      expect(scanKomgaLibrary({ libraryId: "library-down" })).rejects.toThrow(
+        "Komga library scan failed with status 503."
+      );
     } finally {
-      server.stop(true);
+      void server.stop(true);
     }
   });
 });

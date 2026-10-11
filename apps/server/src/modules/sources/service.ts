@@ -20,32 +20,32 @@ interface DiscoverSection {
 }
 
 const mapSeriesResponse = (sourceId: string, item: SourceSeries) => ({
-  sourceId,
-  seriesId: item.externalId,
-  title: item.title,
-  description: item.description,
-  canonicalUrl: item.canonicalUrl,
-  coverImageUrl: item.coverImageUrl,
-  status: item.status,
-  originalLanguage: item.originalLanguage,
-  latestChapter: item.latestChapter,
-  contentRating: item.contentRating,
-  publicationDemographic: item.publicationDemographic,
-  authorNames: item.authorNames,
   artistNames: item.artistNames,
-  tags: item.tags,
+  authorNames: item.authorNames,
   availableTranslatedLanguages: item.availableTranslatedLanguages,
+  canonicalUrl: item.canonicalUrl,
+  contentRating: item.contentRating,
+  coverImageUrl: item.coverImageUrl,
+  description: item.description,
+  latestChapter: item.latestChapter,
+  originalLanguage: item.originalLanguage,
+  publicationDemographic: item.publicationDemographic,
+  seriesId: item.externalId,
+  sourceId,
+  status: item.status,
+  tags: item.tags,
+  title: item.title,
 });
 
 const mapListResponse = (
   sourceId: string,
   response: SourceListResponse<SourceSeries>
 ) => ({
+  hasNextPage: response.hasNextPage,
   items: response.items.map((item) => mapSeriesResponse(sourceId, item)),
   page: response.page,
   pageSize: response.pageSize,
   total: response.total,
-  hasNextPage: response.hasNextPage,
 });
 
 const normalizeLimit = (limit: number | undefined): number => {
@@ -64,48 +64,28 @@ const list = Effect.gen(function* listEffect() {
   );
 
   return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    websiteUrl: row.websiteUrl,
-    iconUrl: row.iconUrl,
-    languageCode: row.languageCode,
-    supportedLanguages: row.supportedLanguages,
-    isEnabled: row.isEnabled,
     capabilities: {
-      supportsPopular: row.supportsPopular,
-      supportsLatest: row.supportsLatest,
-      supportsTrending: row.supportsTrending,
-      supportsSearch: row.supportsSearch,
-      supportsFilters: row.supportsFilters,
-      supportsSeriesDetails: row.supportsSeriesDetails,
       supportsChapterFeed: row.supportsChapterFeed,
+      supportsFilters: row.supportsFilters,
+      supportsLatest: row.supportsLatest,
       supportsPageFetch: row.supportsPageFetch,
+      supportsPopular: row.supportsPopular,
+      supportsSearch: row.supportsSearch,
+      supportsSeriesDetails: row.supportsSeriesDetails,
+      supportsTrending: row.supportsTrending,
     },
+    description: row.description,
+    iconUrl: row.iconUrl,
+    id: row.id,
+    isEnabled: row.isEnabled,
+    languageCode: row.languageCode,
+    name: row.name,
+    supportedLanguages: row.supportedLanguages,
+    websiteUrl: row.websiteUrl,
   }));
 });
 
 export const SourcesService = {
-  async list() {
-    await SourcesStorage.syncSources(sourceRegistry.list());
-
-    return runSql(list);
-  },
-
-  getSourceOrThrow(sourceId: string) {
-    const adapter = sourceRegistry.get(sourceId);
-    if (!adapter) {
-      throw new Error(`Unknown source: ${sourceId}`);
-    }
-
-    return adapter;
-  },
-
-  getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
-    const adapter = SourcesService.getSourceOrThrow(sourceId);
-    return adapter.getFilters();
-  },
-
   async getDiscover(sourceId: string, limit?: number) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     const resolvedLimit = normalizeLimit(limit);
@@ -117,9 +97,9 @@ export const SourcesService = {
       await SourcesStorage.upsertSeries(sourceId, popular.items);
       sections.push({
         id: "popular",
+        items: popular.items,
         title: "Popular this month",
         type: "popular",
-        items: popular.items,
       });
     }
 
@@ -128,9 +108,9 @@ export const SourcesService = {
       await SourcesStorage.upsertSeries(sourceId, trending.items);
       sections.push({
         id: "trending",
+        items: trending.items,
         title: "Trending now",
         type: "trending",
-        items: trending.items,
       });
     }
 
@@ -139,18 +119,38 @@ export const SourcesService = {
       await SourcesStorage.upsertSeries(sourceId, latest.items);
       sections.push({
         id: "latest",
+        items: latest.items,
         title: "Latest updates",
         type: "latest",
-        items: latest.items,
       });
     }
 
     return sections.map((section) => ({
       id: section.id,
+      items: section.items.map((item) => mapSeriesResponse(sourceId, item)),
       title: section.title,
       type: section.type,
-      items: section.items.map((item) => mapSeriesResponse(sourceId, item)),
     }));
+  },
+
+  async getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
+    const adapter = SourcesService.getSourceOrThrow(sourceId);
+    return await adapter.getFilters();
+  },
+
+  getSourceOrThrow(sourceId: string) {
+    const adapter = sourceRegistry.get(sourceId);
+    if (!adapter) {
+      throw new Error(`Unknown source: ${sourceId}`);
+    }
+
+    return adapter;
+  },
+
+  async list() {
+    await SourcesStorage.syncSources(sourceRegistry.list());
+
+    return await runSql(list);
   },
 
   async search(sourceId: string, input: SourceSearchInput) {

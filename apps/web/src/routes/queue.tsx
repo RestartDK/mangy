@@ -4,7 +4,8 @@ import { ArrowUp, RotateCcw, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge, type StatusTone } from "@/components/status-badge";
+import { StatusBadge } from "@/components/status-badge";
+import type { StatusTone } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -18,19 +19,14 @@ import { useRetryDownload } from "@/hooks/use-retry-download";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
-export const Route = createFileRoute("/queue")({
-  beforeLoad: requireAuth,
-  component: QueueRouteComponent,
-});
-
 const sortQueuedJobs = <T extends { createdAt: string }>(items: T[]): T[] =>
-  [...items].sort(
+  [...items].toSorted(
     (left, right) =>
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
   );
 
 const sortFinishedJobs = <T extends { updatedAt: string }>(items: T[]): T[] =>
-  [...items].sort(
+  [...items].toSorted(
     (left, right) =>
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
   );
@@ -58,122 +54,6 @@ const resolveJobState = (
 
   return { label: "Queued", tone: "neutral" };
 };
-
-function QueueRouteComponent() {
-  const downloadsQuery = useDownloads();
-  const cancelDownload = useCancelDownload();
-  const retryDownload = useRetryDownload();
-  const prioritizeDownload = usePrioritizeDownload();
-  const jobs = downloadsQuery.data ?? [];
-
-  const activeJobs = sortQueuedJobs(
-    jobs.filter((job) => job.status === "queued" || job.status === "running")
-  );
-  const retryJobs = sortQueuedJobs(
-    jobs.filter(
-      (job) =>
-        job.status === "retryableFailed" && job.attempts < job.maxAttempts
-    )
-  );
-  const failedJobs = sortFinishedJobs(
-    jobs.filter(
-      (job) =>
-        job.status === "retryableFailed" && job.attempts >= job.maxAttempts
-    )
-  );
-  const completedJobs = sortFinishedJobs(
-    jobs.filter((job) => job.status === "completed")
-  );
-  const cancelledJobs = sortFinishedJobs(
-    jobs.filter((job) => job.status === "cancelled")
-  );
-
-  const views = [
-    {
-      empty: "Nothing is downloading right now.",
-      jobs: activeJobs,
-      label: "In progress",
-      value: "active",
-    },
-    {
-      empty: "Nothing is waiting for another attempt.",
-      jobs: retryJobs,
-      label: "Retrying",
-      value: "retrying",
-    },
-    {
-      empty: "No download has finished yet.",
-      jobs: completedJobs,
-      label: "Completed",
-      value: "completed",
-    },
-    {
-      empty: "No job needs manual attention.",
-      jobs: failedJobs,
-      label: "Failed",
-      value: "failed",
-    },
-    {
-      empty: "No cancelled jobs.",
-      jobs: cancelledJobs,
-      label: "Cancelled",
-      value: "cancelled",
-    },
-  ];
-
-  return (
-    <AppShell>
-      <PageHeader title="Queue" />
-
-      {downloadsQuery.error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Unable to load the queue</AlertTitle>
-          <AlertDescription>
-            {getErrorMessage(downloadsQuery.error, "Try again in a moment.")}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {downloadsQuery.isLoading ? <QueueSkeleton /> : null}
-
-      {!downloadsQuery.isLoading && jobs.length === 0 ? (
-        <EmptyState
-          action={
-            <Button asChild variant="outline">
-              <Link to="/search">Search for a series</Link>
-            </Button>
-          }
-          description="Queue a chapter from a series page and it shows up here with progress and retries."
-          icon="download"
-          title="No downloads yet"
-        />
-      ) : null}
-
-      {jobs.length ? (
-        <Tabs className="page-section" defaultValue="active">
-          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [&>*]:shrink-0">
-            {views.map((view) => (
-              <TabsTrigger key={view.value} value={view.value}>
-                {view.label} ({view.jobs.length})
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {views.map((view) => (
-            <TabsContent key={view.value} value={view.value}>
-              <QueueList
-                cancelDownload={cancelDownload}
-                empty={view.empty}
-                jobs={view.jobs}
-                prioritizeDownload={prioritizeDownload}
-                retryDownload={retryDownload}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      ) : null}
-    </AppShell>
-  );
-}
 
 interface QueueListProps {
   cancelDownload: ReturnType<typeof useCancelDownload>;
@@ -300,3 +180,123 @@ const QueueSkeleton = () => (
     ))}
   </div>
 );
+const QueueRouteComponent = () => {
+  const downloadsQuery = useDownloads();
+  const cancelDownload = useCancelDownload();
+  const retryDownload = useRetryDownload();
+  const prioritizeDownload = usePrioritizeDownload();
+  const jobs = downloadsQuery.data ?? [];
+
+  const activeJobs = sortQueuedJobs(
+    jobs.filter((job) => job.status === "queued" || job.status === "running")
+  );
+  const retryJobs = sortQueuedJobs(
+    jobs.filter(
+      (job) =>
+        job.status === "retryableFailed" && job.attempts < job.maxAttempts
+    )
+  );
+  const failedJobs = sortFinishedJobs(
+    jobs.filter(
+      (job) =>
+        job.status === "retryableFailed" && job.attempts >= job.maxAttempts
+    )
+  );
+  const completedJobs = sortFinishedJobs(
+    jobs.filter((job) => job.status === "completed")
+  );
+  const cancelledJobs = sortFinishedJobs(
+    jobs.filter((job) => job.status === "cancelled")
+  );
+
+  const views = [
+    {
+      empty: "Nothing is downloading right now.",
+      jobs: activeJobs,
+      label: "In progress",
+      value: "active",
+    },
+    {
+      empty: "Nothing is waiting for another attempt.",
+      jobs: retryJobs,
+      label: "Retrying",
+      value: "retrying",
+    },
+    {
+      empty: "No download has finished yet.",
+      jobs: completedJobs,
+      label: "Completed",
+      value: "completed",
+    },
+    {
+      empty: "No job needs manual attention.",
+      jobs: failedJobs,
+      label: "Failed",
+      value: "failed",
+    },
+    {
+      empty: "No cancelled jobs.",
+      jobs: cancelledJobs,
+      label: "Cancelled",
+      value: "cancelled",
+    },
+  ];
+
+  return (
+    <AppShell>
+      <PageHeader title="Queue" />
+
+      {downloadsQuery.error ? (
+        <Alert variant="destructive">
+          <AlertTitle>Unable to load the queue</AlertTitle>
+          <AlertDescription>
+            {getErrorMessage(downloadsQuery.error, "Try again in a moment.")}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {downloadsQuery.isLoading ? <QueueSkeleton /> : null}
+
+      {!downloadsQuery.isLoading && jobs.length === 0 ? (
+        <EmptyState
+          action={
+            <Button asChild variant="outline">
+              <Link to="/search">Search for a series</Link>
+            </Button>
+          }
+          description="Queue a chapter from a series page and it shows up here with progress and retries."
+          icon="download"
+          title="No downloads yet"
+        />
+      ) : null}
+
+      {jobs.length ? (
+        <Tabs className="page-section" defaultValue="active">
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [&>*]:shrink-0">
+            {views.map((view) => (
+              <TabsTrigger key={view.value} value={view.value}>
+                {view.label} ({view.jobs.length})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {views.map((view) => (
+            <TabsContent key={view.value} value={view.value}>
+              <QueueList
+                cancelDownload={cancelDownload}
+                empty={view.empty}
+                jobs={view.jobs}
+                prioritizeDownload={prioritizeDownload}
+                retryDownload={retryDownload}
+              />
+            </TabsContent>
+          ))}
+        </Tabs>
+      ) : null}
+    </AppShell>
+  );
+};
+
+export const Route = createFileRoute("/queue")({
+  beforeLoad: requireAuth,
+  component: QueueRouteComponent,
+});

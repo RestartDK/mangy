@@ -11,24 +11,24 @@ import { SqlClient } from "effect/sql";
 import type { Fragment } from "effect/sql/Statement";
 
 const trackedSeriesProjection = Schema.Struct({
+  checkFailureCount: trackedSeriesStateRow.from.fields.check_failure_count,
   id: trackedSeriesStateRow.from.fields.id,
-  sourceId: seriesRow.from.fields.source_id,
-  seriesId: seriesRow.from.fields.external_id,
-  title: seriesRow.from.fields.title,
-  nextCheckAt: trackedSeriesStateRow.from.fields.next_check_at,
   lastCheckedAt: trackedSeriesStateRow.from.fields.last_checked_at,
   lastSeenChapterExternalId:
     trackedSeriesStateRow.from.fields.last_seen_chapter_external_id,
-  checkFailureCount: trackedSeriesStateRow.from.fields.check_failure_count,
+  nextCheckAt: trackedSeriesStateRow.from.fields.next_check_at,
+  seriesId: seriesRow.from.fields.external_id,
+  sourceId: seriesRow.from.fields.source_id,
+  title: seriesRow.from.fields.title,
 });
 
 type TrackedSeries = Schema.Schema.Type<typeof trackedSeriesProjection>;
 
 const serializeTrackedSeries = (row: TrackedSeries) => ({
   ...row,
-  nextCheckAt: row.nextCheckAt ? row.nextCheckAt.toISOString() : null,
   lastCheckedAt: row.lastCheckedAt ? row.lastCheckedAt.toISOString() : null,
   lastSeenChapterExternalId: row.lastSeenChapterExternalId ?? null,
+  nextCheckAt: row.nextCheckAt ? row.nextCheckAt.toISOString() : null,
 });
 
 const baseQuery = (
@@ -96,11 +96,11 @@ const requestRefresh = (userId: string, sourceId: string, seriesId: string) =>
 
     return {
       ...trackedState,
-      nextCheckAt: new Date().toISOString(),
       lastCheckedAt: trackedState.lastCheckedAt
         ? trackedState.lastCheckedAt.toISOString()
         : null,
       lastSeenChapterExternalId: trackedState.lastSeenChapterExternalId ?? null,
+      nextCheckAt: new Date().toISOString(),
     };
   });
 

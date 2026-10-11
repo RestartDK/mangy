@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const iconMap = {
+  default: BookOpen,
+  download: Download,
   library: BookOpen,
   search: Search,
-  download: Download,
-  default: BookOpen,
 } as const;
 
 interface EmptyStateProps {

@@ -20,6 +20,13 @@ export const useUpdateNotificationPreferences = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to update notification settings"
+      );
+    },
     onSuccess: async () => {
       toast.success("Notification settings updated");
       await Promise.all([
@@ -28,13 +35,6 @@ export const useUpdateNotificationPreferences = () => {
         }),
         queryClient.invalidateQueries({ queryKey: ["settingsBootstrap"] }),
       ]);
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to update notification settings"
-      );
     },
   });
 };

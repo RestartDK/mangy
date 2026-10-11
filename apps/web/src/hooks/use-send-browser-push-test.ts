@@ -15,6 +15,13 @@ export const useSendBrowserPushTest = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to send a browser test notification"
+      );
+    },
     onSuccess: async (data) => {
       toast.success(
         data?.deliveredCount === 1
@@ -24,13 +31,6 @@ export const useSendBrowserPushTest = () => {
       await queryClient.invalidateQueries({
         queryKey: ["browserPushSettings"],
       });
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to send a browser test notification"
-      );
     },
   });
 };

@@ -16,7 +16,7 @@ import {
 import { SourcesService } from "./service";
 
 const getAuthenticatedUser = async (request: Request) =>
-  getSessionUser(request);
+  await getSessionUser(request);
 
 export const sources = new Elysia({ prefix: "/api/sources" })
   .get(
@@ -28,7 +28,7 @@ export const sources = new Elysia({ prefix: "/api/sources" })
         return { message: "Unauthorized" };
       }
 
-      return SourcesService.list();
+      return await SourcesService.list();
     },
     {
       response: {
@@ -46,7 +46,7 @@ export const sources = new Elysia({ prefix: "/api/sources" })
         return { message: "Unauthorized" };
       }
 
-      return SourcesService.getFilters(params.sourceId);
+      return await SourcesService.getFilters(params.sourceId);
     },
     {
       params: sourceParamsSchema,
@@ -65,7 +65,7 @@ export const sources = new Elysia({ prefix: "/api/sources" })
         return { message: "Unauthorized" };
       }
 
-      return SourcesService.getDiscover(params.sourceId, query.limit);
+      return await SourcesService.getDiscover(params.sourceId, query.limit);
     },
     {
       params: sourceParamsSchema,
@@ -85,11 +85,11 @@ export const sources = new Elysia({ prefix: "/api/sources" })
         return { message: "Unauthorized" };
       }
 
-      return SourcesService.search(params.sourceId, body);
+      return await SourcesService.search(params.sourceId, body);
     },
     {
-      params: sourceParamsSchema,
       body: sourceSearchBody,
+      params: sourceParamsSchema,
       response: {
         200: sourceSeriesListSchema,
         401: unauthorizedResponseSchema,

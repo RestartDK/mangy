@@ -176,19 +176,20 @@ const enqueue = (
   Effect.gen(function* enqueueEffect() {
     const sql = yield* SqlClient.SqlClient;
     const adapter = SourcesService.getSourceOrThrow(input.sourceId);
-    const seriesItem = yield* Effect.promise(() =>
-      adapter.getSeries(input.seriesId)
+    const seriesItem = yield* Effect.promise(
+      async () => await adapter.getSeries(input.seriesId)
     );
-    const seriesRecord = yield* Effect.promise(() =>
-      SourcesStorage.upsertSeriesItem(input.sourceId, seriesItem)
+    const seriesRecord = yield* Effect.promise(
+      async () =>
+        await SourcesStorage.upsertSeriesItem(input.sourceId, seriesItem)
     );
 
-    const chapters = yield* Effect.promise(() =>
-      adapter.getChapters(input.seriesId)
+    const chapters = yield* Effect.promise(
+      async () => await adapter.getChapters(input.seriesId)
     );
-    yield* Effect.promise(() =>
-      SourcesStorage.upsertChapters(seriesRecord.id, chapters)
-    );
+    yield* Effect.promise(async () => {
+      await SourcesStorage.upsertChapters(seriesRecord.id, chapters);
+    });
 
     const chapterRows = yield* decodeRows(
       Schema.Struct({ id: chapterRow.from.fields.id }),
@@ -234,8 +235,8 @@ const enqueue = (
           sql,
           libraryEntryColumns,
           {
-            id: crypto.randomUUID(),
             downloadDestinationId: destination.id,
+            id: crypto.randomUUID(),
             seriesId: seriesRecord.id,
             userId,
           }
@@ -255,9 +256,9 @@ const enqueue = (
             sql,
             downloadJobColumns,
             {
-              id: crypto.randomUUID(),
               chapterId: chapterRecord.id,
               downloadDestinationId: destination.id,
+              id: crypto.randomUUID(),
               progressPercent: 0,
               seriesId: seriesRecord.id,
               userId,
@@ -408,14 +409,8 @@ const prioritize = (userId: string, jobId: string) =>
   });
 
 export const DownloadsService = {
-  async list(userId: string) {
-    return await runSql(list(userId));
-  },
-
-  async getJob(userId: string, jobId: string) {
-    const job = await runSql(getJob(userId, jobId));
-
-    return job ?? null;
+  async cancel(userId: string, jobId: string) {
+    return await runSql(cancel(userId, jobId));
   },
 
   async enqueue(
@@ -430,15 +425,21 @@ export const DownloadsService = {
     return await runSql(enqueue(userId, input));
   },
 
-  async cancel(userId: string, jobId: string) {
-    return await runSql(cancel(userId, jobId));
+  async getJob(userId: string, jobId: string) {
+    const job = await runSql(getJob(userId, jobId));
+
+    return job ?? null;
   },
 
-  async retry(userId: string, jobId: string) {
-    return await runSql(retry(userId, jobId));
+  async list(userId: string) {
+    return await runSql(list(userId));
   },
 
   async prioritize(userId: string, jobId: string) {
     return await runSql(prioritize(userId, jobId));
+  },
+
+  async retry(userId: string, jobId: string) {
+    return await runSql(retry(userId, jobId));
   },
 };

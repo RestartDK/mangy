@@ -21,7 +21,7 @@ export const tracking = new Elysia({ prefix: "/api/tracking" })
         return { message: "Unauthorized" };
       }
 
-      return TrackingService.list(user.id);
+      return await TrackingService.list(user.id);
     },
     {
       response: {

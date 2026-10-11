@@ -9,15 +9,15 @@ declare module "web-push" {
   }
 
   interface WebPushStatic {
-    sendNotification(
+    sendNotification: (
       subscription: PushSubscription,
       payload?: string
-    ): Promise<void>;
-    setVapidDetails(
+    ) => Promise<void>;
+    setVapidDetails: (
       subject: string,
       publicKey: string,
       privateKey: string
-    ): void;
+    ) => void;
   }
 
   const webpush: WebPushStatic;

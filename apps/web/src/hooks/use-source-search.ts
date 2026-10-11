@@ -37,11 +37,11 @@ const fetchSearchPage = async (
 
   return (
     data ?? {
+      hasNextPage: false,
       items: [],
       page,
       pageSize: params.pageSize ?? 20,
       total: null,
-      hasNextPage: false,
     }
   );
 };
@@ -58,12 +58,12 @@ export const useSourceSearch = (params: SourceSearchParams) =>
     getNextPageParam: (last) => (last.hasNextPage ? last.page + 1 : undefined),
     initialPageParam: 1,
     placeholderData: keepPreviousData,
-    queryFn: ({ pageParam }) => {
+    queryFn: async ({ pageParam }) => {
       if (!params.sourceId) {
         throw new Error("A source must be selected before searching.");
       }
 
-      return fetchSearchPage(params.sourceId, params, pageParam);
+      return await fetchSearchPage(params.sourceId, params, pageParam);
     },
     queryKey: [
       "sourceSearch",

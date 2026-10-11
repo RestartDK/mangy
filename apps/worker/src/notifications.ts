@@ -16,11 +16,8 @@ import {
   pushSubscriptionColumns,
   pushSubscriptionRow,
 } from "@mangy/db/model";
-import {
-  BrowserPushError,
-  type BrowserPushPayload,
-  sendBrowserPush,
-} from "@mangy/push";
+import { BrowserPushError, sendBrowserPush } from "@mangy/push";
+import type { BrowserPushPayload } from "@mangy/push";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -100,9 +97,8 @@ const shouldSendBrowserPush = (
   return endpoint.notifyOnSystemWarning;
 };
 
-const getRetryDelayMs = (attempts: number): number => {
-  return 15_000 * 2 ** Math.min(Math.max(attempts - 1, 0), 4);
-};
+const getRetryDelayMs = (attempts: number): number =>
+  15_000 * 2 ** Math.min(Math.max(attempts - 1, 0), 4);
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -112,7 +108,7 @@ const getErrorMessage = (error: unknown): string => {
   return "Unable to deliver this browser notification.";
 };
 
-const createNotificationRecord = (input: {
+export const queueNotification = (input: {
   body: string;
   title: string;
   type: NotificationType;
@@ -193,22 +189,14 @@ const createNotificationRecord = (input: {
       sql,
       notificationDeliveryColumns,
       subscriptions.map((subscription) => ({
-        id: crypto.randomUUID(),
         channel: "browserPush" as const,
+        id: crypto.randomUUID(),
         notificationEndpointId: browserPushEndpoint.id,
         notificationId: createdNotification.id,
         pushSubscriptionId: subscription.id,
       }))
     )}`;
   });
-
-export const queueNotification = (input: {
-  body: string;
-  title: string;
-  type: NotificationType;
-  userId: string;
-}): Effect.Effect<void, unknown, SqlClient.SqlClient> =>
-  createNotificationRecord(input);
 
 export const claimNextPushDelivery = async (
   workerId: string
@@ -421,28 +409,16 @@ export const failPushDelivery = async (
           }
 
           if (delivery.pushSubscriptionId) {
-            if (shouldDeactivateSubscription) {
-              yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
-                sql,
-                pushSubscriptionColumns,
-                {
-                  isActive: false,
-                  lastError: message,
-                  updatedAt: now,
-                }
-              )}
-                WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
-            } else {
-              yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
-                sql,
-                pushSubscriptionColumns,
-                {
-                  lastError: message,
-                  updatedAt: now,
-                }
-              )}
-                WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
-            }
+            const subscriptionValues = shouldDeactivateSubscription
+              ? { isActive: false, lastError: message, updatedAt: now }
+              : { lastError: message, updatedAt: now };
+
+            yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
+              sql,
+              pushSubscriptionColumns,
+              subscriptionValues
+            )}
+              WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
           }
         })
       );

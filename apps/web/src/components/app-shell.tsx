@@ -30,25 +30,25 @@ import { cn } from "@/lib/utils";
 
 const navigationGroups = [
   {
+    items: [
+      { icon: Compass, label: "Discover", to: "/" },
+      { icon: Search, label: "Search", to: "/search" },
+    ],
     label: "Browse",
-    items: [
-      { to: "/", label: "Discover", icon: Compass },
-      { to: "/search", label: "Search", icon: Search },
-    ],
   },
   {
+    items: [
+      { icon: BookMarked, label: "Library", to: "/library" },
+      { icon: Download, label: "Queue", to: "/queue" },
+    ],
     label: "Manage",
-    items: [
-      { to: "/library", label: "Library", icon: BookMarked },
-      { to: "/queue", label: "Queue", icon: Download },
-    ],
   },
   {
-    label: "Account",
     items: [
-      { to: "/notifications", label: "Notifications", icon: Bell },
-      { to: "/settings", label: "Settings", icon: Settings },
+      { icon: Bell, label: "Notifications", to: "/notifications" },
+      { icon: Settings, label: "Settings", to: "/settings" },
     ],
+    label: "Account",
   },
 ] as const;
 

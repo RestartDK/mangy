@@ -7,7 +7,6 @@ export type SourceSummary = NonNullable<SourcesResponse>[number];
 
 export const useSources = () =>
   useQuery({
-    queryKey: ["sources"],
     queryFn: async () => {
       const { data, error } = await api.api.sources.get();
       if (error) {
@@ -16,4 +15,5 @@ export const useSources = () =>
 
       return data ?? [];
     },
+    queryKey: ["sources"],
   });

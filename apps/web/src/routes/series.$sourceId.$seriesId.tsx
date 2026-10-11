@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { BookOpen, ExternalLink, RefreshCcw, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -41,14 +41,36 @@ import {
   pluralize,
 } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
+import { runMutation } from "@/lib/run-mutation";
 
-export const Route = createFileRoute("/series/$sourceId/$seriesId")({
-  beforeLoad: requireAuth,
-  component: SeriesDetailRouteComponent,
-});
-
-function SeriesDetailRouteComponent() {
-  const { sourceId, seriesId } = Route.useParams();
+const SeriesDetailSkeleton = () => (
+  <div className="page-grid">
+    <div className="grid gap-6 lg:grid-cols-[190px_minmax(0,1fr)]">
+      <Skeleton className="aspect-2/3 w-40 rounded-xl lg:w-full" />
+      <div className="space-y-4">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    </div>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="panel space-y-3 p-4">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Skeleton className="h-10 w-full" key={String(index)} />
+        ))}
+      </div>
+      <div className="panel space-y-3 p-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    </div>
+  </div>
+);
+const SeriesDetailRouteComponent = () => {
+  const { sourceId, seriesId } = useParams({
+    from: "/series/$sourceId/$seriesId",
+  });
   const { chapters, error, isLoading, series } = useSeriesDetail(
     sourceId,
     seriesId
@@ -63,10 +85,13 @@ function SeriesDetailRouteComponent() {
   const [isTracked, setIsTracked] = useState(false);
   const [autoDownload, setAutoDownload] = useState(false);
 
-  const enabledDestinations =
-    settingsQuery.data?.destinations.filter(
-      (destination) => destination.isEnabled
-    ) ?? [];
+  const enabledDestinations = useMemo(
+    () =>
+      settingsQuery.data?.destinations.filter(
+        (destination) => destination.isEnabled
+      ) ?? [],
+    [settingsQuery.data]
+  );
   const trackingState = libraryStateQuery.data?.trackingState ?? null;
   const defaultDestinationId =
     enabledDestinations.find((destination) => destination.isDefault)?.id ??
@@ -301,21 +326,23 @@ function SeriesDetailRouteComponent() {
                             }
                             onClick={() => {
                               setPendingChapterId(chapter.chapterId);
-                              enqueueDownload
-                                .mutateAsync({
+                              void runMutation(
+                                enqueueDownload.mutateAsync({
                                   chapterId: chapter.chapterId,
                                   downloadDestinationId: selectedDestinationId,
                                   seriesId,
                                   sourceId,
-                                })
-                                .finally(() => {
-                                  setPendingChapterId((current) =>
-                                    current === chapter.chapterId
-                                      ? null
-                                      : current
-                                  );
-                                })
-                                .catch(() => undefined);
+                                }),
+                                {
+                                  onSettled: () => {
+                                    setPendingChapterId((current) =>
+                                      current === chapter.chapterId
+                                        ? null
+                                        : current
+                                    );
+                                  },
+                                }
+                              );
                             }}
                             size="sm"
                             type="button"
@@ -441,15 +468,15 @@ function SeriesDetailRouteComponent() {
                   <Button
                     disabled={!canSaveTracking}
                     onClick={() => {
-                      updateLibrarySeriesState
-                        .mutateAsync({
+                      void runMutation(
+                        updateLibrarySeriesState.mutateAsync({
                           autoDownload,
                           downloadDestinationId: selectedDestinationId || null,
                           isTracked,
                           seriesId,
                           sourceId,
                         })
-                        .catch(() => undefined);
+                      );
                     }}
                     type="button"
                   >
@@ -459,9 +486,9 @@ function SeriesDetailRouteComponent() {
                   <Button
                     disabled={!trackingState || refreshTracking.isPending}
                     onClick={() => {
-                      refreshTracking
-                        .mutateAsync({ seriesId, sourceId })
-                        .catch(() => undefined);
+                      void runMutation(
+                        refreshTracking.mutateAsync({ seriesId, sourceId })
+                      );
                     }}
                     type="button"
                     variant="outline"
@@ -484,29 +511,9 @@ function SeriesDetailRouteComponent() {
       ) : null}
     </AppShell>
   );
-}
+};
 
-const SeriesDetailSkeleton = () => (
-  <div className="page-grid">
-    <div className="grid gap-6 lg:grid-cols-[190px_minmax(0,1fr)]">
-      <Skeleton className="aspect-2/3 w-40 rounded-xl lg:w-full" />
-      <div className="space-y-4">
-        <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-12 w-full" />
-      </div>
-    </div>
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="panel space-y-3 p-4">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <Skeleton className="h-10 w-full" key={String(index)} />
-        ))}
-      </div>
-      <div className="panel space-y-3 p-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    </div>
-  </div>
-);
+export const Route = createFileRoute("/series/$sourceId/$seriesId")({
+  beforeLoad: requireAuth,
+  component: SeriesDetailRouteComponent,
+});

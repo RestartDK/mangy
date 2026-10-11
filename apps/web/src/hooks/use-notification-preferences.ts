@@ -11,7 +11,6 @@ export type NotificationPreferences =
 
 export const useNotificationPreferences = () =>
   useQuery({
-    queryKey: ["notificationPreferences"],
     queryFn: async () => {
       const { data, error } = await api.api.notifications.preferences.get();
       if (error) {
@@ -20,4 +19,5 @@ export const useNotificationPreferences = () =>
 
       return data ?? { inAppEnabled: true, unreadCount: 0 };
     },
+    queryKey: ["notificationPreferences"],
   });

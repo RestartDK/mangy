@@ -63,34 +63,34 @@ const toSeriesResponse = (
     availableTranslatedLanguages: string[];
   }
 ) => ({
-  sourceId,
-  seriesId: item.externalId,
-  title: item.title,
-  description: item.description,
-  canonicalUrl: item.canonicalUrl,
-  coverImageUrl: item.coverImageUrl,
-  status: item.status,
-  originalLanguage: item.originalLanguage,
-  latestChapter: item.latestChapter,
-  contentRating: item.contentRating,
-  publicationDemographic: item.publicationDemographic,
-  authorNames: item.authorNames,
   artistNames: item.artistNames,
-  tags: item.tags,
+  authorNames: item.authorNames,
   availableTranslatedLanguages: item.availableTranslatedLanguages,
+  canonicalUrl: item.canonicalUrl,
+  contentRating: item.contentRating,
+  coverImageUrl: item.coverImageUrl,
+  description: item.description,
+  latestChapter: item.latestChapter,
+  originalLanguage: item.originalLanguage,
+  publicationDemographic: item.publicationDemographic,
+  seriesId: item.externalId,
+  sourceId,
+  status: item.status,
+  tags: item.tags,
+  title: item.title,
 });
 
 const toChapterResponse = (item: SourceChapter) => ({
   chapterId: item.externalId,
-  title: item.title,
   chapterNumber: item.chapterNumber,
-  volumeNumber: item.volumeNumber,
-  translatedLanguage: item.translatedLanguage,
   externalUrl: item.externalUrl,
-  sourceOrder: item.sourceOrder,
+  isUnavailable: item.isUnavailable,
   pageCount: item.pageCount,
   publishedAt: item.publishedAt ? item.publishedAt.toISOString() : null,
-  isUnavailable: item.isUnavailable,
+  sourceOrder: item.sourceOrder,
+  title: item.title,
+  translatedLanguage: item.translatedLanguage,
+  volumeNumber: item.volumeNumber,
 });
 
 const toPageResponse = (
@@ -108,13 +108,6 @@ const toPageResponse = (
 });
 
 export const SeriesService = {
-  async getSeries(sourceId: string, seriesId: string) {
-    const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const seriesItem = await adapter.getSeries(seriesId);
-    await SourcesStorage.upsertSeriesItem(sourceId, seriesItem);
-    return toSeriesResponse(sourceId, seriesItem);
-  },
-
   async getChapters(sourceId: string, seriesId: string) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     const seriesItem = await adapter.getSeries(seriesId);
@@ -152,6 +145,13 @@ export const SeriesService = {
         toPageResponse(requestUrl, sourceId, seriesId, chapterId, item)
       ),
     };
+  },
+
+  async getSeries(sourceId: string, seriesId: string) {
+    const adapter = SourcesService.getSourceOrThrow(sourceId);
+    const seriesItem = await adapter.getSeries(seriesId);
+    await SourcesStorage.upsertSeriesItem(sourceId, seriesItem);
+    return toSeriesResponse(sourceId, seriesItem);
   },
 
   async proxyPageImage(sourceId: string, chapterId: string, pageIndex: number) {

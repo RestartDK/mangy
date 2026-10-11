@@ -53,14 +53,9 @@ import {
   withoutFilter,
 } from "@/lib/search-filters";
 
-export const Route = createFileRoute("/search")({
-  beforeLoad: requireAuth,
-  component: SearchRouteComponent,
-});
-
 const SEARCH_DEBOUNCE_MS = 350;
-const ASCENDING_VALUE_PATTERN = /^asc/i;
-const DESCENDING_VALUE_PATTERN = /^desc/i;
+const ASCENDING_VALUE_PATTERN = /^asc/iu;
+const DESCENDING_VALUE_PATTERN = /^desc/iu;
 
 const setFilterValue = (
   definition: SourceFilterDefinition,
@@ -92,7 +87,125 @@ const setFilterValue = (
   return { [definition.key]: value };
 };
 
-function SearchRouteComponent() {
+interface FilterFieldProps {
+  definition: SourceFilterDefinition;
+  filters: Record<string, unknown>;
+  onValueChange: (
+    definition: SourceFilterDefinition,
+    value: string | string[] | boolean | undefined
+  ) => void;
+}
+
+const FilterField = ({
+  definition,
+  filters,
+  onValueChange,
+}: FilterFieldProps) => {
+  if (definition.type === "multiSelect") {
+    const selected = new Set(
+      Array.isArray(filters[definition.key])
+        ? (filters[definition.key] as string[])
+        : (definition.defaultValue ?? [])
+    );
+
+    return (
+      <Field className="gap-2">
+        <FieldTitle id={`${definition.key}-label`}>
+          {definition.label}
+        </FieldTitle>
+        <fieldset
+          aria-labelledby={`${definition.key}-label`}
+          className="flex flex-col gap-2 border-0 p-0"
+        >
+          {definition.options.map((option) => (
+            <label
+              className="flex cursor-pointer items-center gap-2.5 text-sm"
+              htmlFor={`${definition.key}-${option.value}`}
+              key={option.value}
+            >
+              <Checkbox
+                checked={selected.has(option.value)}
+                id={`${definition.key}-${option.value}`}
+                onCheckedChange={(checked) => {
+                  const next = new Set(selected);
+                  if (checked === true) {
+                    next.add(option.value);
+                  } else {
+                    next.delete(option.value);
+                  }
+                  onValueChange(definition, [...next]);
+                }}
+              />
+              {option.label}
+            </label>
+          ))}
+        </fieldset>
+      </Field>
+    );
+  }
+
+  if (definition.type === "toggle") {
+    return (
+      <Field orientation="horizontal">
+        <Checkbox
+          checked={
+            filters[definition.key] === true ||
+            (filters[definition.key] === undefined &&
+              definition.defaultValue === true)
+          }
+          id={definition.key}
+          onCheckedChange={(checked) => {
+            onValueChange(definition, checked === true);
+          }}
+        />
+        <FieldLabel htmlFor={definition.key}>{definition.label}</FieldLabel>
+      </Field>
+    );
+  }
+
+  return (
+    <Field className="gap-2">
+      <FieldLabel htmlFor={definition.key}>{definition.label}</FieldLabel>
+      <Select
+        onValueChange={(value) => {
+          onValueChange(definition, value);
+        }}
+        value={
+          (filters[definition.key] as string | undefined) ??
+          definition.defaultValue ??
+          ""
+        }
+      >
+        <SelectTrigger className="h-8 w-full" id={definition.key}>
+          <SelectValue placeholder="Any" />
+        </SelectTrigger>
+        <SelectContent>
+          {definition.options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <FieldDescription className="text-xs">
+        Defaults to {definition.defaultValue ?? "Any"}.
+      </FieldDescription>
+    </Field>
+  );
+};
+
+const ResultGridSkeleton = () => (
+  <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    {Array.from({ length: 10 }).map((_, index) => (
+      <div className="flex flex-col gap-3" key={String(index)}>
+        <Skeleton className="aspect-2/3 w-full rounded-lg" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    ))}
+  </div>
+);
+const SearchRouteComponent = () => {
   const sourcesQuery = useSources();
   const enabledSources = useMemo(
     () => (sourcesQuery.data ?? []).filter((source) => source.isEnabled),
@@ -113,7 +226,9 @@ function SearchRouteComponent() {
       setQuery(queryInput.trim());
     }, SEARCH_DEBOUNCE_MS);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [queryInput]);
 
   const definitions = useMemo(
@@ -179,9 +294,9 @@ function SearchRouteComponent() {
       const patch = setFilterValue(definition, value);
 
       if (!patch) {
-        const next = { ...current };
-        delete next[definition.key];
-        return next;
+        return Object.fromEntries(
+          Object.entries(current).filter(([key]) => key !== definition.key)
+        );
       }
 
       return { ...current, ...patch };
@@ -232,7 +347,9 @@ function SearchRouteComponent() {
           aria-label="Search titles"
           autoComplete="off"
           className="placeholder:text-muted-foreground h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
-          onChange={(event) => setQueryInput(event.target.value)}
+          onChange={(event) => {
+            setQueryInput(event.target.value);
+          }}
           placeholder={`Search ${sourceName}`}
           value={queryInput}
         />
@@ -252,7 +369,9 @@ function SearchRouteComponent() {
         ) : null}
         <Button
           className="h-8"
-          onClick={() => setIsFiltersOpen(true)}
+          onClick={() => {
+            setIsFiltersOpen(true);
+          }}
           type="button"
           variant="outline"
         >
@@ -291,7 +410,9 @@ function SearchRouteComponent() {
 
         {sortDefinition ? (
           <Select
-            onValueChange={(value) => applyFilterValue(sortDefinition, value)}
+            onValueChange={(value) => {
+              applyFilterValue(sortDefinition, value);
+            }}
             value={
               (effectiveFilters[sortDefinition.key] as string | undefined) ??
               sortDefinition.defaultValue ??
@@ -352,9 +473,9 @@ function SearchRouteComponent() {
             <button
               className="border-border bg-card hover:bg-muted inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors"
               key={`${active.key}:${active.value}`}
-              onClick={() =>
-                setFilters((current) => withoutFilter(current, active))
-              }
+              onClick={() => {
+                setFilters((current) => withoutFilter(current, active));
+              }}
               type="button"
             >
               {active.label}
@@ -363,7 +484,9 @@ function SearchRouteComponent() {
           ))}
           <Button
             className="h-6"
-            onClick={() => setFilters({})}
+            onClick={() => {
+              setFilters({});
+            }}
             size="sm"
             type="button"
             variant="ghost"
@@ -402,7 +525,9 @@ function SearchRouteComponent() {
           action={
             activeFilters.length > 0 ? (
               <Button
-                onClick={() => setFilters({})}
+                onClick={() => {
+                  setFilters({});
+                }}
                 size="sm"
                 type="button"
                 variant="outline"
@@ -435,7 +560,9 @@ function SearchRouteComponent() {
             <div className="flex justify-center">
               <Button
                 disabled={searchQuery.isFetchingNextPage}
-                onClick={() => searchQuery.fetchNextPage()}
+                onClick={() => {
+                  void searchQuery.fetchNextPage();
+                }}
                 size="lg"
                 type="button"
                 variant="outline"
@@ -477,13 +604,20 @@ function SearchRouteComponent() {
           <SheetFooter className="flex-row justify-between gap-2">
             <Button
               disabled={activeFilters.length === 0}
-              onClick={() => setFilters({})}
+              onClick={() => {
+                setFilters({});
+              }}
               type="button"
               variant="ghost"
             >
               Clear all
             </Button>
-            <Button onClick={() => setIsFiltersOpen(false)} type="button">
+            <Button
+              onClick={() => {
+                setIsFiltersOpen(false);
+              }}
+              type="button"
+            >
               Done
             </Button>
           </SheetFooter>
@@ -491,121 +625,9 @@ function SearchRouteComponent() {
       </Sheet>
     </AppShell>
   );
-}
-
-interface FilterFieldProps {
-  definition: SourceFilterDefinition;
-  filters: Record<string, unknown>;
-  onValueChange: (
-    definition: SourceFilterDefinition,
-    value: string | string[] | boolean | undefined
-  ) => void;
-}
-
-const FilterField = ({
-  definition,
-  filters,
-  onValueChange,
-}: FilterFieldProps) => {
-  if (definition.type === "multiSelect") {
-    const selected = new Set(
-      Array.isArray(filters[definition.key])
-        ? (filters[definition.key] as string[])
-        : (definition.defaultValue ?? [])
-    );
-
-    return (
-      <Field className="gap-2">
-        <FieldTitle id={`${definition.key}-label`}>
-          {definition.label}
-        </FieldTitle>
-        <fieldset
-          aria-labelledby={`${definition.key}-label`}
-          className="flex flex-col gap-2 border-0 p-0"
-        >
-          {definition.options.map((option) => (
-            <label
-              className="flex cursor-pointer items-center gap-2.5 text-sm"
-              htmlFor={`${definition.key}-${option.value}`}
-              key={option.value}
-            >
-              <Checkbox
-                checked={selected.has(option.value)}
-                id={`${definition.key}-${option.value}`}
-                onCheckedChange={(checked) => {
-                  const next = new Set(selected);
-                  if (checked === true) {
-                    next.add(option.value);
-                  } else {
-                    next.delete(option.value);
-                  }
-                  onValueChange(definition, Array.from(next));
-                }}
-              />
-              {option.label}
-            </label>
-          ))}
-        </fieldset>
-      </Field>
-    );
-  }
-
-  if (definition.type === "toggle") {
-    return (
-      <Field orientation="horizontal">
-        <Checkbox
-          checked={
-            filters[definition.key] === true ||
-            (filters[definition.key] === undefined &&
-              definition.defaultValue === true)
-          }
-          id={definition.key}
-          onCheckedChange={(checked) =>
-            onValueChange(definition, checked === true)
-          }
-        />
-        <FieldLabel htmlFor={definition.key}>{definition.label}</FieldLabel>
-      </Field>
-    );
-  }
-
-  return (
-    <Field className="gap-2">
-      <FieldLabel htmlFor={definition.key}>{definition.label}</FieldLabel>
-      <Select
-        onValueChange={(value) => onValueChange(definition, value)}
-        value={
-          (filters[definition.key] as string | undefined) ??
-          definition.defaultValue ??
-          ""
-        }
-      >
-        <SelectTrigger className="h-8 w-full" id={definition.key}>
-          <SelectValue placeholder="Any" />
-        </SelectTrigger>
-        <SelectContent>
-          {definition.options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <FieldDescription className="text-xs">
-        Defaults to {definition.defaultValue ?? "Any"}.
-      </FieldDescription>
-    </Field>
-  );
 };
 
-const ResultGridSkeleton = () => (
-  <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-    {Array.from({ length: 10 }).map((_, index) => (
-      <div className="flex flex-col gap-3" key={String(index)}>
-        <Skeleton className="aspect-2/3 w-full rounded-lg" />
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-3 w-1/2" />
-      </div>
-    ))}
-  </div>
-);
+export const Route = createFileRoute("/search")({
+  beforeLoad: requireAuth,
+  component: SearchRouteComponent,
+});

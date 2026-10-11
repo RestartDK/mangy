@@ -20,6 +20,13 @@ export const useRemoveLibrarySeries = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to remove series from library"
+      );
+    },
     onSuccess: async (_, variables) => {
       toast.success("Series removed from library");
       await Promise.all([
@@ -33,13 +40,6 @@ export const useRemoveLibrarySeries = () => {
           ],
         }),
       ]);
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to remove series from library"
-      );
     },
   });
 };

@@ -17,24 +17,26 @@ export interface BrowserPushClientState {
 
 const serviceWorkerPath = "/push-sw.js";
 
-const hasNotificationApi = (): boolean => {
-  return typeof window !== "undefined" && "Notification" in window;
-};
+const hasNotificationApi = (): boolean =>
+  typeof window !== "undefined" && "Notification" in window;
 
-const hasPushManagerApi = (): boolean => {
-  return typeof window !== "undefined" && "PushManager" in window;
-};
+const hasPushManagerApi = (): boolean =>
+  typeof window !== "undefined" && "PushManager" in window;
 
-const hasServiceWorkerApi = (): boolean => {
-  return typeof window !== "undefined" && "serviceWorker" in navigator;
-};
+const hasServiceWorkerApi = (): boolean =>
+  typeof window !== "undefined" && "serviceWorker" in navigator;
 
-const urlBase64ToUint8Array = (value: string): Uint8Array => {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+const urlBase64ToUint8Array = (value: string): Uint8Array<ArrayBuffer> => {
+  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
   const paddedValue = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`;
   const rawData = window.atob(paddedValue);
+  const bytes = new Uint8Array(rawData.length);
 
-  return Uint8Array.from(rawData, (character) => character.charCodeAt(0));
+  for (let index = 0; index < rawData.length; index += 1) {
+    bytes[index] = rawData.codePointAt(index) ?? 0;
+  }
+
+  return bytes;
 };
 
 const serializePushSubscription = (
@@ -58,6 +60,9 @@ const serializePushSubscription = (
   };
 };
 
+export const isBrowserPushSecureContext = (): boolean =>
+  typeof window !== "undefined" && window.isSecureContext;
+
 export const isBrowserPushSupported = (): boolean => {
   if (!hasNotificationApi()) {
     return false;
@@ -68,10 +73,6 @@ export const isBrowserPushSupported = (): boolean => {
   }
 
   return hasPushManagerApi();
-};
-
-export const isBrowserPushSecureContext = (): boolean => {
-  return typeof window !== "undefined" && window.isSecureContext;
 };
 
 export const getBrowserPushClientState =
@@ -138,7 +139,7 @@ export const registerPushServiceWorker =
       );
     }
 
-    return navigator.serviceWorker.register(serviceWorkerPath);
+    return await navigator.serviceWorker.register(serviceWorkerPath);
   };
 
 export const subscribeCurrentBrowserToPush = async (
@@ -180,7 +181,7 @@ export const subscribeCurrentBrowserToPush = async (
   }
 
   const createdSubscription = await registration.pushManager.subscribe({
-    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
     userVisibleOnly: true,
   });
 
@@ -203,7 +204,7 @@ export const unsubscribeCurrentBrowserFromPush = async (): Promise<
     return null;
   }
 
-  const endpoint = subscription.endpoint;
+  const { endpoint } = subscription;
   await subscription.unsubscribe();
   return endpoint;
 };

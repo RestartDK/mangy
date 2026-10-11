@@ -29,6 +29,11 @@ export default defineConfig({
     },
   ],
   rules: {
+    // effect/http-api and effect/sql are the replacements for elysia and drizzle,
+    // so the unstable imports are deliberate and there is no stable alternative.
+    // The rule is correct that these may break in a minor release; that risk is
+    // accepted knowingly. Revisit when those modules graduate.
+    "effecttsgo/unstable-api-usage": "off",
     "oxc/no-barrel-file": "off",
   },
 });
