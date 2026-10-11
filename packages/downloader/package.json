@@ -13,6 +13,8 @@
     "check-types": "tsc -b"
   },
   "dependencies": {
+    "@effect/platform-bun": "catalog:",
+    "effect": "catalog:",
     "fflate": "^0.8.3"
   },
   "devDependencies": {

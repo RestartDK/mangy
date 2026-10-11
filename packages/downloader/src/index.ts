@@ -1,65 +1,52 @@
-import { zipSync } from "fflate";
+import { BunServices } from "@effect/platform-bun";
+import { Effect, FileSystem, Path } from "effect";
+import type { PlatformError } from "effect/PlatformError";
+import { Zip, ZipPassThrough } from "fflate";
 
-import {
-  ensureDirectory,
-  ensureEmptyDirectory,
-  removePath,
-  writeBytes,
-} from "./fs";
+import * as fs from "./fs";
 
-export {
-  ensureDirectory,
-  ensureEmptyDirectory,
-  removeDirectory,
-  removePath,
-  writeBytes,
-} from "./fs";
+type PlatformServices = FileSystem.FileSystem | Path.Path;
 
-const trailingSeparatorsPattern = /[\\/]+$/u;
-const leadingAndTrailingSeparatorsPattern = /^[\\/]+|[\\/]+$/gu;
+const runPlatform = async <A, E>(
+  program: Effect.Effect<A, E, PlatformServices>
+): Promise<A> =>
+  await Effect.runPromise(Effect.provide(program, BunServices.layer));
+
+const attempt = <A>(
+  evaluate: () => A | PromiseLike<A>
+): Effect.Effect<A, Error> =>
+  Effect.tryPromise({
+    catch: (cause) =>
+      cause instanceof Error ? cause : new Error(String(cause)),
+    try: async () => await evaluate(),
+  });
+
+export const ensureDirectory = async (directoryPath: string): Promise<void> => {
+  await runPlatform(fs.ensureDirectory(directoryPath));
+};
+
+export const ensureEmptyDirectory = async (
+  directoryPath: string
+): Promise<void> => {
+  await runPlatform(fs.ensureEmptyDirectory(directoryPath));
+};
+
+export const removeDirectory = async (directoryPath: string): Promise<void> => {
+  await runPlatform(fs.removeDirectory(directoryPath));
+};
+
+export const removePath = async (filePath: string): Promise<void> => {
+  await runPlatform(fs.removePath(filePath));
+};
+
+export const writeBytes = async (
+  filePath: string,
+  data: Uint8Array
+): Promise<void> => {
+  await runPlatform(fs.writeBytes(filePath, data));
+};
+
 const queryAndHashPattern = /[?#].*$/u;
-const pathSeparatorsPattern = /[\\/]/u;
-
-const getPathSeparator = (path: string): string =>
-  path.includes("\\") && !path.includes("/") ? "\\" : "/";
-
-const trimTrailingSeparators = (value: string): string =>
-  value.replace(trailingSeparatorsPattern, "");
-
-const joinPath = (...parts: string[]): string => {
-  const [firstPart, ...restParts] = parts.filter(Boolean);
-
-  if (!firstPart) {
-    return "";
-  }
-
-  const separator = getPathSeparator(firstPart);
-  let joined = trimTrailingSeparators(firstPart);
-
-  for (const part of restParts) {
-    const trimmedPart = part.replace(leadingAndTrailingSeparatorsPattern, "");
-
-    if (!trimmedPart) {
-      continue;
-    }
-
-    joined = `${joined}${separator}${trimmedPart}`;
-  }
-
-  return joined;
-};
-
-const getExtension = (value: string): string => {
-  const normalizedValue = value.replace(queryAndHashPattern, "");
-  const fileName = normalizedValue.split(pathSeparatorsPattern).pop() ?? "";
-  const extensionIndex = fileName.lastIndexOf(".");
-
-  if (extensionIndex <= 0) {
-    return "";
-  }
-
-  return fileName.slice(extensionIndex);
-};
 
 export interface DownloadPage {
   index: number;
@@ -106,6 +93,20 @@ interface ChapterOutputPaths {
   seriesDirectory: string;
 }
 
+interface DownloadPagesInput {
+  beforePage?: (page: DownloadPage) => Promise<void> | void;
+  onProgress?: (progress: DownloadProgress) => Promise<void> | void;
+  pages: DownloadPage[];
+}
+
+interface DownloadPagesToFolderInput extends DownloadPagesInput {
+  outputDirectory: string;
+}
+
+interface DownloadPagesToCbzInput extends DownloadPagesInput {
+  outputPath: string;
+}
+
 const invalidPathCharacters = new Set([
   "<",
   ">",
@@ -143,6 +144,7 @@ const sanitizePathSegment = (value: string, fallback: string): string => {
 };
 
 const getFileExtension = (
+  path: Path.Path,
   imageUrl: string,
   contentType: string | null | undefined
 ): string => {
@@ -161,13 +163,14 @@ const getFileExtension = (
   }
 
   try {
-    const url = new URL(imageUrl);
-    const extension = getExtension(url.pathname);
+    const extension = path.extname(new URL(imageUrl).pathname);
+
     if (extension) {
       return extension;
     }
   } catch {
-    const extension = getExtension(imageUrl);
+    const extension = path.extname(imageUrl.replace(queryAndHashPattern, ""));
+
     if (extension) {
       return extension;
     }
@@ -193,13 +196,16 @@ export const formatChapterLabel = (
   );
 };
 
-const getChapterOutputPaths = ({
-  chapterId,
-  chapterNumber,
-  chapterTitle,
-  destinationPath,
-  seriesTitle,
-}: PrepareChapterOutputInput): ChapterOutputPaths => {
+const getChapterOutputPaths = (
+  path: Path.Path,
+  {
+    chapterId,
+    chapterNumber,
+    chapterTitle,
+    destinationPath,
+    seriesTitle,
+  }: PrepareChapterOutputInput
+): ChapterOutputPaths => {
   const safeSeriesTitle = sanitizePathSegment(seriesTitle, "Series");
   const chapterLabel = formatChapterLabel(
     chapterNumber,
@@ -209,143 +215,206 @@ const getChapterOutputPaths = ({
 
   return {
     chapterLabel,
-    seriesDirectory: joinPath(destinationPath, safeSeriesTitle),
+    seriesDirectory: path.join(destinationPath, safeSeriesTitle),
   };
 };
 
 const normalizeExtension = (extension: string): string =>
   extension.startsWith(".") ? extension : `.${extension}`;
 
+const orderPages = (pages: DownloadPage[]): DownloadPage[] =>
+  [...pages].toSorted((left, right) => left.index - right.index);
+
+const downloadPage = (path: Path.Path, page: DownloadPage) =>
+  attempt(async () => {
+    const response = await fetch(page.imageUrl, {
+      headers: createRequestHeaders(page),
+    });
+    if (!response.ok) {
+      throw new Error(`Page download failed with status ${response.status}`);
+    }
+
+    return {
+      bytes: new Uint8Array(await response.arrayBuffer()),
+      extension: getFileExtension(
+        path,
+        page.imageUrl,
+        response.headers.get("content-type")
+      ),
+    };
+  });
+
+const reportProgress = (
+  onProgress:
+    | ((progress: DownloadProgress) => Promise<void> | void)
+    | undefined,
+  completed: number,
+  total: number
+): Effect.Effect<void, Error> =>
+  attempt(async () => {
+    await onProgress?.({
+      completed,
+      percent: Math.round((completed / total) * 100),
+      total,
+    });
+  });
+
+const prepareChapterOutputDirectoryProgram = (
+  input: PrepareChapterOutputInput
+): Effect.Effect<string, Error, PlatformServices> =>
+  Effect.gen(function* prepareChapterOutputDirectoryEffect() {
+    const path = yield* Path.Path;
+    const { chapterLabel, seriesDirectory } = getChapterOutputPaths(
+      path,
+      input
+    );
+    const outputDirectory = path.join(seriesDirectory, chapterLabel);
+
+    yield* fs.ensureEmptyDirectory(outputDirectory);
+
+    return outputDirectory;
+  });
+
 export const prepareChapterOutputDirectory = async (
   input: PrepareChapterOutputInput
-): Promise<string> => {
-  const { chapterLabel, seriesDirectory } = getChapterOutputPaths(input);
-  const outputDirectory = joinPath(seriesDirectory, chapterLabel);
+): Promise<string> =>
+  await runPlatform(prepareChapterOutputDirectoryProgram(input));
 
-  await ensureEmptyDirectory(outputDirectory);
-
-  return outputDirectory;
-};
-
-export const prepareChapterOutputFile = async ({
+const prepareChapterOutputFileProgram = ({
   extension,
   ...input
-}: PrepareChapterOutputFileInput): Promise<string> => {
-  const { chapterLabel, seriesDirectory } = getChapterOutputPaths(input);
-  const outputPath = `${joinPath(seriesDirectory, chapterLabel)}${normalizeExtension(extension)}`;
+}: PrepareChapterOutputFileInput): Effect.Effect<
+  string,
+  Error,
+  PlatformServices
+> =>
+  Effect.gen(function* prepareChapterOutputFileEffect() {
+    const path = yield* Path.Path;
+    const { chapterLabel, seriesDirectory } = getChapterOutputPaths(
+      path,
+      input
+    );
+    const outputPath = `${path.join(seriesDirectory, chapterLabel)}${normalizeExtension(extension)}`;
 
-  await ensureDirectory(seriesDirectory);
-  await removePath(outputPath);
+    yield* fs.ensureDirectory(seriesDirectory);
+    yield* fs.removePath(outputPath);
 
-  return outputPath;
-};
+    return outputPath;
+  });
 
-export const downloadPagesToFolder = async ({
+export const prepareChapterOutputFile = async (
+  input: PrepareChapterOutputFileInput
+): Promise<string> => await runPlatform(prepareChapterOutputFileProgram(input));
+
+const downloadPagesToFolderProgram = ({
   beforePage,
   onProgress,
   outputDirectory,
   pages,
-}: {
-  beforePage?: (page: DownloadPage) => Promise<void> | void;
-  onProgress?: (progress: DownloadProgress) => Promise<void> | void;
-  outputDirectory: string;
-  pages: DownloadPage[];
-}): Promise<DownloadPagesResult> => {
-  const orderedPages = [...pages].toSorted(
-    (left, right) => left.index - right.index
-  );
-  let totalBytes = 0;
+}: DownloadPagesToFolderInput): Effect.Effect<
+  DownloadPagesResult,
+  Error,
+  PlatformServices
+> =>
+  Effect.gen(function* downloadPagesToFolderEffect() {
+    const path = yield* Path.Path;
+    const orderedPages = orderPages(pages);
+    let totalBytes = 0;
 
-  for (const [index, page] of orderedPages.entries()) {
-    if (beforePage) {
-      await beforePage(page);
-    }
-
-    const response = await fetch(page.imageUrl, {
-      headers: createRequestHeaders(page),
-    });
-    if (!response.ok) {
-      throw new Error(`Page download failed with status ${response.status}`);
-    }
-
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    totalBytes += bytes.byteLength;
-
-    const extension = getFileExtension(
-      page.imageUrl,
-      response.headers.get("content-type")
-    );
-    const fileName = `${String(index + 1).padStart(3, "0")}${extension}`;
-
-    await writeBytes(joinPath(outputDirectory, fileName), bytes);
-
-    if (onProgress) {
-      const completed = index + 1;
-      await onProgress({
-        completed,
-        percent: Math.round((completed / orderedPages.length) * 100),
-        total: orderedPages.length,
+    for (const [index, page] of orderedPages.entries()) {
+      yield* attempt(async () => {
+        await beforePage?.(page);
       });
+
+      const { bytes, extension } = yield* downloadPage(path, page);
+      totalBytes += bytes.byteLength;
+
+      const fileName = `${String(index + 1).padStart(3, "0")}${extension}`;
+
+      yield* fs.writeBytes(path.join(outputDirectory, fileName), bytes);
+      yield* reportProgress(onProgress, index + 1, orderedPages.length);
     }
-  }
 
-  return {
-    fileCount: orderedPages.length,
-    totalBytes,
-  };
-};
+    return { fileCount: orderedPages.length, totalBytes };
+  });
 
-export const downloadPagesToCbz = async ({
+export const downloadPagesToFolder = async (
+  input: DownloadPagesToFolderInput
+): Promise<DownloadPagesResult> =>
+  await runPlatform(downloadPagesToFolderProgram(input));
+
+const downloadPagesToCbzProgram = ({
   beforePage,
   onProgress,
   outputPath,
   pages,
-}: {
-  beforePage?: (page: DownloadPage) => Promise<void> | void;
-  onProgress?: (progress: DownloadProgress) => Promise<void> | void;
-  outputPath: string;
-  pages: DownloadPage[];
-}): Promise<DownloadPagesResult> => {
-  const orderedPages = [...pages].toSorted(
-    (left, right) => left.index - right.index
-  );
-  const files: Record<string, Uint8Array> = {};
+}: DownloadPagesToCbzInput): Effect.Effect<
+  DownloadPagesResult,
+  Error,
+  PlatformServices
+> =>
+  Effect.gen(function* downloadPagesToCbzEffect() {
+    const path = yield* Path.Path;
+    const fileSystem = yield* FileSystem.FileSystem;
+    const orderedPages = orderPages(pages);
+    const pendingChunks: Uint8Array[] = [];
+    let totalBytes = 0;
 
-  for (const [index, page] of orderedPages.entries()) {
-    if (beforePage) {
-      await beforePage(page);
-    }
+    const archive = new Zip((error, chunk) => {
+      if (error) {
+        throw error;
+      }
 
-    const response = await fetch(page.imageUrl, {
-      headers: createRequestHeaders(page),
+      totalBytes += chunk.byteLength;
+      pendingChunks.push(chunk);
     });
-    if (!response.ok) {
-      throw new Error(`Page download failed with status ${response.status}`);
-    }
 
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const extension = getFileExtension(
-      page.imageUrl,
-      response.headers.get("content-type")
-    );
-    const fileName = `${String(index + 1).padStart(3, "0")}${extension}`;
-    files[fileName] = bytes;
+    const flushChunks = (
+      file: FileSystem.File
+    ): Effect.Effect<void, PlatformError> =>
+      Effect.gen(function* flushChunksEffect() {
+        if (pendingChunks.length === 0) {
+          return;
+        }
 
-    if (onProgress) {
-      const completed = index + 1;
-      await onProgress({
-        completed,
-        percent: Math.round((completed / orderedPages.length) * 100),
-        total: orderedPages.length,
+        const chunks = pendingChunks.splice(0);
+
+        for (const chunk of chunks) {
+          yield* file.write(chunk);
+        }
       });
-    }
-  }
 
-  const cbzBytes = zipSync(files, { level: 0 });
-  await writeBytes(outputPath, cbzBytes);
+    const writeArchive = Effect.gen(function* writeArchiveEffect() {
+      const file = yield* fileSystem.open(outputPath, { flag: "w" });
 
-  return {
-    fileCount: orderedPages.length,
-    totalBytes: cbzBytes.byteLength,
-  };
-};
+      for (const [index, page] of orderedPages.entries()) {
+        yield* attempt(async () => {
+          await beforePage?.(page);
+        });
+
+        const { bytes, extension } = yield* downloadPage(path, page);
+        const pageEntry = new ZipPassThrough(
+          `${String(index + 1).padStart(3, "0")}${extension}`
+        );
+
+        archive.add(pageEntry);
+        pageEntry.push(bytes, true);
+        yield* flushChunks(file);
+        yield* reportProgress(onProgress, index + 1, orderedPages.length);
+      }
+
+      archive.end();
+      yield* flushChunks(file);
+
+      return { fileCount: orderedPages.length, totalBytes };
+    });
+
+    return yield* Effect.scoped(writeArchive).pipe(
+      Effect.onError(() => Effect.ignore(fileSystem.remove(outputPath)))
+    );
+  });
+
+export const downloadPagesToCbz = async (
+  input: DownloadPagesToCbzInput
+): Promise<DownloadPagesResult> =>
+  await runPlatform(downloadPagesToCbzProgram(input));
