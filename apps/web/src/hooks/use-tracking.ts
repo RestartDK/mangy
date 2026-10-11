@@ -1,22 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { api } from "@/lib/api";
+import { tracking } from "@/lib/api";
 
-type TrackingResponse = Awaited<
-  ReturnType<typeof api.api.tracking.get>
->["data"];
-export type TrackedSeries = NonNullable<TrackingResponse>[number];
+export type { TrackedSeries } from "@/lib/api";
 
 export const useTracking = () =>
   useQuery({
-    queryFn: async () => {
-      const { data, error } = await api.api.tracking.get();
-      if (error) {
-        throw error;
-      }
-
-      return data ?? [];
-    },
+    queryFn: async () => await tracking.run((client) => client.tracking.list()),
     queryKey: ["tracking"],
     refetchInterval: 5000,
   });

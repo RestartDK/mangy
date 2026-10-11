@@ -1,24 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { api } from "@/lib/api";
+import { tracking } from "@/lib/api";
 
-type RefreshTrackingPayload = NonNullable<
-  Parameters<typeof api.api.tracking.refresh.post>[0]
->;
+import { decodeRefreshTrackedSeries } from "../../../server/src/api/tracking";
 
 export const useRefreshTracking = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: RefreshTrackingPayload) => {
-      const { data, error } = await api.api.tracking.refresh.post(body);
-      if (error) {
-        throw new Error(error.value.message);
-      }
-
-      return data;
-    },
+    mutationFn: async (body: { seriesId: string; sourceId: string }) =>
+      await tracking.run((client) =>
+        client.tracking.refresh({
+          payload: decodeRefreshTrackedSeries(body),
+        })
+      ),
     onError: (error) => {
       toast.error(
         error instanceof Error

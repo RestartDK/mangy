@@ -1,4 +1,3 @@
-import { cors } from "@elysiajs/cors";
 import { auth } from "@mangy/auth";
 import { env } from "@mangy/env";
 import { Elysia } from "elysia";
@@ -10,54 +9,24 @@ import { notifications } from "./modules/notifications";
 import { series } from "./modules/series";
 import { settings } from "./modules/settings";
 import { sources } from "./modules/sources";
-import { tracking } from "./modules/tracking";
-
-const configuredOrigins = env.CORS_ORIGIN.split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const trustedDevOrigins = [
-  "http://localhost:3001",
-  "http://127.0.0.1:3001",
-  /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:3001$/u,
-  /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/u,
-  /^http:\/\/100\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/u,
-  /^http:\/\/172\.\d{1,3}\.\d{1,3}\.\d{1,3}:3001$/u,
-  /^http:\/\/[a-z0-9-]+\.local:3001$/iu,
-] as const;
-
-const corsOrigins =
-  process.env.NODE_ENV === "production"
-    ? configuredOrigins
-    : [...configuredOrigins, ...trustedDevOrigins];
+import { makeServer } from "./server";
 
 export const createApp = () =>
   new Elysia()
-    .use(
-      cors({
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        origin: corsOrigins,
-      })
-    )
     .mount(auth.handler)
-    .get("/", () => ({
-      appName: "Mangy",
-      status: "ok",
-      timestamp: Date.now(),
-      version: "0.1.0",
-    }))
     .use(sources)
     .use(series)
     .use(library)
     .use(downloads)
-    .use(tracking)
     .use(notifications)
     .use(settings)
     .use(live);
 
-export const app = createApp();
+const elysia = createApp();
+
+export const app = makeServer(elysia);
+
+export type App = typeof elysia;
 
 if (import.meta.main) {
   app.listen({
@@ -65,5 +34,3 @@ if (import.meta.main) {
     port: Number(env.PORT),
   });
 }
-
-export type App = typeof app;

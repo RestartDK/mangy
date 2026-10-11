@@ -1,11 +1,13 @@
 import { column, decodeRows, runSql, table, updateRow } from "@mangy/db";
 import {
   Series,
+  SeriesIdSchema,
   TrackedSeriesState,
   libraryEntryColumns,
   seriesColumns,
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
+import type { SeriesId, SourceId, UserId } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { Fragment } from "effect/sql/Statement";
@@ -17,7 +19,7 @@ const trackedSeriesProjection = Schema.Struct({
   lastSeenChapterExternalId:
     TrackedSeriesState.fields.lastSeenChapterExternalId,
   nextCheckAt: TrackedSeriesState.fields.nextCheckAt,
-  seriesId: Series.fields.externalId,
+  seriesId: SeriesIdSchema,
   sourceId: Series.fields.sourceId,
   title: Series.fields.title,
 });
@@ -33,7 +35,7 @@ const serializeTrackedSeries = (row: TrackedSeries) => ({
 
 const baseQuery = (
   sql: SqlClient.SqlClient,
-  userId: string,
+  userId: UserId,
   extra: readonly Fragment[]
 ) => sql`SELECT ${sql.csv([
   sql`${table("trackedSeriesState")}.${column(trackedSeriesStateColumns, "id")} AS ${sql("id")}`,
@@ -54,7 +56,7 @@ const baseQuery = (
     ...extra,
   ])}`;
 
-const list = (userId: string) =>
+const list = (userId: UserId) =>
   Effect.gen(function* listEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -66,7 +68,11 @@ const list = (userId: string) =>
     return rows.map(serializeTrackedSeries);
   });
 
-const requestRefresh = (userId: string, sourceId: string, seriesId: string) =>
+const requestRefresh = (
+  userId: UserId,
+  sourceId: SourceId,
+  seriesId: SeriesId
+) =>
   Effect.gen(function* requestRefreshEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -105,11 +111,11 @@ const requestRefresh = (userId: string, sourceId: string, seriesId: string) =>
   });
 
 export const TrackingService = {
-  async list(userId: string) {
+  async list(userId: UserId) {
     return await runSql(list(userId));
   },
 
-  async requestRefresh(userId: string, sourceId: string, seriesId: string) {
+  async requestRefresh(userId: UserId, sourceId: SourceId, seriesId: SeriesId) {
     return await runSql(requestRefresh(userId, sourceId, seriesId));
   },
 };

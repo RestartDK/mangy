@@ -23,6 +23,7 @@
     "apps/server": {
       "name": "server",
       "dependencies": {
+        "@effect/platform-bun": "catalog:",
         "@elysiajs/cors": "^1.4.2",
         "@mangy/auth": "workspace:*",
         "@mangy/db": "workspace:*",
