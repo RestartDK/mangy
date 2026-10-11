@@ -14,7 +14,7 @@ import { HttpApiBuilder } from "effect/http-api";
 import type { AppConfig } from "./config";
 import { DownloadsApiLive } from "./modules/downloads";
 import { makeLibraryApiLive } from "./modules/library";
-import { LiveApiLive } from "./modules/live";
+import { heartbeatIntervalSeconds, LiveApiLive } from "./modules/live";
 import { NotificationsApiLive } from "./modules/notifications";
 import { SeriesApiLive, SeriesPageImageRoute } from "./modules/series";
 import { SettingsApiLive } from "./modules/settings";
@@ -107,6 +107,7 @@ export const makeServer = (config: AppConfig) => {
         Layer.provide(
           BunHttpServer.layer({
             hostname: options.hostname,
+            idleTimeout: heartbeatIntervalSeconds * 4,
             port: options.port,
           })
         ),

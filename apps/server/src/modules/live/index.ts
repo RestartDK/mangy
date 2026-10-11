@@ -8,7 +8,8 @@ import { currentUser } from "@/lib/auth";
 import { hasSnapshotChanged, LiveService } from "./service";
 
 const pollInterval = Duration.millis(1500);
-const heartbeatInterval = Duration.millis(15_000);
+export const heartbeatIntervalSeconds = 15;
+const heartbeatInterval = Duration.seconds(heartbeatIntervalSeconds);
 
 const stateEvent = (previous: LiveSnapshot, next: LiveSnapshot): LiveEvent => ({
   data: {
