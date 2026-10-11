@@ -1,4 +1,7 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import type { SourceFilterDefinition } from "@mangy/contract";
 import { createFileRoute } from "@tanstack/react-router";
+import { AsyncResult } from "effect/reactivity";
 import {
   ArrowDown,
   ArrowUp,
@@ -9,6 +12,13 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  searchIdle,
+  searchPages,
+  sourceFilters,
+  sourceFiltersIdle,
+  sourcesQuery,
+} from "@/atoms/sources";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -40,10 +50,11 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePreferredSource } from "@/hooks/use-preferred-source";
-import type { SourceFilterDefinition } from "@/hooks/use-source-filters";
-import { useSourceFilters } from "@/hooks/use-source-filters";
-import { useSourceSearch } from "@/hooks/use-source-search";
-import { useSources } from "@/hooks/use-sources";
+import {
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
 import { getErrorMessage, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 import {
@@ -57,6 +68,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 const ASCENDING_VALUE_PATTERN = /^asc/iu;
 const DESCENDING_VALUE_PATTERN = /^desc/iu;
 
+// The search atom is keyed by its parameters, so a new search starts from nothing.
 const setFilterValue = (
   definition: SourceFilterDefinition,
   value: string | string[] | boolean | undefined
@@ -206,10 +218,11 @@ const ResultGridSkeleton = () => (
   </div>
 );
 const SearchRouteComponent = () => {
-  const sourcesQuery = useSources();
+  const sourcesResult = useAtomValue(sourcesQuery);
+  const sources = asyncResultValue(sourcesResult);
   const enabledSources = useMemo(
-    () => (sourcesQuery.data ?? []).filter((source) => source.isEnabled),
-    [sourcesQuery.data]
+    () => (sources ?? []).filter((source) => source.isEnabled),
+    [sources]
   );
   const { selectedSourceId: sourceId, setSelectedSourceId: setSourceId } =
     usePreferredSource(enabledSources);
@@ -219,7 +232,12 @@ const SearchRouteComponent = () => {
   const [filters, setFilters] = useState<Record<string, unknown>>({});
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
-  const filtersQuery = useSourceFilters(sourceId);
+  const filtersResult = useAtomValue(
+    sourceId === undefined || sourceId === ""
+      ? sourceFiltersIdle
+      : sourceFilters({ sourceId })
+  );
+  const definitionsValue = asyncResultValue(filtersResult);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -231,10 +249,7 @@ const SearchRouteComponent = () => {
     };
   }, [queryInput]);
 
-  const definitions = useMemo(
-    () => filtersQuery.data ?? [],
-    [filtersQuery.data]
-  );
+  const definitions = useMemo(() => definitionsValue ?? [], [definitionsValue]);
   const drawerDefinitions = definitions.filter(
     (definition) => !TOOLBAR_FILTER_KEYS.has(definition.key)
   );
@@ -274,17 +289,30 @@ const SearchRouteComponent = () => {
     () => ({ ...toolbarDefaults, ...filters }),
     [filters, toolbarDefaults]
   );
-  const searchQuery = useSourceSearch({
-    enabled: !filtersQuery.isLoading,
-    filters: effectiveFilters,
-    query,
-    sourceId,
-  });
+  const isSearchEnabled =
+    sourceId !== undefined &&
+    sourceId !== "" &&
+    !asyncResultLoading(filtersResult);
+  const searchAtom = isSearchEnabled
+    ? searchPages({
+        filters: effectiveFilters,
+        pageSize: undefined,
+        query,
+        sourceId,
+      })
+    : searchIdle;
+  const searchResult = useAtomValue(searchAtom);
+  const pullNextPage = useAtomSet(searchAtom);
   const isOrderAscending = Boolean(
     orderAscendingValue && effectiveFilters.order === orderAscendingValue
   );
-  const results = searchQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  const total = searchQuery.data?.pages.at(0)?.total ?? null;
+  const pages = asyncResultValue(searchResult)?.items ?? [];
+  const results = pages.flatMap((page) => page.items);
+  const total = pages.at(0)?.total ?? null;
+  const hasNextPage = pages.at(-1)?.hasNextPage ?? false;
+  const isSearching = AsyncResult.isWaiting(searchResult);
+  const searchError = asyncResultError(searchResult);
+  const filtersUnavailable = asyncResultError(filtersResult) !== undefined;
 
   const applyFilterValue = (
     definition: SourceFilterDefinition,
@@ -309,10 +337,10 @@ const SearchRouteComponent = () => {
     resultsLabel = `${pluralize(total ?? results.length, "result")} for “${query}”`;
   }
 
-  const showSkeleton = Boolean(sourceId) && searchQuery.isLoading;
-  const showError = Boolean(searchQuery.error);
+  const showSkeleton = Boolean(sourceId) && asyncResultLoading(searchResult);
+  const showError = searchError !== undefined;
 
-  if (!showSkeleton && searchQuery.isFetching) {
+  if (!showSkeleton && isSearching) {
     resultsLabel = "Searching…";
   }
 
@@ -320,21 +348,24 @@ const SearchRouteComponent = () => {
     <AppShell>
       <PageHeader title="Search" />
 
-      {sourcesQuery.error ? (
+      {sourcesResult._tag === "Failure" ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load sources</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(sourcesQuery.error, "Try again in a moment.")}
+            {getErrorMessage(
+              asyncResultError(sourcesResult),
+              "Try again in a moment."
+            )}
           </AlertDescription>
         </Alert>
       ) : null}
 
-      {filtersQuery.error ? (
+      {filtersResult._tag === "Failure" ? (
         <Alert variant="destructive">
           <AlertTitle>Unable to load filters</AlertTitle>
           <AlertDescription>
             {getErrorMessage(
-              filtersQuery.error,
+              asyncResultError(filtersResult),
               "Try another source or reload the page."
             )}
           </AlertDescription>
@@ -460,7 +491,7 @@ const SearchRouteComponent = () => {
         ) : null}
 
         <div className="ml-auto flex items-center gap-2">
-          {searchQuery.isFetching && !showSkeleton ? (
+          {isSearching && !showSkeleton ? (
             <Loader2 className="text-muted-foreground size-3.5 animate-spin" />
           ) : null}
           <span className="meta">{resultsLabel}</span>
@@ -500,7 +531,7 @@ const SearchRouteComponent = () => {
         <Alert variant="destructive">
           <AlertTitle>Search failed</AlertTitle>
           <AlertDescription>
-            {getErrorMessage(searchQuery.error, "Try again in a moment.")}
+            {getErrorMessage(searchError, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -509,7 +540,7 @@ const SearchRouteComponent = () => {
 
       {showSkeleton ||
       showError ||
-      sourcesQuery.isLoading ||
+      asyncResultLoading(sourcesResult) ||
       sourceId ? null : (
         <EmptyState
           description="No enabled sources are connected yet."
@@ -519,7 +550,7 @@ const SearchRouteComponent = () => {
       )}
 
       {sourceId &&
-      !(showSkeleton || showError || searchQuery.isFetching) &&
+      !(showSkeleton || showError || isSearching) &&
       results.length === 0 ? (
         <EmptyState
           action={
@@ -556,18 +587,18 @@ const SearchRouteComponent = () => {
               />
             ))}
           </div>
-          {searchQuery.hasNextPage ? (
+          {hasNextPage ? (
             <div className="flex justify-center">
               <Button
-                disabled={searchQuery.isFetchingNextPage}
+                disabled={isSearching}
                 onClick={() => {
-                  void searchQuery.fetchNextPage();
+                  pullNextPage();
                 }}
                 size="lg"
                 type="button"
                 variant="outline"
               >
-                {searchQuery.isFetchingNextPage ? "Loading..." : "Load more"}
+                {isSearching ? "Loading..." : "Load more"}
               </Button>
             </div>
           ) : null}
@@ -583,7 +614,7 @@ const SearchRouteComponent = () => {
             </SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-6">
-            {filtersQuery.error ? (
+            {filtersUnavailable ? (
               <p className="meta pb-4">Filters are unavailable right now.</p>
             ) : (
               <FieldGroup className="gap-5 pb-4">

@@ -1,4 +1,4 @@
-import type { DiscoverSection } from "@/hooks/use-source-discover";
+import type { DiscoverSection } from "@mangy/contract";
 
 import { SeriesCard } from "./series-card";
 

@@ -1,6 +1,8 @@
+import { useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 
+import { discoverIdle, sourceDiscover, sourcesQuery } from "@/atoms/sources";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -16,8 +18,11 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePreferredSource } from "@/hooks/use-preferred-source";
-import { useSourceDiscover } from "@/hooks/use-source-discover";
-import { useSources } from "@/hooks/use-sources";
+import {
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
 import { getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -40,20 +45,28 @@ const DiscoverSkeleton = () => (
   </div>
 );
 const DiscoverRouteComponent = () => {
-  const sourcesQuery = useSources();
+  const sourcesResult = useAtomValue(sourcesQuery);
+  const sources = asyncResultValue(sourcesResult);
   const enabledSources = useMemo(
-    () => (sourcesQuery.data ?? []).filter((source) => source.isEnabled),
-    [sourcesQuery.data]
+    () => (sources ?? []).filter((source) => source.isEnabled),
+    [sources]
   );
   const { selectedSourceId, setSelectedSourceId } =
     usePreferredSource(enabledSources);
 
   const activeSource =
     enabledSources.find((source) => source.id === selectedSourceId) ?? null;
-  const discoverQuery = useSourceDiscover(activeSource?.id, 10);
+  const discoverResult = useAtomValue(
+    activeSource === null
+      ? discoverIdle
+      : sourceDiscover({ limit: 10, sourceId: activeSource.id })
+  );
+  const sections = asyncResultValue(discoverResult);
 
-  const isLoading = sourcesQuery.isLoading || discoverQuery.isLoading;
-  const hasError = sourcesQuery.error ?? discoverQuery.error;
+  const isLoading =
+    asyncResultLoading(sourcesResult) || asyncResultLoading(discoverResult);
+  const hasError =
+    asyncResultError(sourcesResult) ?? asyncResultError(discoverResult);
 
   return (
     <AppShell>
@@ -78,14 +91,14 @@ const DiscoverRouteComponent = () => {
         title="Discover"
       />
 
-      {hasError ? (
+      {hasError === undefined ? null : (
         <Alert variant="destructive">
           <AlertTitle>Unable to load discovery</AlertTitle>
           <AlertDescription>
             {getErrorMessage(hasError, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
       {isLoading ? <DiscoverSkeleton /> : null}
 
@@ -99,8 +112,8 @@ const DiscoverRouteComponent = () => {
 
       {!isLoading && activeSource ? (
         <div className="page-grid">
-          {discoverQuery.data?.length ? (
-            discoverQuery.data.map((section) => (
+          {sections !== undefined && sections.length > 0 ? (
+            sections.map((section) => (
               <SectionShelf key={section.id} section={section} />
             ))
           ) : (

@@ -1,4 +1,4 @@
-import type { SourceFilterDefinition } from "@/hooks/use-source-filters";
+import type { SourceFilterDefinition } from "@mangy/contract";
 
 export const TOOLBAR_FILTER_KEYS = new Set(["sort", "order"]);
 
