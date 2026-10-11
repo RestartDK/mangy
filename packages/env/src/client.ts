@@ -1,6 +1,4 @@
-function optional(key: string): string | undefined {
-  return import.meta.env[key] as string | undefined;
-}
+const optional = (key: string): string | undefined => import.meta.env[key];
 
 export const env = {
   // Unset builds are origin-agnostic: getServerOrigin falls back to the

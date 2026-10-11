@@ -31,7 +31,7 @@ export const settingsBootstrapSchema = z.object({
     unreadCount: z.number().int(),
   }),
   profile: z.object({
-    email: z.string().email(),
+    email: z.email(),
     name: z.string(),
   }),
 });
@@ -40,13 +40,13 @@ export const browserPushSettingsSchema = z.object({
   activeSubscriptionCount: z.number().int(),
   isConfigured: z.boolean(),
   isEnabled: z.boolean(),
-  lastDeliveredAt: z.string().datetime().nullable(),
+  lastDeliveredAt: z.iso.datetime().nullable(),
   lastError: z.string().nullable(),
-  lastErrorAt: z.string().datetime().nullable(),
+  lastErrorAt: z.iso.datetime().nullable(),
   notifyOnDownloadCompleted: z.boolean(),
   notifyOnDownloadFailed: z.boolean(),
-  notifyOnTrackedSeriesUpdate: z.boolean(),
   notifyOnSystemWarning: z.boolean(),
+  notifyOnTrackedSeriesUpdate: z.boolean(),
   vapidPublicKey: z.string().nullable(),
 });
 
@@ -54,13 +54,13 @@ export const updateBrowserPushPreferencesBody = z.object({
   isEnabled: z.boolean(),
   notifyOnDownloadCompleted: z.boolean(),
   notifyOnDownloadFailed: z.boolean(),
-  notifyOnTrackedSeriesUpdate: z.boolean(),
   notifyOnSystemWarning: z.boolean(),
+  notifyOnTrackedSeriesUpdate: z.boolean(),
 });
 
 export const savePushSubscriptionBody = z.object({
-  endpoint: z.string().url(),
-  expirationTime: z.number().finite().nullable().optional(),
+  endpoint: z.url(),
+  expirationTime: z.number().nullable().optional(),
   keys: z.object({
     auth: z.string().trim().min(1),
     p256dh: z.string().trim().min(1),
@@ -69,7 +69,7 @@ export const savePushSubscriptionBody = z.object({
 });
 
 export const removePushSubscriptionBody = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.url(),
 });
 
 export const browserPushTestResponseSchema = z.object({

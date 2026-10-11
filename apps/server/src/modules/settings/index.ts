@@ -28,7 +28,7 @@ export const settings = new Elysia({ prefix: "/api/settings" })
         return { message: "Unauthorized" };
       }
 
-      return SettingsService.getBootstrap(user.id, {
+      return await SettingsService.getBootstrap(user.id, {
         email: user.email,
         name: user.name,
       });
@@ -49,7 +49,7 @@ export const settings = new Elysia({ prefix: "/api/settings" })
         return { message: "Unauthorized" };
       }
 
-      return SettingsService.getBrowserPushSettings(user.id);
+      return await SettingsService.getBrowserPushSettings(user.id);
     },
     {
       response: {

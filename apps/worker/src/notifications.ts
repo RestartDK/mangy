@@ -7,24 +7,21 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  Notification,
+  NotificationDelivery,
+  NotificationEndpoint,
+  PushSubscription,
   notificationColumns,
   notificationDeliveryColumns,
-  notificationDeliveryRow,
   notificationEndpointColumns,
-  notificationEndpointRow,
-  notificationRow,
   pushSubscriptionColumns,
-  pushSubscriptionRow,
 } from "@mangy/db/model";
-import {
-  BrowserPushError,
-  type BrowserPushPayload,
-  sendBrowserPush,
-} from "@mangy/push";
+import { BrowserPushError, sendBrowserPush } from "@mangy/push";
+import type { BrowserPushPayload } from "@mangy/push";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
-type NotificationType = Schema.Schema.Type<typeof notificationRow>["type"];
+type NotificationType = Schema.Schema.Type<typeof Notification.fields.type>;
 
 interface BrowserPushEndpointRecord {
   id: string;
@@ -51,19 +48,18 @@ export interface ClaimedPushDelivery {
 }
 
 const claimedPushDeliveryProjection = Schema.Struct({
-  attempts: notificationDeliveryRow.from.fields.attempts,
-  id: notificationDeliveryRow.from.fields.id,
-  maxAttempts: notificationDeliveryRow.from.fields.max_attempts,
-  notificationBody: notificationRow.from.fields.body,
-  notificationEndpointId:
-    notificationDeliveryRow.from.fields.notification_endpoint_id,
-  notificationId: notificationRow.from.fields.id,
-  notificationTitle: notificationRow.from.fields.title,
-  notificationType: notificationRow.from.fields.type,
-  pushSubscriptionAuth: Schema.NullOr(pushSubscriptionRow.from.fields.auth),
-  pushSubscriptionEndpoint: Schema.NullOr(pushSubscriptionRow.from.fields.endpoint),
-  pushSubscriptionId: Schema.NullOr(pushSubscriptionRow.from.fields.id),
-  pushSubscriptionP256dh: Schema.NullOr(pushSubscriptionRow.from.fields.p256dh),
+  attempts: NotificationDelivery.fields.attempts,
+  id: NotificationDelivery.fields.id,
+  maxAttempts: NotificationDelivery.fields.maxAttempts,
+  notificationBody: Notification.fields.body,
+  notificationEndpointId: NotificationDelivery.fields.notificationEndpointId,
+  notificationId: Notification.fields.id,
+  notificationTitle: Notification.fields.title,
+  notificationType: Notification.fields.type,
+  pushSubscriptionAuth: Schema.NullOr(PushSubscription.fields.auth),
+  pushSubscriptionEndpoint: Schema.NullOr(PushSubscription.fields.endpoint),
+  pushSubscriptionId: Schema.NullOr(PushSubscription.fields.id),
+  pushSubscriptionP256dh: Schema.NullOr(PushSubscription.fields.p256dh),
 });
 
 const buildBrowserPushPayload = (
@@ -100,9 +96,8 @@ const shouldSendBrowserPush = (
   return endpoint.notifyOnSystemWarning;
 };
 
-const getRetryDelayMs = (attempts: number): number => {
-  return 15_000 * 2 ** Math.min(Math.max(attempts - 1, 0), 4);
-};
+const getRetryDelayMs = (attempts: number): number =>
+  15_000 * 2 ** Math.min(Math.max(attempts - 1, 0), 4);
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -112,7 +107,7 @@ const getErrorMessage = (error: unknown): string => {
   return "Unable to deliver this browser notification.";
 };
 
-const createNotificationRecord = (input: {
+export const queueNotification = (input: {
   body: string;
   title: string;
   type: NotificationType;
@@ -121,7 +116,7 @@ const createNotificationRecord = (input: {
   Effect.gen(function* createNotificationRecordEffect() {
     const sql = yield* SqlClient.SqlClient;
     const created = yield* decodeRows(
-      Schema.Struct({ id: notificationRow.from.fields.id }),
+      Schema.Struct({ id: Notification.fields.id }),
       yield* sql`INSERT INTO ${table("notification")} ${insertRow(
         sql,
         notificationColumns,
@@ -137,16 +132,16 @@ const createNotificationRecord = (input: {
 
     const endpointRows = yield* decodeRows(
       Schema.Struct({
-        id: notificationEndpointRow.from.fields.id,
-        is_enabled: notificationEndpointRow.from.fields.is_enabled,
+        id: NotificationEndpoint.fields.id,
+        is_enabled: NotificationEndpoint.fields.isEnabled,
         notify_on_download_completed:
-          notificationEndpointRow.from.fields.notify_on_download_completed,
+          NotificationEndpoint.fields.notifyOnDownloadCompleted,
         notify_on_download_failed:
-          notificationEndpointRow.from.fields.notify_on_download_failed,
+          NotificationEndpoint.fields.notifyOnDownloadFailed,
         notify_on_system_warning:
-          notificationEndpointRow.from.fields.notify_on_system_warning,
+          NotificationEndpoint.fields.notifyOnSystemWarning,
         notify_on_tracked_series_update:
-          notificationEndpointRow.from.fields.notify_on_tracked_series_update,
+          NotificationEndpoint.fields.notifyOnTrackedSeriesUpdate,
       }),
       yield* sql`SELECT ${column(notificationEndpointColumns, "id")},
           ${column(notificationEndpointColumns, "isEnabled")},
@@ -179,7 +174,7 @@ const createNotificationRecord = (input: {
     }
 
     const subscriptions = yield* decodeRows(
-      Schema.Struct({ id: pushSubscriptionRow.from.fields.id }),
+      Schema.Struct({ id: PushSubscription.fields.id }),
       yield* sql`SELECT ${column(pushSubscriptionColumns, "id")} FROM ${table("pushSubscription")}
         WHERE ${column(pushSubscriptionColumns, "userId")} = ${input.userId}
           AND ${column(pushSubscriptionColumns, "isActive")} = ${true}`
@@ -193,22 +188,14 @@ const createNotificationRecord = (input: {
       sql,
       notificationDeliveryColumns,
       subscriptions.map((subscription) => ({
-        id: crypto.randomUUID(),
         channel: "browserPush" as const,
+        id: crypto.randomUUID(),
         notificationEndpointId: browserPushEndpoint.id,
         notificationId: createdNotification.id,
         pushSubscriptionId: subscription.id,
       }))
     )}`;
   });
-
-export const queueNotification = (input: {
-  body: string;
-  title: string;
-  type: NotificationType;
-  userId: string;
-}): Effect.Effect<void, unknown, SqlClient.SqlClient> =>
-  createNotificationRecord(input);
 
 export const claimNextPushDelivery = async (
   workerId: string
@@ -421,28 +408,16 @@ export const failPushDelivery = async (
           }
 
           if (delivery.pushSubscriptionId) {
-            if (shouldDeactivateSubscription) {
-              yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
-                sql,
-                pushSubscriptionColumns,
-                {
-                  isActive: false,
-                  lastError: message,
-                  updatedAt: now,
-                }
-              )}
-                WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
-            } else {
-              yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
-                sql,
-                pushSubscriptionColumns,
-                {
-                  lastError: message,
-                  updatedAt: now,
-                }
-              )}
-                WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
-            }
+            const subscriptionValues = shouldDeactivateSubscription
+              ? { isActive: false, lastError: message, updatedAt: now }
+              : { lastError: message, updatedAt: now };
+
+            yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
+              sql,
+              pushSubscriptionColumns,
+              subscriptionValues
+            )}
+              WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
           }
         })
       );

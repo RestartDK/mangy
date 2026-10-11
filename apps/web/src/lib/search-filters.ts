@@ -2,6 +2,9 @@ import type { SourceFilterDefinition } from "@/hooks/use-source-filters";
 
 export const TOOLBAR_FILTER_KEYS = new Set(["sort", "order"]);
 
+const isUnknownArray = (value: unknown): value is unknown[] =>
+  Array.isArray(value);
+
 export interface ActiveFilter {
   key: string;
   label: string;
@@ -87,11 +90,10 @@ export const withoutFilter = (
   active: ActiveFilter
 ): Record<string, unknown> => {
   const next = { ...filters };
+  const current = next[active.key];
 
-  if (active.kind === "multiSelect" && Array.isArray(next[active.key])) {
-    const remaining = (next[active.key] as string[]).filter(
-      (item) => item !== active.value
-    );
+  if (active.kind === "multiSelect" && isUnknownArray(current)) {
+    const remaining = current.filter((item) => item !== active.value);
 
     if (remaining.length > 0) {
       next[active.key] = remaining;
@@ -99,7 +101,7 @@ export const withoutFilter = (
     }
   }
 
-  delete next[active.key];
-
-  return next;
+  return Object.fromEntries(
+    Object.entries(next).filter(([key]) => key !== active.key)
+  );
 };

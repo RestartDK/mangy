@@ -1,6 +1,4 @@
-declare const Bun: typeof import("bun");
-
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 
 export const ensureDirectory = async (path: string): Promise<void> => {
   await mkdir(path, { recursive: true });
@@ -23,5 +21,5 @@ export const writeBytes = async (
   path: string,
   data: Uint8Array
 ): Promise<void> => {
-  await Bun.write(path, data);
+  await writeFile(path, data);
 };

@@ -14,7 +14,6 @@ export const useLibrarySeriesState = (
 ) =>
   useQuery({
     enabled: Boolean(sourceId && seriesId),
-    queryKey: ["librarySeriesState", sourceId, seriesId],
     queryFn: async () => {
       if (!(sourceId && seriesId)) {
         return null;
@@ -22,8 +21,8 @@ export const useLibrarySeriesState = (
 
       const { data, error } = await api.api.library["series-state"].get({
         query: {
-          sourceId,
           seriesId,
+          sourceId,
         },
       });
       if (error) {
@@ -32,5 +31,6 @@ export const useLibrarySeriesState = (
 
       return data ?? null;
     },
+    queryKey: ["librarySeriesState", sourceId, seriesId],
     refetchInterval: 5000,
   });

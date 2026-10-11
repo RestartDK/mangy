@@ -1,5 +1,5 @@
 import { Effect, Semaphore } from "effect";
-import type { Browser, Page } from "playwright";
+import type { Browser, LaunchOptions, Page } from "playwright";
 
 import { defaultUserAgent } from "./http";
 
@@ -8,10 +8,8 @@ const idleBrowserCloseDelayMs = 1000;
 const maxConcurrentPages = 2;
 const playwrightModuleName = ["play", "wright"].join("");
 
-type PlaywrightModule = typeof import("playwright");
-
 interface BrowserLocalStorage {
-  setItem(key: string, value: string): void;
+  setItem: (key: string, value: string) => void;
 }
 
 interface BrowserDocument {
@@ -21,20 +19,26 @@ interface BrowserDocument {
 }
 
 interface BrowserWindow {
-  clearInterval(timer: ReturnType<typeof setInterval>): void;
+  clearInterval: (timer: ReturnType<typeof setInterval>) => void;
   document: BrowserDocument;
   innerHeight: number;
   localStorage: BrowserLocalStorage;
-  scrollBy(x: number, y: number): void;
-  setInterval(
+  scrollBy: (x: number, y: number) => void;
+  setInterval: (
     handler: () => void,
     timeout: number
-  ): ReturnType<typeof setInterval>;
+  ) => ReturnType<typeof setInterval>;
+}
+
+interface PlaywrightModule {
+  chromium: {
+    launch: (options: LaunchOptions) => Promise<Browser>;
+  };
 }
 
 export class BrowserUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "BrowserUnavailableError";
   }
 }
@@ -67,18 +71,6 @@ const acquirePageSlot = async (): Promise<void> => {
   activePages += 1;
 };
 
-const releasePageSlot = (): void => {
-  Effect.runSync(pageSlots.release(1));
-  activePages = Math.max(0, activePages - 1);
-
-  if (activePages === 0 && browserPromise && !browserCloseTimer) {
-    browserCloseTimer = setTimeout(() => {
-      browserCloseTimer = null;
-      closeBrowser().catch(() => undefined);
-    }, idleBrowserCloseDelayMs);
-  }
-};
-
 const closeBrowser = async (): Promise<void> => {
   const currentBrowserPromise = browserPromise;
 
@@ -99,54 +91,66 @@ const closeBrowser = async (): Promise<void> => {
 const autoScroll = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {
     const pageWindow = globalThis as unknown as BrowserWindow;
+    const { promise, resolve } = Promise.withResolvers<unknown>();
+    let totalHeight = 0;
+    const distance = pageWindow.innerHeight * 0.8;
+    const timer = pageWindow.setInterval(() => {
+      const { scrollHeight } = pageWindow.document.body;
+      pageWindow.scrollBy(0, distance);
+      totalHeight += distance;
 
-    await new Promise<void>((resolve) => {
-      let totalHeight = 0;
-      const distance = pageWindow.innerHeight * 0.8;
-      const timer = pageWindow.setInterval(() => {
-        const scrollHeight = pageWindow.document.body.scrollHeight;
-        pageWindow.scrollBy(0, distance);
-        totalHeight += distance;
+      if (totalHeight >= scrollHeight) {
+        pageWindow.clearInterval(timer);
+        resolve(null);
+      }
+    }, 150);
 
-        if (totalHeight >= scrollHeight) {
-          pageWindow.clearInterval(timer);
-          resolve();
-        }
-      }, 150);
-    });
+    await promise;
   });
 };
 
+const isPlaywrightModule = (value: unknown): value is PlaywrightModule =>
+  typeof value === "object" && value !== null && "chromium" in value;
+
 const loadPlaywrightModule = async (): Promise<PlaywrightModule> => {
-  return (await import(playwrightModuleName)) as PlaywrightModule;
-};
+  const playwrightModule: unknown = await import(playwrightModuleName);
 
-const getBrowser = (): Promise<Browser> => {
-  if (!browserPromise) {
-    browserPromise = loadPlaywrightModule()
-      .then((playwright) =>
-        playwright.chromium.launch({
-          args: [
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-          ],
-          headless: true,
-        })
-      )
-      .catch((error: unknown) => {
-        browserPromise = null;
-
-        throw new BrowserUnavailableError(
-          error instanceof Error
-            ? error.message
-            : "Unable to launch the Playwright browser."
-        );
-      });
+  if (!isPlaywrightModule(playwrightModule)) {
+    throw new BrowserUnavailableError("Playwright could not be loaded.");
   }
 
-  return browserPromise;
+  return playwrightModule;
+};
+
+const launchBrowser = async (): Promise<Browser> => {
+  try {
+    const playwright = await loadPlaywrightModule();
+
+    return await playwright.chromium.launch({
+      args: [
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+      ],
+      headless: true,
+    });
+  } catch (error) {
+    browserPromise = null;
+
+    throw new BrowserUnavailableError(
+      error instanceof Error
+        ? error.message
+        : "Unable to launch the Playwright browser.",
+      { cause: error }
+    );
+  }
+};
+
+const getBrowser = async (): Promise<Browser> => {
+  browserPromise ??= launchBrowser();
+
+  return await browserPromise;
 };
 
 const createHeaders = (options: BrowserPageOptions): Record<string, string> => {
@@ -161,9 +165,21 @@ const createHeaders = (options: BrowserPageOptions): Record<string, string> => {
   return headers;
 };
 
+const releasePageSlot = (): void => {
+  Effect.runSync(pageSlots.release(1));
+  activePages = Math.max(0, activePages - 1);
+
+  if (activePages === 0 && browserPromise && !browserCloseTimer) {
+    browserCloseTimer = setTimeout(() => {
+      browserCloseTimer = null;
+      void closeBrowser();
+    }, idleBrowserCloseDelayMs);
+  }
+};
+
 export const withBrowserPage = async <TResult>(
   url: string,
-  callback: (page: Page) => Promise<TResult>,
+  run: (page: Page) => Promise<TResult>,
   options: BrowserPageOptions = {}
 ): Promise<TResult> => {
   const browser = await getBrowser();
@@ -179,21 +195,15 @@ export const withBrowserPage = async <TResult>(
 
   try {
     if (options.localStorage && Object.keys(options.localStorage).length > 0) {
-      const entries = Object.entries(options.localStorage) as [
-        string,
-        string,
-      ][];
+      const entries = Object.entries(options.localStorage);
 
-      await context.addInitScript(
-        (values) => {
-          const pageWindow = globalThis as unknown as BrowserWindow;
+      await context.addInitScript((values) => {
+        const pageWindow = globalThis as unknown as BrowserWindow;
 
-          for (const [key, value] of values) {
-            pageWindow.localStorage.setItem(key, value);
-          }
-        },
-        entries as [string, string][]
-      );
+        for (const [key, value] of values) {
+          pageWindow.localStorage.setItem(key, value);
+        }
+      }, entries);
     }
 
     const page = await context.newPage();
@@ -217,7 +227,7 @@ export const withBrowserPage = async <TResult>(
       await page.waitForTimeout(options.waitAfterLoadMs);
     }
 
-    return await callback(page);
+    return await run(page);
   } finally {
     await context.close();
     releasePageSlot();

@@ -24,9 +24,9 @@ const runtime = ManagedRuntime.make(
   })
 );
 
-export const runSql = <A, E>(
+export const runSql = async <A, E>(
   program: Effect.Effect<A, E, SqlClient.SqlClient>
-): Promise<A> => runtime.runPromise(program);
+): Promise<A> => await runtime.runPromise(program);
 
 export const decodeRows = <A, I>(
   schema: Schema.Codec<A, I>,
@@ -34,16 +34,26 @@ export const decodeRows = <A, I>(
 ): Effect.Effect<readonly A[], Schema.SchemaError> =>
   Schema.decodeUnknownEffect(Schema.Array(schema))(rows);
 
-const columnName = (columns: ColumnMap, field: string): string =>
-  columns[field] as string;
+const isReadonlyArray = (value: unknown): value is readonly unknown[] =>
+  Array.isArray(value);
+
+const columnName = (columns: ColumnMap, field: string): string => {
+  const column = columns[field];
+
+  if (column === undefined) {
+    throw new Error(`Unknown column: ${field}`);
+  }
+
+  return column;
+};
 
 export const table = (model: ModelName): Fragment =>
   fragment([identifier(modelTables[model].table)]);
 
 export const column = <C extends ColumnMap>(
   columns: C,
-  field: keyof C
-): Fragment => fragment([identifier(columnName(columns, field as string))]);
+  field: Extract<keyof C, string>
+): Fragment => fragment([identifier(columnName(columns, field))]);
 
 const asColumns = <C extends ColumnMap>(
   columns: C,
@@ -61,7 +71,9 @@ export const insertRow = <C extends ColumnMap>(
   columns: C,
   values: RowValues<C> | readonly RowValues<C>[]
 ): Fragment => {
-  const rows = Array.isArray(values) ? values : [values];
+  const rows: readonly RowValues<C>[] = isReadonlyArray(values)
+    ? values
+    : [values];
   return fragment([sql.insert(rows.map((row) => asColumns(columns, row)))]);
 };
 

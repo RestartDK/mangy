@@ -9,7 +9,7 @@ if (liveSourceTestsEnabled) {
   test("WeebCentral live smoke fetches series, chapters, and pages", async () => {
     const adapter = createWeebCentralSourceAdapter();
     const popular = await adapter.getPopular(1, 1);
-    const firstSeries = popular.items[0];
+    const [firstSeries] = popular.items;
 
     expect(firstSeries).toBeDefined();
     expect(firstSeries?.externalId).toBeString();
@@ -42,8 +42,8 @@ if (liveSourceTestsEnabled) {
 
     const imageCount = await withBrowserPage(
       `https://weebcentral.com/chapters/${firstChapter?.externalId ?? ""}`,
-      (page) =>
-        page.evaluate(
+      async (page) =>
+        await page.evaluate(
           () => document.querySelectorAll('img[alt^="Page"]').length
         ),
       {

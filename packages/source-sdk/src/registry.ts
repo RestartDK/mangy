@@ -2,12 +2,12 @@ import { createWeebCentralSourceAdapter } from "./adapters/weeb-central";
 import type { SourceAdapter } from "./types";
 
 export interface SourceRegistry {
-  get(sourceId: string): SourceAdapter | null;
-  list(): SourceAdapter[];
-  register(adapter: SourceAdapter): void;
-  remove(sourceId: string): void;
-  replaceAll(adapters: SourceAdapter[]): void;
-  reset(): void;
+  get: (sourceId: string) => SourceAdapter | null;
+  list: () => SourceAdapter[];
+  register: (adapter: SourceAdapter) => void;
+  remove: (sourceId: string) => void;
+  replaceAll: (adapters: SourceAdapter[]) => void;
+  reset: () => void;
 }
 
 const createDefaultAdapters = (): SourceAdapter[] => [

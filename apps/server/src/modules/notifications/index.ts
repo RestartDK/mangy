@@ -24,7 +24,7 @@ export const notifications = new Elysia({ prefix: "/api/notifications" })
         return { message: "Unauthorized" };
       }
 
-      return NotificationsService.list(user.id);
+      return await NotificationsService.list(user.id);
     },
     {
       response: {
@@ -42,7 +42,7 @@ export const notifications = new Elysia({ prefix: "/api/notifications" })
         return { message: "Unauthorized" };
       }
 
-      return NotificationsService.getPreferences(user.id);
+      return await NotificationsService.getPreferences(user.id);
     },
     {
       response: {
@@ -60,7 +60,7 @@ export const notifications = new Elysia({ prefix: "/api/notifications" })
         return { message: "Unauthorized" };
       }
 
-      return NotificationsService.updatePreferences(user.id, body);
+      return await NotificationsService.updatePreferences(user.id, body);
     },
     {
       body: updateNotificationPreferencesBody,
@@ -112,7 +112,7 @@ export const notifications = new Elysia({ prefix: "/api/notifications" })
         return { message: "Unauthorized" };
       }
 
-      return NotificationsService.markAllRead(user.id);
+      return await NotificationsService.markAllRead(user.id);
     },
     {
       response: {

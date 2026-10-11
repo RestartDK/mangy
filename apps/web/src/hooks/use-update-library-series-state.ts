@@ -19,6 +19,13 @@ export const useUpdateLibrarySeriesState = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to update tracking settings"
+      );
+    },
     onSuccess: async (_, variables) => {
       toast.success("Tracking settings updated");
       await Promise.all([
@@ -32,13 +39,6 @@ export const useUpdateLibrarySeriesState = () => {
           ],
         }),
       ]);
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to update tracking settings"
-      );
     },
   });
 };

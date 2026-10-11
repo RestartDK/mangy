@@ -47,10 +47,10 @@ export const ShellUserMenu = ({ email, name }: ShellUserMenuProps) => {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
-            authClient.signOut({
+            void authClient.signOut({
               fetchOptions: {
                 onSuccess: () => {
-                  navigate({ to: "/login" });
+                  void navigate({ to: "/login" });
                 },
               },
             });

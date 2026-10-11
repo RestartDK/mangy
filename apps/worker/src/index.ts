@@ -15,7 +15,9 @@ import {
   processTrackedSeries,
 } from "./tracking";
 
-const sleep = (durationMs: number): Promise<void> => Bun.sleep(durationMs);
+const sleep = async (durationMs: number): Promise<void> => {
+  await Bun.sleep(durationMs);
+};
 
 const workerHostname = Bun.env.HOSTNAME ?? Bun.env.HOST ?? "worker";
 const workerId = `${workerHostname}-${Date.now()}-${crypto.randomUUID()}`;
@@ -67,10 +69,10 @@ const runWorkerLoop = async (): Promise<never> => {
   }
 };
 
-const program = Effect.gen(function* () {
+const program = Effect.gen(function* program() {
   yield* Effect.logInfo(`worker ${workerId} started`);
 
-  yield* Effect.promise(() => runWorkerLoop());
+  return yield* Effect.promise(async () => await runWorkerLoop());
 });
 
 BunRuntime.runMain(program);

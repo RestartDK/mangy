@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import {
-  fetchHtmlPage,
-  HttpError,
-} from "../src/adapters/shared/http";
+import { fetchHtmlPage, HttpError } from "../src/adapters/shared/http";
 
 const originalFetch = globalThis.fetch;
 
@@ -16,10 +13,10 @@ const stubFetch = (
 ): (() => number) => {
   let calls = 0;
 
-  globalThis.fetch = (() => {
+  globalThis.fetch = async () => {
     calls += 1;
-    return Promise.resolve(handler(calls));
-  }) as typeof fetch;
+    return await handler(calls);
+  };
 
   return () => calls;
 };
@@ -31,16 +28,18 @@ const htmlResponse = (body: string): Response =>
   });
 
 describe("fetchHtmlPage retry policy", () => {
-  test("does not retry a permanent 4xx", async () => {
+  test("does not retry a permanent 4xx", () => {
     const calls = stubFetch(() => new Response("nope", { status: 404 }));
 
-    await expect(fetchHtmlPage("https://example.test/x")).rejects.toThrow();
+    expect(fetchHtmlPage("https://example.test/x")).rejects.toThrow();
     expect(calls()).toBe(1);
   });
 
   test("retries a 5xx until it succeeds", async () => {
     const calls = stubFetch((call) =>
-      call < 3 ? new Response("busy", { status: 503 }) : htmlResponse("<p>ok</p>")
+      call < 3
+        ? new Response("busy", { status: 503 })
+        : htmlResponse("<p>ok</p>")
     );
 
     const result = await fetchHtmlPage("https://example.test/x");
@@ -61,10 +60,10 @@ describe("fetchHtmlPage retry policy", () => {
     expect(calls()).toBe(2);
   });
 
-  test("stops after the configured retry count", async () => {
+  test("stops after the configured retry count", () => {
     const calls = stubFetch(() => new Response("busy", { status: 500 }));
 
-    await expect(
+    expect(
       fetchHtmlPage("https://example.test/x", { retries: 1 })
     ).rejects.toThrow();
 
@@ -75,11 +74,14 @@ describe("fetchHtmlPage retry policy", () => {
     stubFetch(() => new Response("nope", { status: 404 }));
 
     const failure = await fetchHtmlPage("https://example.test/x").catch(
-      (cause: unknown) => cause
+      (error: unknown) => error
     );
 
     expect(failure).toBeInstanceOf(HttpError);
-    expect((failure as HttpError).status).toBe(404);
-    expect((failure as HttpError).retryable).toBe(false);
+    if (!(failure instanceof HttpError)) {
+      throw new Error("Expected the request to fail with an HttpError.");
+    }
+    expect(failure.status).toBe(404);
+    expect(failure.retryable).toBe(false);
   });
 });

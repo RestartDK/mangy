@@ -1,15 +1,16 @@
 import { column, decodeRows, runSql, table } from "@mangy/db";
 import {
+  DownloadJob,
+  Notification,
+  TrackedSeriesState,
   downloadJobColumns,
-  downloadJobRow,
   libraryEntryColumns,
   notificationColumns,
-  notificationRow,
   trackedSeriesStateColumns,
-  trackedSeriesStateRow,
 } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
+import type { SqlError } from "effect/sql";
 import { Elysia } from "elysia";
 
 import { getSessionUser } from "@/lib/auth";
@@ -23,7 +24,11 @@ interface LiveSnapshot {
 
 const getSnapshot = (
   userId: string
-): Effect.Effect<LiveSnapshot, unknown, SqlClient.SqlClient> =>
+): Effect.Effect<
+  LiveSnapshot,
+  Schema.SchemaError | SqlError.SqlError,
+  SqlClient.SqlClient
+> =>
   Effect.gen(function* getSnapshotEffect() {
     const sql = yield* SqlClient.SqlClient;
     const [downloadRecord, notificationRecord, unreadRecord, trackingRecord] =
@@ -32,7 +37,7 @@ const getSnapshot = (
           Effect.gen(function* downloads() {
             const rows = yield* decodeRows(
               Schema.Struct({
-                updated_at: downloadJobRow.from.fields.updated_at,
+                updated_at: DownloadJob.fields.updatedAt,
               }),
               yield* sql`SELECT ${column(downloadJobColumns, "updatedAt")} FROM ${table("downloadJob")}
                 WHERE ${column(downloadJobColumns, "userId")} = ${userId}
@@ -44,7 +49,7 @@ const getSnapshot = (
           }),
           Effect.gen(function* notifications() {
             const rows = yield* decodeRows(
-              Schema.Struct({ updated_at: notificationRow.from.fields.updated_at }),
+              Schema.Struct({ updated_at: Notification.fields.updatedAt }),
               yield* sql`SELECT ${column(notificationColumns, "updatedAt")} FROM ${table("notification")}
                 WHERE ${column(notificationColumns, "userId")} = ${userId}
                 ORDER BY ${column(notificationColumns, "updatedAt")} DESC
@@ -55,7 +60,7 @@ const getSnapshot = (
           }),
           Effect.gen(function* unread() {
             const rows = yield* decodeRows(
-              Schema.Struct({ id: notificationRow.from.fields.id }),
+              Schema.Struct({ id: Notification.fields.id }),
               yield* sql`SELECT ${column(notificationColumns, "id")} FROM ${table("notification")}
                 WHERE ${column(notificationColumns, "userId")} = ${userId}
                   AND ${column(notificationColumns, "isRead")} = ${false}`
@@ -66,7 +71,7 @@ const getSnapshot = (
           Effect.gen(function* tracking() {
             const rows = yield* decodeRows(
               Schema.Struct({
-                updated_at: trackedSeriesStateRow.from.fields.updated_at,
+                updated_at: TrackedSeriesState.fields.updatedAt,
               }),
               yield* sql`SELECT ${table("trackedSeriesState")}.${column(trackedSeriesStateColumns, "updatedAt")}
                 FROM ${table("trackedSeriesState")}
@@ -84,14 +89,15 @@ const getSnapshot = (
 
     return {
       downloadsUpdatedAt: downloadRecord?.updated_at?.toISOString() ?? null,
+      notificationsUnreadCount: unreadRecord,
       notificationsUpdatedAt:
         notificationRecord?.updated_at?.toISOString() ?? null,
-      notificationsUnreadCount: unreadRecord,
       trackingUpdatedAt: trackingRecord?.updated_at?.toISOString() ?? null,
     };
   });
 
-const loadSnapshot = (userId: string) => runSql(getSnapshot(userId));
+const loadSnapshot = async (userId: string) =>
+  await runSql(getSnapshot(userId));
 
 const hasSnapshotChanged = (left: LiveSnapshot, right: LiveSnapshot): boolean =>
   left.downloadsUpdatedAt !== right.downloadsUpdatedAt ||
@@ -128,14 +134,15 @@ export const live = new Elysia({ prefix: "/api/live" }).get(
           controller.enqueue(encoder.encode(formatSseEvent(event, data)));
         };
 
+        const abortController = new AbortController();
+
         const cleanup = () => {
           if (isClosed) {
             return;
           }
 
           isClosed = true;
-          clearInterval(pollInterval);
-          clearInterval(heartbeatInterval);
+          abortController.abort();
           controller.close();
         };
 
@@ -170,16 +177,27 @@ export const live = new Elysia({ prefix: "/api/live" }).get(
           }
         };
 
+        const pollAndCleanupOnFailure = async () => {
+          try {
+            await poll();
+          } catch {
+            cleanup();
+          }
+        };
+
         send("connected", { snapshot: initialSnapshot });
 
         const pollInterval = setInterval(() => {
-          poll().catch(() => {
-            cleanup();
-          });
+          void pollAndCleanupOnFailure();
         }, 1500);
         const heartbeatInterval = setInterval(() => {
           send("heartbeat", { timestamp: Date.now() });
         }, 15_000);
+
+        abortController.signal.addEventListener("abort", () => {
+          clearInterval(pollInterval);
+          clearInterval(heartbeatInterval);
+        });
 
         request.signal.addEventListener("abort", cleanup, { once: true });
       },

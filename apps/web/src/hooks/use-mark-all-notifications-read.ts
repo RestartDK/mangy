@@ -16,6 +16,13 @@ export const useMarkAllNotificationsRead = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to update notifications"
+      );
+    },
     onSuccess: async (result) => {
       toast.success(
         result?.updatedCount
@@ -29,13 +36,6 @@ export const useMarkAllNotificationsRead = () => {
         }),
         queryClient.invalidateQueries({ queryKey: ["settingsBootstrap"] }),
       ]);
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to update notifications"
-      );
     },
   });
 };

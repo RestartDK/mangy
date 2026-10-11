@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge, type StatusTone } from "@/components/status-badge";
+import { StatusBadge } from "@/components/status-badge";
+import type { StatusTone } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,14 +43,13 @@ import { useCreateDestination } from "@/hooks/use-create-destination";
 import { useDeleteDestination } from "@/hooks/use-delete-destination";
 import { usePushSettings } from "@/hooks/use-push-settings";
 import { useSendBrowserPushTest } from "@/hooks/use-send-browser-push-test";
-import {
-  type SettingsBootstrap,
-  useSettingsBootstrap,
-} from "@/hooks/use-settings-bootstrap";
+import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
+import type { SettingsBootstrap } from "@/hooks/use-settings-bootstrap";
 import { useUpdateBrowserPushPreferences } from "@/hooks/use-update-browser-push-preferences";
 import { useUpdateNotificationPreferences } from "@/hooks/use-update-notification-preferences";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
+import { runMutation } from "@/lib/run-mutation";
 
 const destinationFieldIds = {
   absolutePath: "destination-absolute-path",
@@ -57,12 +57,55 @@ const destinationFieldIds = {
   name: "destination-name",
 } as const;
 
-export const Route = createFileRoute("/settings")({
-  beforeLoad: requireAuth,
-  component: SettingsRouteComponent,
-});
+interface ToggleRowProps {
+  checked: boolean;
+  description: string;
+  disabled?: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}
 
-function SettingsRouteComponent() {
+const ToggleRow = ({
+  checked,
+  description,
+  disabled,
+  label,
+  onCheckedChange,
+}: ToggleRowProps) => (
+  <div className="row">
+    <div className="min-w-0 space-y-0.5">
+      <p className="text-sm font-medium">{label}</p>
+      <p className="meta">{description}</p>
+    </div>
+    <Switch
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={onCheckedChange}
+    />
+  </div>
+);
+
+const SettingsSkeleton = () => (
+  <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+    <div className="flex flex-col gap-6">
+      <div className="panel space-y-4 p-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+      <div className="panel space-y-4 p-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    </div>
+    <div className="panel space-y-4 p-4">
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  </div>
+);
+const SettingsRouteComponent = () => {
   const settingsQuery = useSettingsBootstrap();
   const pushSettingsQuery = usePushSettings();
   const browserPushClientStateQuery = useBrowserPushClientState();
@@ -145,8 +188,8 @@ function SettingsRouteComponent() {
     browserPushClientStateQuery.isLoading;
 
   const pageError =
-    settingsQuery.error ||
-    pushSettingsQuery.error ||
+    settingsQuery.error ??
+    pushSettingsQuery.error ??
     browserPushClientStateQuery.error;
 
   const isCurrentBrowserPushEnabled = Boolean(
@@ -177,14 +220,16 @@ function SettingsRouteComponent() {
         return;
       }
 
-      await connectCurrentBrowserPush
-        .mutateAsync({ vapidPublicKey: pushSettings.vapidPublicKey })
-        .catch(() => undefined);
+      await runMutation(
+        connectCurrentBrowserPush.mutateAsync({
+          vapidPublicKey: pushSettings.vapidPublicKey,
+        })
+      );
 
       return;
     }
 
-    await disconnectCurrentBrowserPush.mutateAsync().catch(() => undefined);
+    await runMutation(disconnectCurrentBrowserPush.mutateAsync());
   };
 
   const unreadCount = settingsQuery.data?.notifications.unreadCount ?? 0;
@@ -336,7 +381,7 @@ function SettingsRouteComponent() {
                   }
                   label="Enable on this browser"
                   onCheckedChange={(checked) => {
-                    handleBrowserPushToggle(checked).catch(() => undefined);
+                    void runMutation(handleBrowserPushToggle(checked));
                   }}
                 />
                 <ToggleRow
@@ -422,8 +467,8 @@ function SettingsRouteComponent() {
                       isEnabled: pushSettingsQuery.data?.isEnabled ?? false,
                       notifyOnDownloadCompleted,
                       notifyOnDownloadFailed,
-                      notifyOnTrackedSeriesUpdate,
                       notifyOnSystemWarning,
+                      notifyOnTrackedSeriesUpdate,
                     });
                   }}
                   size="lg"
@@ -516,20 +561,22 @@ function SettingsRouteComponent() {
               onSubmit={(event) => {
                 event.preventDefault();
 
-                createDestination
-                  .mutateAsync({
+                void runMutation(
+                  createDestination.mutateAsync({
                     absolutePath,
                     isDefault,
                     komgaLibraryId,
                     name,
-                  })
-                  .then(() => {
-                    setAbsolutePath("");
-                    setIsDefault(false);
-                    setKomgaLibraryId("");
-                    setName("");
-                  })
-                  .catch(() => undefined);
+                  }),
+                  {
+                    onSuccess: () => {
+                      setAbsolutePath("");
+                      setIsDefault(false);
+                      setKomgaLibraryId("");
+                      setName("");
+                    },
+                  }
+                );
               }}
             >
               <h3 className="panel-title">Add destination</h3>
@@ -542,7 +589,9 @@ function SettingsRouteComponent() {
                   <Input
                     className="h-8"
                     id={destinationFieldIds.name}
-                    onChange={(event) => setName(event.target.value)}
+                    onChange={(event) => {
+                      setName(event.target.value);
+                    }}
                     placeholder="Main library"
                     value={name}
                   />
@@ -555,7 +604,9 @@ function SettingsRouteComponent() {
                   <Input
                     className="h-8"
                     id={destinationFieldIds.absolutePath}
-                    onChange={(event) => setAbsolutePath(event.target.value)}
+                    onChange={(event) => {
+                      setAbsolutePath(event.target.value);
+                    }}
                     placeholder="/srv/media/manga"
                     value={absolutePath}
                   />
@@ -571,7 +622,9 @@ function SettingsRouteComponent() {
                   <Input
                     className="h-8"
                     id={destinationFieldIds.komgaLibraryId}
-                    onChange={(event) => setKomgaLibraryId(event.target.value)}
+                    onChange={(event) => {
+                      setKomgaLibraryId(event.target.value);
+                    }}
                     placeholder="Optional"
                     value={komgaLibraryId}
                   />
@@ -630,12 +683,11 @@ function SettingsRouteComponent() {
                   return;
                 }
 
-                deleteDestination
-                  .mutateAsync(destinationId)
-                  .then(() => {
+                void runMutation(deleteDestination.mutateAsync(destinationId), {
+                  onSuccess: () => {
                     setDestinationPendingRemoval(null);
-                  })
-                  .catch(() => undefined);
+                  },
+                });
               }}
               type="button"
               variant="destructive"
@@ -657,53 +709,9 @@ function SettingsRouteComponent() {
       </Dialog>
     </AppShell>
   );
-}
+};
 
-interface ToggleRowProps {
-  checked: boolean;
-  description: string;
-  disabled?: boolean;
-  label: string;
-  onCheckedChange: (checked: boolean) => void;
-}
-
-const ToggleRow = ({
-  checked,
-  description,
-  disabled,
-  label,
-  onCheckedChange,
-}: ToggleRowProps) => (
-  <div className="row">
-    <div className="min-w-0 space-y-0.5">
-      <p className="text-sm font-medium">{label}</p>
-      <p className="meta">{description}</p>
-    </div>
-    <Switch
-      aria-label={label}
-      checked={checked}
-      disabled={disabled}
-      onCheckedChange={onCheckedChange}
-    />
-  </div>
-);
-
-const SettingsSkeleton = () => (
-  <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-    <div className="flex flex-col gap-6">
-      <div className="panel space-y-4 p-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-      <div className="panel space-y-4 p-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </div>
-    </div>
-    <div className="panel space-y-4 p-4">
-      <Skeleton className="h-14 w-full" />
-      <Skeleton className="h-14 w-full" />
-      <Skeleton className="h-32 w-full" />
-    </div>
-  </div>
-);
+export const Route = createFileRoute("/settings")({
+  beforeLoad: requireAuth,
+  component: SettingsRouteComponent,
+});

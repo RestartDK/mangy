@@ -1,26 +1,26 @@
 import { z } from "zod";
 
 export const sourceCapabilitiesSchema = z.object({
-  supportsPopular: z.boolean(),
-  supportsLatest: z.boolean(),
-  supportsTrending: z.boolean(),
-  supportsSearch: z.boolean(),
-  supportsFilters: z.boolean(),
-  supportsSeriesDetails: z.boolean(),
   supportsChapterFeed: z.boolean(),
+  supportsFilters: z.boolean(),
+  supportsLatest: z.boolean(),
   supportsPageFetch: z.boolean(),
+  supportsPopular: z.boolean(),
+  supportsSearch: z.boolean(),
+  supportsSeriesDetails: z.boolean(),
+  supportsTrending: z.boolean(),
 });
 
 export const sourceSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  websiteUrl: z.string().url(),
-  iconUrl: z.string().url().nullable(),
-  languageCode: z.string(),
-  supportedLanguages: z.array(z.string()),
-  isEnabled: z.boolean(),
   capabilities: sourceCapabilitiesSchema,
+  description: z.string(),
+  iconUrl: z.url().nullable(),
+  id: z.string(),
+  isEnabled: z.boolean(),
+  languageCode: z.string(),
+  name: z.string(),
+  supportedLanguages: z.array(z.string()),
+  websiteUrl: z.url(),
 });
 
 export const sourceFilterOptionSchema = z.object({
@@ -30,65 +30,65 @@ export const sourceFilterOptionSchema = z.object({
 
 export const sourceFilterSchema = z.discriminatedUnion("type", [
   z.object({
-    type: z.literal("select"),
-    key: z.string(),
-    label: z.string(),
     defaultValue: z.string().optional(),
-    options: z.array(sourceFilterOptionSchema),
-  }),
-  z.object({
-    type: z.literal("multiSelect"),
     key: z.string(),
     label: z.string(),
+    options: z.array(sourceFilterOptionSchema),
+    type: z.literal("select"),
+  }),
+  z.object({
     defaultValue: z.array(z.string()).optional(),
-    options: z.array(sourceFilterOptionSchema),
-  }),
-  z.object({
-    type: z.literal("toggle"),
     key: z.string(),
     label: z.string(),
+    options: z.array(sourceFilterOptionSchema),
+    type: z.literal("multiSelect"),
+  }),
+  z.object({
     defaultValue: z.boolean().optional(),
+    key: z.string(),
+    label: z.string(),
+    type: z.literal("toggle"),
   }),
 ]);
 
 export const sourceSeriesSchema = z.object({
-  sourceId: z.string(),
-  seriesId: z.string(),
-  title: z.string(),
-  description: z.string().nullable(),
-  canonicalUrl: z.string().url().nullable(),
-  coverImageUrl: z.string().url().nullable(),
-  status: z.enum(["ongoing", "completed", "hiatus", "cancelled", "unknown"]),
-  originalLanguage: z.string().nullable(),
-  latestChapter: z.string().nullable(),
-  contentRating: z.string().nullable(),
-  publicationDemographic: z.string().nullable(),
-  authorNames: z.array(z.string()),
   artistNames: z.array(z.string()),
-  tags: z.array(z.string()),
+  authorNames: z.array(z.string()),
   availableTranslatedLanguages: z.array(z.string()),
+  canonicalUrl: z.url().nullable(),
+  contentRating: z.string().nullable(),
+  coverImageUrl: z.url().nullable(),
+  description: z.string().nullable(),
+  latestChapter: z.string().nullable(),
+  originalLanguage: z.string().nullable(),
+  publicationDemographic: z.string().nullable(),
+  seriesId: z.string(),
+  sourceId: z.string(),
+  status: z.enum(["ongoing", "completed", "hiatus", "cancelled", "unknown"]),
+  tags: z.array(z.string()),
+  title: z.string(),
 });
 
 export const sourceSeriesListSchema = z.object({
+  hasNextPage: z.boolean(),
   items: z.array(sourceSeriesSchema),
   page: z.number().int(),
   pageSize: z.number().int(),
   total: z.number().int().nullable(),
-  hasNextPage: z.boolean(),
 });
 
 export const sourceDiscoverSectionSchema = z.object({
   id: z.string(),
+  items: z.array(sourceSeriesSchema),
   title: z.string(),
   type: z.enum(["popular", "latest", "trending"]),
-  items: z.array(sourceSeriesSchema),
 });
 
 export const sourceSearchBody = z.object({
-  query: z.string().trim().optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
   page: z.number().int().min(1).optional(),
   pageSize: z.number().int().min(1).max(24).optional(),
-  filters: z.record(z.string(), z.unknown()).optional(),
+  query: z.string().trim().optional(),
 });
 
 export const sourceDiscoverQuery = z.object({

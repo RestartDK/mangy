@@ -23,10 +23,10 @@ const runtime = ManagedRuntime.make(
   PgClient.layer({ url: Redacted.make(env.DATABASE_URL) })
 );
 
-const run = <A>(
+const run = async <A>(
   build: (sql: SqlClient.SqlClient) => Effect.Effect<A, SqlError>
 ): Promise<A> =>
-  runtime.runPromise(
+  await runtime.runPromise(
     Effect.gen(function* runStatement() {
       const sql = yield* SqlClient.SqlClient;
       return yield* build(sql);

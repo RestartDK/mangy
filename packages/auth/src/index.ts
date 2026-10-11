@@ -26,18 +26,18 @@ const getTrustedOrigins = (): string[] => {
 };
 
 export const auth = betterAuth({
-  secret: env.BETTER_AUTH_SECRET,
+  advanced: {
+    defaultCookieAttributes: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  },
   baseURL: env.BETTER_AUTH_URL,
   database: effectSqlAdapter(),
-  trustedOrigins: () => getTrustedOrigins(),
   emailAndPassword: {
     enabled: true,
   },
-  advanced: {
-    defaultCookieAttributes: {
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-    },
-  },
+  secret: env.BETTER_AUTH_SECRET,
+  trustedOrigins: () => getTrustedOrigins(),
 });

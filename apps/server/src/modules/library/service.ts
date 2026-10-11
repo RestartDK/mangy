@@ -7,14 +7,14 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  DownloadDestination,
+  LibraryEntry,
+  Series,
+  TrackedSeriesState,
   downloadDestinationColumns,
-  downloadDestinationRow,
   libraryEntryColumns,
-  libraryEntryRow,
   seriesColumns,
-  seriesRow,
   trackedSeriesStateColumns,
-  trackedSeriesStateRow,
 } from "@mangy/db/model";
 import { env } from "@mangy/env";
 import { Effect, Schema } from "effect";
@@ -45,42 +45,40 @@ const createEmptySeriesState = (sourceId: string, seriesId: string) => ({
 });
 
 const seriesStateProjection = Schema.Struct({
-  autoDownload: Schema.NullOr(libraryEntryRow.from.fields.auto_download),
-  checkFailureCount: Schema.NullOr(
-    trackedSeriesStateRow.from.fields.check_failure_count
-  ),
-  downloadDestinationId: Schema.NullOr(downloadDestinationRow.from.fields.id),
-  downloadDestinationName: Schema.NullOr(downloadDestinationRow.from.fields.name),
-  isTracked: Schema.NullOr(libraryEntryRow.from.fields.is_tracked),
-  lastCheckedAt: trackedSeriesStateRow.from.fields.last_checked_at,
+  autoDownload: Schema.NullOr(LibraryEntry.fields.autoDownload),
+  checkFailureCount: Schema.NullOr(TrackedSeriesState.fields.checkFailureCount),
+  downloadDestinationId: Schema.NullOr(DownloadDestination.fields.id),
+  downloadDestinationName: Schema.NullOr(DownloadDestination.fields.name),
+  isTracked: Schema.NullOr(LibraryEntry.fields.isTracked),
+  lastCheckedAt: TrackedSeriesState.fields.lastCheckedAt,
   lastSeenChapterExternalId:
-    trackedSeriesStateRow.from.fields.last_seen_chapter_external_id,
-  libraryEntryId: Schema.NullOr(libraryEntryRow.from.fields.id),
-  nextCheckAt: trackedSeriesStateRow.from.fields.next_check_at,
-  seriesId: seriesRow.from.fields.external_id,
-  sourceId: seriesRow.from.fields.source_id,
-  trackingStateId: Schema.NullOr(trackedSeriesStateRow.from.fields.id),
+    TrackedSeriesState.fields.lastSeenChapterExternalId,
+  libraryEntryId: Schema.NullOr(LibraryEntry.fields.id),
+  nextCheckAt: TrackedSeriesState.fields.nextCheckAt,
+  seriesId: Series.fields.externalId,
+  sourceId: Series.fields.sourceId,
+  trackingStateId: Schema.NullOr(TrackedSeriesState.fields.id),
 });
 
 type SeriesStateRow = Schema.Schema.Type<typeof seriesStateProjection>;
 
 const serializeSeriesState = (row: SeriesStateRow) => ({
-  libraryEntryId: row.libraryEntryId,
-  sourceId: row.sourceId,
-  seriesId: row.seriesId,
-  isTracked: row.isTracked ?? false,
   autoDownload: row.autoDownload ?? false,
   downloadDestinationId: row.downloadDestinationId,
   downloadDestinationName: row.downloadDestinationName,
+  isTracked: row.isTracked ?? false,
+  libraryEntryId: row.libraryEntryId,
+  seriesId: row.seriesId,
+  sourceId: row.sourceId,
   trackingState: row.trackingStateId
     ? {
+        checkFailureCount: row.checkFailureCount ?? 0,
         id: row.trackingStateId,
-        nextCheckAt: row.nextCheckAt ? row.nextCheckAt.toISOString() : null,
         lastCheckedAt: row.lastCheckedAt
           ? row.lastCheckedAt.toISOString()
           : null,
         lastSeenChapterExternalId: row.lastSeenChapterExternalId ?? null,
-        checkFailureCount: row.checkFailureCount ?? 0,
+        nextCheckAt: row.nextCheckAt ? row.nextCheckAt.toISOString() : null,
       }
     : null,
 });
@@ -135,15 +133,15 @@ const list = (userId: string) =>
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
       Schema.Struct({
-        id: libraryEntryRow.from.fields.id,
-        source_id: seriesRow.from.fields.source_id,
-        external_id: seriesRow.from.fields.external_id,
-        title: seriesRow.from.fields.title,
-        cover_image_url: Schema.NullOr(seriesRow.from.fields.cover_image_url),
-        is_tracked: libraryEntryRow.from.fields.is_tracked,
-        auto_download: libraryEntryRow.from.fields.auto_download,
-        destination_name: Schema.NullOr(downloadDestinationRow.from.fields.name),
-        updated_at: libraryEntryRow.from.fields.updated_at,
+        auto_download: LibraryEntry.fields.autoDownload,
+        cover_image_url: Schema.NullOr(Series.fields.coverImageUrl),
+        destination_name: Schema.NullOr(DownloadDestination.fields.name),
+        external_id: Series.fields.externalId,
+        id: LibraryEntry.fields.id,
+        is_tracked: LibraryEntry.fields.isTracked,
+        source_id: Series.fields.sourceId,
+        title: Series.fields.title,
+        updated_at: LibraryEntry.fields.updatedAt,
       }),
       yield* sql`SELECT ${table("libraryEntry")}.${column(libraryEntryColumns, "id")},
           ${table("series")}.${column(seriesColumns, "externalId")},
@@ -162,32 +160,34 @@ const list = (userId: string) =>
     );
 
     return rows.map((row) => ({
-      id: row.id,
-      sourceId: row.source_id,
-      seriesId: row.external_id,
-      title: row.title,
-      coverImageUrl: row.cover_image_url,
-      isTracked: row.is_tracked,
       autoDownload: row.auto_download,
+      coverImageUrl: row.cover_image_url,
       destinationName: row.destination_name ?? null,
+      id: row.id,
+      isTracked: row.is_tracked,
+      seriesId: row.external_id,
+      sourceId: row.source_id,
+      title: row.title,
       updatedAt: row.updated_at.toISOString(),
     }));
   });
 
 const resolveSeriesRecord = (sourceId: string, seriesId: string) =>
   Effect.gen(function* resolveSeriesRecordEffect() {
-    const existingRecord = yield* Effect.promise(() =>
-      SourcesStorage.findSeriesRecord(sourceId, seriesId)
+    const existingRecord = yield* Effect.promise(
+      async () => await SourcesStorage.findSeriesRecord(sourceId, seriesId)
     );
     if (existingRecord) {
       return existingRecord;
     }
 
     const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const seriesItem = yield* Effect.promise(() => adapter.getSeries(seriesId));
+    const seriesItem = yield* Effect.promise(
+      async () => await adapter.getSeries(seriesId)
+    );
 
-    return yield* Effect.promise(() =>
-      SourcesStorage.upsertSeriesItem(sourceId, seriesItem)
+    return yield* Effect.promise(
+      async () => await SourcesStorage.upsertSeriesItem(sourceId, seriesItem)
     );
   });
 
@@ -209,8 +209,8 @@ const resolveDestinationId = (
 
     const rows = yield* decodeRows(
       Schema.Struct({
-        id: downloadDestinationRow.from.fields.id,
-        is_enabled: downloadDestinationRow.from.fields.is_enabled,
+        id: DownloadDestination.fields.id,
+        is_enabled: DownloadDestination.fields.isEnabled,
       }),
       yield* sql`SELECT ${column(downloadDestinationColumns, "id")}, ${column(downloadDestinationColumns, "isEnabled")}
         FROM ${table("downloadDestination")}
@@ -239,8 +239,8 @@ const upsertTrackedState = (input: {
     const sql = yield* SqlClient.SqlClient;
     const currentRows = yield* decodeRows(
       Schema.Struct({
-        id: trackedSeriesStateRow.from.fields.id,
-        next_check_at: trackedSeriesStateRow.from.fields.next_check_at,
+        id: TrackedSeriesState.fields.id,
+        next_check_at: TrackedSeriesState.fields.nextCheckAt,
       }),
       yield* sql`SELECT ${column(trackedSeriesStateColumns, "id")}, ${column(trackedSeriesStateColumns, "nextCheckAt")}
         FROM ${table("trackedSeriesState")}
@@ -252,43 +252,43 @@ const upsertTrackedState = (input: {
 
     if (!(input.isAlreadyTracked && input.hadTrackingState)) {
       const adapter = SourcesService.getSourceOrThrow(input.sourceId);
-      const chapters = yield* Effect.promise(() =>
-        adapter.getChapters(input.seriesExternalId)
+      const chapters = yield* Effect.promise(
+        async () => await adapter.getChapters(input.seriesExternalId)
       );
-      yield* Effect.promise(() =>
-        SourcesStorage.upsertChapters(input.seriesRecordId, chapters)
-      );
+      yield* Effect.promise(async () => {
+        await SourcesStorage.upsertChapters(input.seriesRecordId, chapters);
+      });
 
       const now = new Date();
       const nextCheckAt = new Date(now.getTime() + getTrackingPollIntervalMs());
 
-      if (primaryState) {
-        yield* sql`UPDATE ${table("trackedSeriesState")} SET ${updateRow(
-          sql,
-          trackedSeriesStateColumns,
-          {
-            checkFailureCount: 0,
-            lastCheckedAt: now,
-            lastSeenChapterExternalId: chapters[0]?.externalId ?? null,
-            nextCheckAt,
-            updatedAt: now,
-          }
-        )}
-          WHERE ${column(trackedSeriesStateColumns, "id")} = ${primaryState.id}`;
-      } else {
-        yield* sql`INSERT INTO ${table("trackedSeriesState")} ${insertRow(
-          sql,
-          trackedSeriesStateColumns,
-          {
-            id: crypto.randomUUID(),
-            checkFailureCount: 0,
-            lastCheckedAt: now,
-            lastSeenChapterExternalId: chapters[0]?.externalId ?? null,
-            libraryEntryId: input.libraryEntryId,
-            nextCheckAt,
-          }
-        )}`;
-      }
+      const trackedStateStatement = primaryState
+        ? sql`UPDATE ${table("trackedSeriesState")} SET ${updateRow(
+            sql,
+            trackedSeriesStateColumns,
+            {
+              checkFailureCount: 0,
+              lastCheckedAt: now,
+              lastSeenChapterExternalId: chapters[0]?.externalId ?? null,
+              nextCheckAt,
+              updatedAt: now,
+            }
+          )}
+            WHERE ${column(trackedSeriesStateColumns, "id")} = ${primaryState.id}`
+        : sql`INSERT INTO ${table("trackedSeriesState")} ${insertRow(
+            sql,
+            trackedSeriesStateColumns,
+            {
+              checkFailureCount: 0,
+              id: crypto.randomUUID(),
+              lastCheckedAt: now,
+              lastSeenChapterExternalId: chapters[0]?.externalId ?? null,
+              libraryEntryId: input.libraryEntryId,
+              nextCheckAt,
+            }
+          )}`;
+
+      yield* trackedStateStatement;
 
       if (duplicateIds.length > 0) {
         yield* sql`DELETE FROM ${table("trackedSeriesState")}
@@ -338,14 +338,14 @@ const updateSeriesState = (
     }
 
     const entries = yield* decodeRows(
-      Schema.Struct({ id: libraryEntryRow.from.fields.id }),
+      Schema.Struct({ id: LibraryEntry.fields.id }),
       yield* sql`INSERT INTO ${table("libraryEntry")} ${insertRow(
         sql,
         libraryEntryColumns,
         {
-          id: crypto.randomUUID(),
           autoDownload: input.autoDownload,
           downloadDestinationId,
+          id: crypto.randomUUID(),
           isTracked,
           seriesId: seriesRecord.id,
           userId,
@@ -369,19 +369,19 @@ const updateSeriesState = (
       throw new Error("Unable to update the library entry for this series.");
     }
 
-    if (isTracked) {
-      yield* upsertTrackedState({
-        hadTrackingState: Boolean(existingState.trackingState),
-        isAlreadyTracked: existingState.isTracked,
-        libraryEntryId: entry.id,
-        seriesExternalId: input.seriesId,
-        seriesRecordId: seriesRecord.id,
-        sourceId: input.sourceId,
-      });
-    } else {
-      yield* sql`DELETE FROM ${table("trackedSeriesState")}
+    const trackedStateStatement = isTracked
+      ? upsertTrackedState({
+          hadTrackingState: Boolean(existingState.trackingState),
+          isAlreadyTracked: existingState.isTracked,
+          libraryEntryId: entry.id,
+          seriesExternalId: input.seriesId,
+          seriesRecordId: seriesRecord.id,
+          sourceId: input.sourceId,
+        })
+      : sql`DELETE FROM ${table("trackedSeriesState")}
         WHERE ${column(trackedSeriesStateColumns, "libraryEntryId")} = ${entry.id}`;
-    }
+
+    yield* trackedStateStatement;
 
     return yield* getSeriesState(userId, input.sourceId, input.seriesId);
   });
@@ -400,18 +400,22 @@ const removeSeries = (userId: string, sourceId: string, seriesId: string) =>
         AND ${column(libraryEntryColumns, "userId")} = ${userId}`;
 
     return {
-      sourceId,
       seriesId,
+      sourceId,
     };
   });
 
 export const LibraryService = {
+  async getSeriesState(userId: string, sourceId: string, seriesId: string) {
+    return await runSql(getSeriesState(userId, sourceId, seriesId));
+  },
+
   async list(userId: string) {
     return await runSql(list(userId));
   },
 
-  async getSeriesState(userId: string, sourceId: string, seriesId: string) {
-    return await runSql(getSeriesState(userId, sourceId, seriesId));
+  async removeSeries(userId: string, sourceId: string, seriesId: string) {
+    return await runSql(removeSeries(userId, sourceId, seriesId));
   },
 
   async updateSeriesState(
@@ -425,9 +429,5 @@ export const LibraryService = {
     }
   ) {
     return await runSql(updateSeriesState(userId, input));
-  },
-
-  async removeSeries(userId: string, sourceId: string, seriesId: string) {
-    return await runSql(removeSeries(userId, sourceId, seriesId));
   },
 };

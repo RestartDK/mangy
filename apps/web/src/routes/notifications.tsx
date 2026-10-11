@@ -3,7 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge, type StatusTone } from "@/components/status-badge";
+import { StatusBadge } from "@/components/status-badge";
+import type { StatusTone } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,22 +17,29 @@ import { formatDateTime, getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/notifications")({
-  beforeLoad: requireAuth,
-  component: NotificationsRouteComponent,
-});
-
 const notificationTypeLabels: Record<
   NotificationItem["type"],
   { label: string; tone: StatusTone }
 > = {
   downloadCompleted: { label: "Download complete", tone: "success" },
   downloadFailed: { label: "Download failed", tone: "danger" },
-  trackedSeriesUpdated: { label: "Tracked series", tone: "brand" },
   systemWarning: { label: "System", tone: "warning" },
+  trackedSeriesUpdated: { label: "Tracked series", tone: "brand" },
 };
 
-function NotificationsRouteComponent() {
+const NotificationsSkeleton = () => (
+  <div className="panel rows">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <div className="row" key={String(index)}>
+        <div className="w-full space-y-2">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-3 w-full" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+const NotificationsRouteComponent = () => {
   const notificationsQuery = useNotifications();
   const preferencesQuery = useNotificationPreferences();
   const markNotificationRead = useMarkNotificationRead();
@@ -137,17 +145,9 @@ function NotificationsRouteComponent() {
       ) : null}
     </AppShell>
   );
-}
+};
 
-const NotificationsSkeleton = () => (
-  <div className="panel rows">
-    {Array.from({ length: 4 }).map((_, index) => (
-      <div className="row" key={String(index)}>
-        <div className="w-full space-y-2">
-          <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-3 w-full" />
-        </div>
-      </div>
-    ))}
-  </div>
-);
+export const Route = createFileRoute("/notifications")({
+  beforeLoad: requireAuth,
+  component: NotificationsRouteComponent,
+});

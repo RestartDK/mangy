@@ -9,7 +9,6 @@ export type DownloadItem = NonNullable<DownloadsResponse>[number];
 
 export const useDownloads = () =>
   useQuery({
-    queryKey: ["downloads"],
     queryFn: async () => {
       const { data, error } = await api.api.downloads.get();
       if (error) {
@@ -18,5 +17,6 @@ export const useDownloads = () =>
 
       return data ?? [];
     },
+    queryKey: ["downloads"],
     refetchInterval: 2000,
   });

@@ -1,2 +1,2 @@
 export * from "./adapters/weeb-central";
-export * from "./types";
+export type * from "./types";

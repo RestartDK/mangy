@@ -7,7 +7,6 @@ export type LibraryItem = NonNullable<LibraryResponse>[number];
 
 export const useLibrary = () =>
   useQuery({
-    queryKey: ["library"],
     queryFn: async () => {
       const { data, error } = await api.api.library.get();
       if (error) {
@@ -16,5 +15,6 @@ export const useLibrary = () =>
 
       return data ?? [];
     },
+    queryKey: ["library"],
     refetchInterval: 5000,
   });

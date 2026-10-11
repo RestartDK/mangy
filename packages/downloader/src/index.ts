@@ -120,14 +120,20 @@ const invalidPathCharacters = new Set([
 
 const sanitizePathSegment = (value: string, fallback: string): string => {
   const normalized = Array.from(value, (character) => {
-    if (invalidPathCharacters.has(character) || character.charCodeAt(0) < 32) {
+    if (
+      invalidPathCharacters.has(character) ||
+      (character.codePointAt(0) ?? 0) < 32
+    ) {
       return " ";
     }
 
     return character;
   }).join("");
 
-  const sanitized = normalized.replace(/\s+/g, " ").replace(/\.+$/g, "").trim();
+  const sanitized = normalized
+    .replaceAll(/\s+/gu, " ")
+    .replaceAll(/\.+$/gu, "")
+    .trim();
 
   if (!sanitized) {
     return fallback;
@@ -245,7 +251,7 @@ export const downloadPagesToFolder = async ({
   outputDirectory: string;
   pages: DownloadPage[];
 }): Promise<DownloadPagesResult> => {
-  const orderedPages = [...pages].sort(
+  const orderedPages = [...pages].toSorted(
     (left, right) => left.index - right.index
   );
   let totalBytes = 0;
@@ -300,7 +306,7 @@ export const downloadPagesToCbz = async ({
   outputPath: string;
   pages: DownloadPage[];
 }): Promise<DownloadPagesResult> => {
-  const orderedPages = [...pages].sort(
+  const orderedPages = [...pages].toSorted(
     (left, right) => left.index - right.index
   );
   const files: Record<string, Uint8Array> = {};

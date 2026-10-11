@@ -41,11 +41,8 @@ export class BrowserPushError extends Error {
   }
 }
 
-const isConfigured = (): boolean => {
-  return Boolean(
-    env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT
-  );
-};
+const isConfigured = (): boolean =>
+  Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT);
 
 const getConfiguredVapid = () => {
   if (!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT)) {
@@ -88,9 +85,8 @@ const normalizeError = (error: unknown): BrowserPushError => {
 
 export const hasBrowserPushConfig = (): boolean => isConfigured();
 
-export const getBrowserPushPublicKey = (): string | null => {
-  return env.VAPID_PUBLIC_KEY ?? null;
-};
+export const getBrowserPushPublicKey = (): string | null =>
+  env.VAPID_PUBLIC_KEY ?? null;
 
 export const setBrowserPushSenderForTests = (
   sender: BrowserPushSender | null

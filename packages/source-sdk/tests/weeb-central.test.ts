@@ -4,15 +4,20 @@ import { readFile } from "node:fs/promises";
 import { createWeebCentralSourceAdapter } from "../src/adapters/weeb-central";
 
 const fixture = async (name: string): Promise<string> =>
-  readFile(new URL(`./fixtures/weeb-central/${name}`, import.meta.url), "utf8");
+  await readFile(
+    new URL(`fixtures/weeb-central/${name}`, import.meta.url),
+    "utf-8"
+  );
 
 const createHtmlResponse = (html: string, url: string): Response => {
-  return {
-    ok: true,
+  const response = new Response(html, {
+    headers: { "content-type": "text/html" },
     status: 200,
-    text: async () => html,
-    url,
-  } as unknown as Response;
+  });
+
+  Object.defineProperty(response, "url", { value: url });
+
+  return response;
 };
 
 const toRequestUrl = (input: string | URL | Request): string => {
@@ -30,43 +35,26 @@ const toRequestUrl = (input: string | URL | Request): string => {
 describe("WeebCentral adapter", () => {
   const originalFetch = globalThis.fetch;
 
-  beforeEach(async () => {
-    const chapterHtml = await fixture("chapters.html");
-    const imagesHtml = await fixture("images.html");
-    const searchHtml = await fixture("search.html");
-    const searchResultsHtml = await fixture("search-results.html");
-    const seriesHtml = await fixture("series.html");
+  beforeEach(() => {
+    const fixtureByPath = new Map<string, string>([
+      ["/chapters/01KMRF9PB6E2R9KVZQ3SDWQZNG/images", "images.html"],
+      ["/search", "search.html"],
+      ["/search/data", "search-results.html"],
+      ["/series/01J76XY7E9FNDZ1DBBM6PBJPFK/One-Piece", "series.html"],
+      ["/series/01J76XY7E9FNDZ1DBBM6PBJPFK/full-chapter-list", "chapters.html"],
+    ]);
 
-    globalThis.fetch = ((input) => {
+    globalThis.fetch = async (input) => {
       const requestUrl = toRequestUrl(input);
       const url = new URL(requestUrl);
+      const fixtureName = fixtureByPath.get(url.pathname);
 
-      if (url.pathname === "/search") {
-        return Promise.resolve(createHtmlResponse(searchHtml, url.toString()));
+      if (fixtureName === undefined) {
+        throw new Error(`Unexpected fetch request: ${url.toString()}`);
       }
 
-      if (url.pathname === "/search/data") {
-        return Promise.resolve(
-          createHtmlResponse(searchResultsHtml, url.toString())
-        );
-      }
-
-      if (url.pathname === "/series/01J76XY7E9FNDZ1DBBM6PBJPFK/One-Piece") {
-        return Promise.resolve(createHtmlResponse(seriesHtml, url.toString()));
-      }
-
-      if (
-        url.pathname === "/series/01J76XY7E9FNDZ1DBBM6PBJPFK/full-chapter-list"
-      ) {
-        return Promise.resolve(createHtmlResponse(chapterHtml, url.toString()));
-      }
-
-      if (url.pathname === "/chapters/01KMRF9PB6E2R9KVZQ3SDWQZNG/images") {
-        return Promise.resolve(createHtmlResponse(imagesHtml, url.toString()));
-      }
-
-      throw new Error(`Unexpected fetch request: ${url.toString()}`);
-    }) as typeof fetch;
+      return createHtmlResponse(await fixture(fixtureName), url.toString());
+    };
   });
 
   afterEach(() => {

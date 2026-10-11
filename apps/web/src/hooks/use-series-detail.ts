@@ -15,11 +15,10 @@ export const useSeriesDetail = (
   sourceId: string | undefined,
   seriesId: string | undefined
 ) => {
-  const params = sourceId && seriesId ? { sourceId, seriesId } : undefined;
+  const params = sourceId && seriesId ? { seriesId, sourceId } : undefined;
 
   const seriesQuery = useQuery({
     enabled: Boolean(params),
-    queryKey: ["seriesDetail", sourceId, seriesId],
     queryFn: async () => {
       if (!params) {
         return null;
@@ -36,11 +35,11 @@ export const useSeriesDetail = (
 
       return data ?? null;
     },
+    queryKey: ["seriesDetail", sourceId, seriesId],
   });
 
   const chaptersQuery = useQuery({
     enabled: Boolean(params),
-    queryKey: ["seriesChapters", sourceId, seriesId],
     queryFn: async () => {
       if (!params) {
         return [];
@@ -57,12 +56,13 @@ export const useSeriesDetail = (
 
       return data ?? [];
     },
+    queryKey: ["seriesChapters", sourceId, seriesId],
   });
 
   return {
-    series: seriesQuery.data,
     chapters: chaptersQuery.data ?? [],
-    isLoading: seriesQuery.isLoading || chaptersQuery.isLoading,
     error: seriesQuery.error ?? chaptersQuery.error,
+    isLoading: seriesQuery.isLoading || chaptersQuery.isLoading,
+    series: seriesQuery.data,
   };
 };

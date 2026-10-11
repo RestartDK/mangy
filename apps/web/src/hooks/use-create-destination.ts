@@ -19,14 +19,14 @@ export const useCreateDestination = () => {
 
       return data;
     },
-    onSuccess: async () => {
-      toast.success("Destination saved");
-      await queryClient.invalidateQueries({ queryKey: ["settingsBootstrap"] });
-    },
     onError: (error) => {
       toast.error(
         error instanceof Error ? error.message : "Unable to save destination"
       );
+    },
+    onSuccess: async () => {
+      toast.success("Destination saved");
+      await queryClient.invalidateQueries({ queryKey: ["settingsBootstrap"] });
     },
   });
 };

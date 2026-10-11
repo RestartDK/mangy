@@ -5,9 +5,9 @@ import type { SourceSummary } from "@/hooks/use-sources";
 const PREFERRED_SOURCE_STORAGE_KEY = "mangy.preferred-source-id";
 
 export const usePreferredSource = (sources: SourceSummary[]) => {
-  const [selectedSourceId, setSelectedSourceId] = useState<string | undefined>(
-    undefined
-  );
+  const [selectedSourceId, setSelectedSourceId] = useState<
+    string | undefined
+  >();
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {

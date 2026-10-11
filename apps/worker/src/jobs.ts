@@ -7,15 +7,15 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  Chapter,
+  DownloadDestination,
+  DownloadJob,
+  Series,
   chapterColumns,
-  chapterRow,
   downloadArtifactColumns,
   downloadDestinationColumns,
-  downloadDestinationRow,
   downloadJobColumns,
-  downloadJobRow,
   seriesColumns,
-  seriesRow,
 } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
@@ -48,21 +48,21 @@ interface CompletedArtifact {
 }
 
 const claimedJobProjection = Schema.Struct({
-  attempts: downloadJobRow.from.fields.attempts,
-  chapterExternalId: Schema.NullOr(chapterRow.from.fields.external_id),
-  chapterNumber: Schema.NullOr(chapterRow.from.fields.chapter_number),
-  chapterRecordId: Schema.NullOr(chapterRow.from.fields.id),
-  chapterTitle: Schema.NullOr(chapterRow.from.fields.title),
+  attempts: DownloadJob.fields.attempts,
+  chapterExternalId: Schema.NullOr(Chapter.fields.externalId),
+  chapterNumber: Schema.NullOr(Chapter.fields.chapterNumber),
+  chapterRecordId: Schema.NullOr(Chapter.fields.id),
+  chapterTitle: Schema.NullOr(Chapter.fields.title),
   destinationKomgaLibraryId: Schema.NullOr(
-    downloadDestinationRow.from.fields.komga_library_id
+    DownloadDestination.fields.komgaLibraryId
   ),
-  destinationName: Schema.NullOr(downloadDestinationRow.from.fields.name),
-  destinationPath: Schema.NullOr(downloadDestinationRow.from.fields.absolute_path),
-  id: downloadJobRow.from.fields.id,
-  maxAttempts: downloadJobRow.from.fields.max_attempts,
-  seriesSourceId: Schema.NullOr(seriesRow.from.fields.source_id),
-  seriesTitle: Schema.NullOr(seriesRow.from.fields.title),
-  userId: downloadJobRow.from.fields.user_id,
+  destinationName: Schema.NullOr(DownloadDestination.fields.name),
+  destinationPath: Schema.NullOr(DownloadDestination.fields.absolutePath),
+  id: DownloadJob.fields.id,
+  maxAttempts: DownloadJob.fields.maxAttempts,
+  seriesSourceId: Schema.NullOr(Series.fields.sourceId),
+  seriesTitle: Schema.NullOr(Series.fields.title),
+  userId: DownloadJob.fields.userId,
 });
 
 const buildChapterLabel = (job: ClaimedDownloadJob): string => {
@@ -187,7 +187,7 @@ export const isDownloadJobCancelled = async (
     Effect.gen(function* checkJobCancelledEffect() {
       const sql = yield* SqlClient.SqlClient;
       const rows = yield* decodeRows(
-        Schema.Struct({ status: downloadJobRow.from.fields.status }),
+        Schema.Struct({ status: DownloadJob.fields.status }),
         yield* sql`SELECT ${column(downloadJobColumns, "status")} FROM ${table("downloadJob")}
           WHERE ${column(downloadJobColumns, "id")} = ${jobId}
           LIMIT 1`

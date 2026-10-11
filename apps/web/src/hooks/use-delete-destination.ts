@@ -17,6 +17,11 @@ export const useDeleteDestination = () => {
 
       return data;
     },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to remove destination"
+      );
+    },
     onSuccess: async () => {
       toast.success("Destination removed");
       await Promise.all([
@@ -24,11 +29,6 @@ export const useDeleteDestination = () => {
         queryClient.invalidateQueries({ queryKey: ["library"] }),
         queryClient.invalidateQueries({ queryKey: ["librarySeriesState"] }),
       ]);
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to remove destination"
-      );
     },
   });
 };

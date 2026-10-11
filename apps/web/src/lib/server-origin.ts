@@ -25,9 +25,9 @@ export const getServerOrigin = (): string => {
 
   const configuredOrigin = resolveConfiguredOrigin();
   if (!configuredOrigin) {
-    return typeof window !== "undefined"
-      ? window.location.origin
-      : "http://localhost:3000";
+    return typeof window === "undefined"
+      ? "http://localhost:3000"
+      : window.location.origin;
   }
 
   if (

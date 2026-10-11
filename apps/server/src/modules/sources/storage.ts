@@ -7,9 +7,9 @@ import {
   updateRow,
 } from "@mangy/db";
 import {
+  Series,
   chapterColumns,
   seriesColumns,
-  seriesRow,
   sourceColumns,
 } from "@mangy/db/model";
 import type {
@@ -21,55 +21,55 @@ import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 const mapSeriesValues = (sourceId: string, item: SourceSeries) => ({
-  sourceId,
-  externalId: item.externalId,
-  title: item.title,
-  description: item.description,
-  canonicalUrl: item.canonicalUrl,
-  coverImageUrl: item.coverImageUrl,
-  status: item.status,
-  originalLanguage: item.originalLanguage,
-  latestChapter: item.latestChapter,
-  contentRating: item.contentRating,
-  publicationDemographic: item.publicationDemographic,
-  authorNames: item.authorNames,
   artistNames: item.artistNames,
-  tags: item.tags,
+  authorNames: item.authorNames,
   availableTranslatedLanguages: item.availableTranslatedLanguages,
+  canonicalUrl: item.canonicalUrl,
+  contentRating: item.contentRating,
+  coverImageUrl: item.coverImageUrl,
+  description: item.description,
+  externalId: item.externalId,
   lastFetchedAt: new Date(),
+  latestChapter: item.latestChapter,
+  originalLanguage: item.originalLanguage,
+  publicationDemographic: item.publicationDemographic,
+  sourceId,
+  status: item.status,
+  tags: item.tags,
+  title: item.title,
 });
 
 const mapChapterValues = (seriesId: string, item: SourceChapter) => ({
-  seriesId,
-  externalId: item.externalId,
-  title: item.title,
   chapterNumber: item.chapterNumber,
-  volumeNumber: item.volumeNumber,
-  translatedLanguage: item.translatedLanguage,
+  externalId: item.externalId,
   externalUrl: item.externalUrl,
-  sourceOrder: item.sourceOrder,
+  isUnavailable: item.isUnavailable,
   pageCount: item.pageCount,
   publishedAt: item.publishedAt,
-  isUnavailable: item.isUnavailable,
+  seriesId,
+  sourceOrder: item.sourceOrder,
+  title: item.title,
+  translatedLanguage: item.translatedLanguage,
+  volumeNumber: item.volumeNumber,
 });
 
 const mapSourceValues = (adapter: SourceAdapter) => ({
-  id: adapter.metadata.id,
-  name: adapter.metadata.name,
   description: adapter.metadata.description,
-  websiteUrl: adapter.metadata.websiteUrl,
   iconUrl: adapter.metadata.iconUrl ?? null,
-  languageCode: adapter.metadata.languageCode,
-  supportedLanguages: adapter.metadata.supportedLanguages,
+  id: adapter.metadata.id,
   isEnabled: true,
-  supportsPopular: adapter.metadata.capabilities.supportsPopular,
-  supportsLatest: adapter.metadata.capabilities.supportsLatest,
-  supportsTrending: adapter.metadata.capabilities.supportsTrending,
-  supportsSearch: adapter.metadata.capabilities.supportsSearch,
-  supportsFilters: adapter.metadata.capabilities.supportsFilters,
-  supportsSeriesDetails: adapter.metadata.capabilities.supportsSeriesDetails,
+  languageCode: adapter.metadata.languageCode,
+  name: adapter.metadata.name,
+  supportedLanguages: adapter.metadata.supportedLanguages,
   supportsChapterFeed: adapter.metadata.capabilities.supportsChapterFeed,
+  supportsFilters: adapter.metadata.capabilities.supportsFilters,
+  supportsLatest: adapter.metadata.capabilities.supportsLatest,
   supportsPageFetch: adapter.metadata.capabilities.supportsPageFetch,
+  supportsPopular: adapter.metadata.capabilities.supportsPopular,
+  supportsSearch: adapter.metadata.capabilities.supportsSearch,
+  supportsSeriesDetails: adapter.metadata.capabilities.supportsSeriesDetails,
+  supportsTrending: adapter.metadata.capabilities.supportsTrending,
+  websiteUrl: adapter.metadata.websiteUrl,
 });
 
 const syncSource = (adapter: SourceAdapter) =>
@@ -82,21 +82,21 @@ const syncSource = (adapter: SourceAdapter) =>
         sql,
         sourceColumns,
         {
-          name: values.name,
           description: values.description,
-          websiteUrl: values.websiteUrl,
           iconUrl: values.iconUrl,
           languageCode: values.languageCode,
+          name: values.name,
           supportedLanguages: values.supportedLanguages,
-          supportsPopular: values.supportsPopular,
-          supportsLatest: values.supportsLatest,
-          supportsTrending: values.supportsTrending,
-          supportsSearch: values.supportsSearch,
-          supportsFilters: values.supportsFilters,
-          supportsSeriesDetails: values.supportsSeriesDetails,
           supportsChapterFeed: values.supportsChapterFeed,
+          supportsFilters: values.supportsFilters,
+          supportsLatest: values.supportsLatest,
           supportsPageFetch: values.supportsPageFetch,
+          supportsPopular: values.supportsPopular,
+          supportsSearch: values.supportsSearch,
+          supportsSeriesDetails: values.supportsSeriesDetails,
+          supportsTrending: values.supportsTrending,
           updatedAt: new Date(),
+          websiteUrl: values.websiteUrl,
         }
       )}`;
   });
@@ -106,9 +106,9 @@ const upsertSeriesItem = (sourceId: string, item: SourceSeries) =>
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
       Schema.Struct({
-        id: seriesRow.from.fields.id,
-        source_id: seriesRow.from.fields.source_id,
-        external_id: seriesRow.from.fields.external_id,
+        external_id: Series.fields.externalId,
+        id: Series.fields.id,
+        source_id: Series.fields.sourceId,
       }),
       yield* sql`INSERT INTO ${table("series")} ${insertRow(
         sql,
@@ -122,20 +122,20 @@ const upsertSeriesItem = (sourceId: string, item: SourceSeries) =>
           sql,
           seriesColumns,
           {
-            title: item.title,
-            description: item.description,
-            canonicalUrl: item.canonicalUrl,
-            coverImageUrl: item.coverImageUrl,
-            status: item.status,
-            originalLanguage: item.originalLanguage,
-            latestChapter: item.latestChapter,
-            contentRating: item.contentRating,
-            publicationDemographic: item.publicationDemographic,
-            authorNames: item.authorNames,
             artistNames: item.artistNames,
-            tags: item.tags,
+            authorNames: item.authorNames,
             availableTranslatedLanguages: item.availableTranslatedLanguages,
+            canonicalUrl: item.canonicalUrl,
+            contentRating: item.contentRating,
+            coverImageUrl: item.coverImageUrl,
+            description: item.description,
             lastFetchedAt: new Date(),
+            latestChapter: item.latestChapter,
+            originalLanguage: item.originalLanguage,
+            publicationDemographic: item.publicationDemographic,
+            status: item.status,
+            tags: item.tags,
+            title: item.title,
             updatedAt: new Date(),
           }
         )}
@@ -148,9 +148,9 @@ const upsertSeriesItem = (sourceId: string, item: SourceSeries) =>
     }
 
     return {
+      externalId: record.external_id,
       id: record.id,
       sourceId: record.source_id,
-      externalId: record.external_id,
     };
   });
 
@@ -171,16 +171,16 @@ const upsertChapters = (seriesId: string, items: SourceChapter[]) =>
           sql,
           chapterColumns,
           {
-            title: item.title,
             chapterNumber: item.chapterNumber,
-            volumeNumber: item.volumeNumber,
-            translatedLanguage: item.translatedLanguage,
             externalUrl: item.externalUrl,
-            sourceOrder: item.sourceOrder,
+            isUnavailable: item.isUnavailable,
             pageCount: item.pageCount,
             publishedAt: item.publishedAt,
-            isUnavailable: item.isUnavailable,
+            sourceOrder: item.sourceOrder,
+            title: item.title,
+            translatedLanguage: item.translatedLanguage,
             updatedAt: new Date(),
+            volumeNumber: item.volumeNumber,
           }
         )}`;
     }
@@ -190,7 +190,7 @@ const findSeriesRecord = (sourceId: string, externalId: string) =>
   Effect.gen(function* findSeriesRecordEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
-      Schema.Struct({ id: seriesRow.from.fields.id }),
+      Schema.Struct({ id: Series.fields.id }),
       yield* sql`SELECT ${column(seriesColumns, "id")} FROM ${table("series")}
         WHERE ${column(seriesColumns, "sourceId")} = ${sourceId}
           AND ${column(seriesColumns, "externalId")} = ${externalId}`
@@ -200,10 +200,24 @@ const findSeriesRecord = (sourceId: string, externalId: string) =>
   });
 
 export const SourcesStorage = {
+  async findSeriesRecord(
+    sourceId: string,
+    externalId: string
+  ): Promise<{ id: string } | null> {
+    return await runSql(findSeriesRecord(sourceId, externalId));
+  },
+
   async syncSources(adapters: SourceAdapter[]): Promise<void> {
     for (const adapter of adapters) {
       await runSql(syncSource(adapter));
     }
+  },
+
+  async upsertChapters(
+    seriesId: string,
+    items: SourceChapter[]
+  ): Promise<void> {
+    await runSql(upsertChapters(seriesId, items));
   },
 
   async upsertSeries(sourceId: string, items: SourceSeries[]): Promise<void> {
@@ -217,19 +231,5 @@ export const SourcesStorage = {
     item: SourceSeries
   ): Promise<{ id: string; sourceId: string; externalId: string }> {
     return await runSql(upsertSeriesItem(sourceId, item));
-  },
-
-  async upsertChapters(
-    seriesId: string,
-    items: SourceChapter[]
-  ): Promise<void> {
-    await runSql(upsertChapters(seriesId, items));
-  },
-
-  async findSeriesRecord(
-    sourceId: string,
-    externalId: string
-  ): Promise<{ id: string } | null> {
-    return await runSql(findSeriesRecord(sourceId, externalId));
   },
 };

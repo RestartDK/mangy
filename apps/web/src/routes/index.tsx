@@ -21,12 +21,25 @@ import { useSources } from "@/hooks/use-sources";
 import { getErrorMessage } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
-export const Route = createFileRoute("/")({
-  beforeLoad: requireAuth,
-  component: DiscoverRouteComponent,
-});
-
-function DiscoverRouteComponent() {
+const DiscoverSkeleton = () => (
+  <div className="page-grid">
+    {Array.from({ length: 2 }).map((_, sectionIndex) => (
+      <div className="page-section" key={String(sectionIndex)}>
+        <Skeleton className="h-5 w-40" />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_card, cardIndex) => (
+            <div className="flex flex-col gap-3" key={String(cardIndex)}>
+              <Skeleton className="aspect-2/3 w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+const DiscoverRouteComponent = () => {
   const sourcesQuery = useSources();
   const enabledSources = useMemo(
     () => (sourcesQuery.data ?? []).filter((source) => source.isEnabled),
@@ -40,7 +53,7 @@ function DiscoverRouteComponent() {
   const discoverQuery = useSourceDiscover(activeSource?.id, 10);
 
   const isLoading = sourcesQuery.isLoading || discoverQuery.isLoading;
-  const hasError = sourcesQuery.error || discoverQuery.error;
+  const hasError = sourcesQuery.error ?? discoverQuery.error;
 
   return (
     <AppShell>
@@ -106,23 +119,9 @@ function DiscoverRouteComponent() {
       ) : null}
     </AppShell>
   );
-}
+};
 
-const DiscoverSkeleton = () => (
-  <div className="page-grid">
-    {Array.from({ length: 2 }).map((_, sectionIndex) => (
-      <div className="page-section" key={String(sectionIndex)}>
-        <Skeleton className="h-5 w-40" />
-        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, cardIndex) => (
-            <div className="flex flex-col gap-3" key={String(cardIndex)}>
-              <Skeleton className="aspect-2/3 w-full rounded-lg" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          ))}
-        </div>
-      </div>
-    ))}
-  </div>
-);
+export const Route = createFileRoute("/")({
+  beforeLoad: requireAuth,
+  component: DiscoverRouteComponent,
+});

@@ -15,14 +15,14 @@ export const useCancelDownload = () => {
 
       return data;
     },
-    onSuccess: async () => {
-      toast.success("Job cancelled");
-      await queryClient.invalidateQueries({ queryKey: ["downloads"] });
-    },
     onError: (error) => {
       toast.error(
         error instanceof Error ? error.message : "Unable to cancel job"
       );
+    },
+    onSuccess: async () => {
+      toast.success("Job cancelled");
+      await queryClient.invalidateQueries({ queryKey: ["downloads"] });
     },
   });
 };

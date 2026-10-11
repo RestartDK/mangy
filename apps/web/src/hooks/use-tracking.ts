@@ -9,7 +9,6 @@ export type TrackedSeries = NonNullable<TrackingResponse>[number];
 
 export const useTracking = () =>
   useQuery({
-    queryKey: ["tracking"],
     queryFn: async () => {
       const { data, error } = await api.api.tracking.get();
       if (error) {
@@ -18,5 +17,6 @@ export const useTracking = () =>
 
       return data ?? [];
     },
+    queryKey: ["tracking"],
     refetchInterval: 5000,
   });

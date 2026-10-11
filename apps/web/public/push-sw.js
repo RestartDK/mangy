@@ -1,19 +1,67 @@
+/** @type {(value: unknown) => value is Record<string, unknown>} */
+const isRecord = (value) => typeof value === "object" && value !== null;
+
+/** @type {(value: unknown) => ServiceWorkerPushPayload} */
+const parsePayload = (value) => {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return {
+    body: typeof value.body === "string" ? value.body : undefined,
+    notificationId:
+      typeof value.notificationId === "string"
+        ? value.notificationId
+        : undefined,
+    tag: typeof value.tag === "string" ? value.tag : undefined,
+    title: typeof value.title === "string" ? value.title : undefined,
+    url: typeof value.url === "string" ? value.url : undefined,
+  };
+};
+
+/** @type {(value: string | undefined, fallback: string) => string} */
+const textOrFallback = (value, fallback) => {
+  if (value === undefined || value === "") {
+    return fallback;
+  }
+
+  return value;
+};
+
+/** @type {(value: string | undefined) => string | undefined} */
+const nonEmpty = (value) =>
+  value === undefined || value === "" ? undefined : value;
+
+/** @type {(client: Client) => client is WindowClient} */
+const isWindowClient = (client) => "focus" in client && "navigate" in client;
+
+/** @type {(targetUrl: string) => Promise<void>} */
+const focusOrOpenClient = async (targetUrl) => {
+  const clients = await self.clients.matchAll({
+    includeUncontrolled: true,
+    type: "window",
+  });
+  const existingClient = clients.find(isWindowClient);
+
+  if (existingClient) {
+    await existingClient.navigate(targetUrl);
+    await existingClient.focus();
+    return;
+  }
+
+  await self.clients.openWindow(targetUrl);
+};
+
 self.addEventListener("push", (event) => {
-  const payload = event.data
-    ? event.data.json()
-    : {
-        body: "You have a new notification.",
-        title: "Mangy",
-        url: "/notifications",
-      };
+  const payload = event.data ? parsePayload(event.data.json()) : {};
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || "Mangy", {
-      body: payload.body || "You have a new notification.",
+    self.registration.showNotification(textOrFallback(payload.title, "Mangy"), {
+      body: textOrFallback(payload.body, "You have a new notification."),
       data: {
-        url: payload.url || "/notifications",
+        url: textOrFallback(payload.url, "/notifications"),
       },
-      tag: payload.tag || payload.notificationId || undefined,
+      tag: nonEmpty(payload.tag) ?? nonEmpty(payload.notificationId),
     })
   );
 });
@@ -22,24 +70,9 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const targetUrl = new URL(
-    event.notification.data?.url || "/notifications",
+    textOrFallback(parsePayload(event.notification.data).url, "/notifications"),
     self.location.origin
   ).toString();
 
-  event.waitUntil(
-    self.clients
-      .matchAll({ includeUncontrolled: true, type: "window" })
-      .then((clients) => {
-        const existingClient = clients.find((client) => {
-          return "focus" in client;
-        });
-
-        if (existingClient) {
-          existingClient.navigate(targetUrl);
-          return existingClient.focus();
-        }
-
-        return self.clients.openWindow(targetUrl);
-      })
-  );
+  event.waitUntil(focusOrOpenClient(targetUrl));
 });

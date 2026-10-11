@@ -15,59 +15,56 @@ import "../index.css";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60,
       retry: 1,
+      staleTime: 1000 * 60,
     },
   },
 });
 
-export type RouterAppContext = {};
+export type RouterAppContext = Record<string, never>;
 
+const RootComponent = () => (
+  <>
+    <HeadContent />
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      disableTransitionOnChange
+      enableSystem
+    >
+      <QueryClientProvider client={queryClient}>
+        <div className="bg-background text-foreground min-h-svh">
+          <Outlet />
+        </div>
+        <Toaster />
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
+    </ThemeProvider>
+    <TanStackRouterDevtools position="bottom-left" />
+  </>
+);
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootComponent,
   head: () => ({
+    links: [
+      {
+        href: "/favicon.ico",
+        rel: "icon",
+        type: "image/x-icon",
+      },
+      {
+        href: "/apple-touch-icon.png",
+        rel: "apple-touch-icon",
+      },
+    ],
     meta: [
       {
         title: "Mangy",
       },
       {
-        name: "description",
         content: "Mangy is a manga discovery and download app for Komga.",
-      },
-    ],
-    links: [
-      {
-        rel: "icon",
-        href: "/favicon.ico",
-        type: "image/x-icon",
-      },
-      {
-        rel: "apple-touch-icon",
-        href: "/apple-touch-icon.png",
+        name: "description",
       },
     ],
   }),
 });
-
-function RootComponent() {
-  return (
-    <>
-      <HeadContent />
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        disableTransitionOnChange
-        enableSystem
-      >
-        <QueryClientProvider client={queryClient}>
-          <div className="bg-background text-foreground min-h-svh">
-            <Outlet />
-          </div>
-          <Toaster />
-          <ReactQueryDevtools initialIsOpen={false} />
-        </QueryClientProvider>
-      </ThemeProvider>
-      <TanStackRouterDevtools position="bottom-left" />
-    </>
-  );
-}

@@ -11,7 +11,6 @@ export type SourceFilterDefinition = NonNullable<FiltersResponse>[number];
 export const useSourceFilters = (sourceId: string | undefined) =>
   useQuery({
     enabled: Boolean(sourceId),
-    queryKey: ["sourceFilters", sourceId],
     queryFn: async () => {
       if (!sourceId) {
         return [];
@@ -24,4 +23,5 @@ export const useSourceFilters = (sourceId: string | undefined) =>
 
       return data ?? [];
     },
+    queryKey: ["sourceFilters", sourceId],
   });

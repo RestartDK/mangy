@@ -24,7 +24,7 @@ export const library = new Elysia({ prefix: "/api/library" })
         return { message: "Unauthorized" };
       }
 
-      return LibraryService.list(user.id);
+      return await LibraryService.list(user.id);
     },
     {
       response: {
@@ -42,7 +42,7 @@ export const library = new Elysia({ prefix: "/api/library" })
         return { message: "Unauthorized" };
       }
 
-      return LibraryService.getSeriesState(
+      return await LibraryService.getSeriesState(
         user.id,
         query.sourceId,
         query.seriesId
