@@ -1,4 +1,4 @@
-import { Config, ConfigProvider, Effect, Option } from "effect";
+import { Config, ConfigProvider, Effect, Option, Redacted } from "effect";
 
 export const configProvider = ConfigProvider.fromEnv({
   preserveEmptyStrings: true,
@@ -21,11 +21,16 @@ const optionalValue = (
 ): Config.Config<string> =>
   Config.String(key).pipe(Config.withDefault(defaultValue));
 
+const optionalRedacted = (
+  key: string
+): Config.Config<Option.Option<Redacted.Redacted>> =>
+  Config.option(Config.Redacted(key));
+
 export const envConfig = {
   BETTER_AUTH_SECRET: required("BETTER_AUTH_SECRET"),
   BETTER_AUTH_URL: required("BETTER_AUTH_URL"),
   CORS_ORIGIN: optionalValue("CORS_ORIGIN", ""),
-  DATABASE_URL: Config.Redacted("DATABASE_URL"),
+  DATABASE_URL: optionalRedacted("DATABASE_URL"),
   HOST: optionalValue("HOST", "0.0.0.0"),
   KOMGA_API_KEY: optionalString("KOMGA_API_KEY"),
   KOMGA_BASE_URL: optionalString("KOMGA_BASE_URL"),
@@ -33,6 +38,11 @@ export const envConfig = {
   KOMGA_USERNAME: optionalString("KOMGA_USERNAME"),
   NODE_ENV: optionalValue("NODE_ENV", "development"),
   PORT: optionalValue("PORT", "3000"),
+  PGDATABASE: optionalString("PGDATABASE"),
+  PGHOST: optionalString("PGHOST"),
+  PGPASSWORD: optionalRedacted("PGPASSWORD"),
+  PGPORT: optionalString("PGPORT"),
+  PGUSER: optionalString("PGUSER"),
   TRACKING_POLL_INTERVAL_MS: optionalValue(
     "TRACKING_POLL_INTERVAL_MS",
     "900000"
@@ -43,8 +53,9 @@ export const envConfig = {
   WORKER_POLL_INTERVAL_MS: optionalValue("WORKER_POLL_INTERVAL_MS", "15000"),
 } as const;
 
-const resolveOptional = (config: Config.Config<Option.Option<string>>) =>
-  Option.getOrUndefined(resolveConfig(config));
+const resolveOptional = <A>(
+  config: Config.Config<Option.Option<A>>
+): A | undefined => Option.getOrUndefined(resolveConfig(config));
 
 export const env = {
   get BETTER_AUTH_SECRET() {
@@ -57,7 +68,7 @@ export const env = {
     return resolveConfig(envConfig.CORS_ORIGIN);
   },
   get DATABASE_URL() {
-    return resolveConfig(envConfig.DATABASE_URL);
+    return resolveOptional(envConfig.DATABASE_URL);
   },
   get HOST() {
     return resolveConfig(envConfig.HOST);
@@ -79,6 +90,21 @@ export const env = {
   },
   get PORT() {
     return resolveConfig(envConfig.PORT);
+  },
+  get PGDATABASE() {
+    return resolveOptional(envConfig.PGDATABASE);
+  },
+  get PGHOST() {
+    return resolveOptional(envConfig.PGHOST);
+  },
+  get PGPASSWORD() {
+    return resolveOptional(envConfig.PGPASSWORD);
+  },
+  get PGPORT() {
+    return resolveOptional(envConfig.PGPORT);
+  },
+  get PGUSER() {
+    return resolveOptional(envConfig.PGUSER);
   },
   get TRACKING_POLL_INTERVAL_MS() {
     return resolveConfig(envConfig.TRACKING_POLL_INTERVAL_MS);
