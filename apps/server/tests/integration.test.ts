@@ -1405,9 +1405,9 @@ describe("server and worker integration", () => {
       )
     );
     expect(saveTrackingResponse.status).toBe(200);
-    const savedTrackingState = await readJson<{ libraryEntryId: string | null }>(
-      saveTrackingResponse
-    );
+    const savedTrackingState = await readJson<{
+      libraryEntryId: string | null;
+    }>(saveTrackingResponse);
 
     const populatedLibraryResponse = await apiFetch("/api/library", {
       method: "GET",

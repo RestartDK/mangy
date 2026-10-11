@@ -17,8 +17,7 @@
     "@mangy/db": "workspace:*",
     "@mangy/env": "workspace:*",
     "better-auth": "catalog:",
-    "effect": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@mangy/config": "workspace:*",
