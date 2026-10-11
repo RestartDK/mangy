@@ -10,7 +10,7 @@ export class User extends Model.Class<User>("User")({
   email: Schema.String,
   emailVerified: Schema.Boolean,
   id: UserIdSchema,
-  image: Schema.NullOr(Schema.String),
+  image: Schema.OptionFromNullOr(Schema.String),
   name: Schema.String,
   updatedAt: Schema.Date,
 }) {}

@@ -58,7 +58,11 @@ export interface DownloadPage {
 const createRequestHeaders = (page: DownloadPage): Headers => {
   const headers = new Headers(page.headers);
 
-  if (page.referer && !headers.has("referer")) {
+  if (
+    page.referer !== undefined &&
+    page.referer.length > 0 &&
+    !headers.has("referer")
+  ) {
     headers.set("referer", page.referer);
   }
 
@@ -148,7 +152,11 @@ const getFileExtension = (
   imageUrl: string,
   contentType: string | null | undefined
 ): string => {
-  if (contentType) {
+  if (
+    contentType !== null &&
+    contentType !== undefined &&
+    contentType.length > 0
+  ) {
     if (contentType.includes("png")) {
       return ".png";
     }
@@ -184,10 +192,14 @@ export const formatChapterLabel = (
   chapterTitle: string | null,
   chapterId: string
 ): string => {
-  const numberLabel = chapterNumber ? `Chapter ${chapterNumber}` : "Special";
-  const titleLabel = chapterTitle
-    ? ` - ${sanitizePathSegment(chapterTitle, "Chapter")}`
-    : "";
+  const numberLabel =
+    chapterNumber !== null && chapterNumber.length > 0
+      ? `Chapter ${chapterNumber}`
+      : "Special";
+  const titleLabel =
+    chapterTitle !== null && chapterTitle.length > 0
+      ? ` - ${sanitizePathSegment(chapterTitle, "Chapter")}`
+      : "";
   const suffix = ` [${chapterId}]`;
 
   return sanitizePathSegment(

@@ -5,7 +5,7 @@ import {
   Duration,
   Effect,
   Layer,
-  Result,
+  Option,
   Schedule,
   Schema,
 } from "effect";
@@ -18,7 +18,7 @@ import {
   loadClaimedDownloadJob,
 } from "./jobs";
 import type { ClaimedDownloadJob } from "./jobs";
-import { CancelledError, runDownloadJob } from "./runner";
+import { runDownloadJob } from "./runner";
 
 const downloadQueueElement = Schema.Struct({ jobId: Schema.String });
 type DownloadQueueElement = Schema.Schema.Type<typeof downloadQueueElement>;
@@ -80,29 +80,19 @@ const runClaimedDownload = (claimed: ClaimedDownloadJob) =>
     const cancelled = { value: false };
     yield* watchForCancellation(claimed.id, cancelled).pipe(Effect.forkChild);
 
-    const outcome = yield* Effect.tryPromise({
-      catch: (cause) => new DownloadRunFailed({ cause }),
-      try: async () => {
-        await runDownloadJob(claimed, () => cancelled.value);
-      },
-    }).pipe(Effect.result);
+    yield* runDownloadJob(claimed, () => cancelled.value).pipe(
+      Effect.catchTag("CancelledError", () => Effect.interrupt),
+      Effect.tapError((error) =>
+        Effect.tryPromise({
+          catch: (cause) => new DownloadRunFailed({ cause }),
+          try: async () => {
+            await failDownloadJob(claimed, error);
+          },
+        }).pipe(Effect.ignoreCause)
+      )
+    );
 
-    if (Result.isSuccess(outcome)) {
-      return claimed;
-    }
-
-    if (outcome.failure.cause instanceof CancelledError) {
-      return yield* Effect.interrupt;
-    }
-
-    yield* Effect.tryPromise({
-      catch: (cause) => new DownloadRunFailed({ cause }),
-      try: async () => {
-        await failDownloadJob(claimed, outcome.failure.cause);
-      },
-    }).pipe(Effect.ignoreCause);
-
-    return yield* outcome.failure;
+    return claimed;
   });
 
 const takeNextDownload = (
@@ -113,7 +103,7 @@ const takeNextDownload = (
     const claimed = yield* loadClaimedDownloadJob(value.jobId);
     if (
       !claimed ||
-      claimed.queueId !== metadata.id ||
+      Option.getOrNull(claimed.queueId) !== metadata.id ||
       claimed.status === "cancelled" ||
       claimed.status === "completed"
     ) {
@@ -140,7 +130,7 @@ export const reconcileQueuedDownloadJobs = (queue: DownloadQueue) =>
 
     for (const { id, queueId: existingQueueId } of queued) {
       let queueId = existingQueueId;
-      if (queueId === null) {
+      if (Option.isNone(queueId)) {
         const generated = crypto.randomUUID();
         const updated = yield* decodeRows(
           Schema.Struct({ id: DownloadJob.fields.id }),
@@ -157,11 +147,11 @@ export const reconcileQueuedDownloadJobs = (queue: DownloadQueue) =>
           continue;
         }
 
-        queueId = generated;
+        queueId = Option.some(generated);
       }
 
       yield* queue
-        .offer({ jobId: id }, { id: queueId })
+        .offer({ jobId: id }, { id: Option.getOrThrow(queueId) })
         .pipe(Effect.ignoreCause);
     }
   });

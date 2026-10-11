@@ -55,7 +55,7 @@ import {
   asyncResultLoading,
   asyncResultValue,
 } from "@/lib/async-result";
-import { getErrorMessage, pluralize } from "@/lib/format";
+import { getErrorMessage, hasText, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 import {
   findSelectFilter,
@@ -303,9 +303,9 @@ const SearchRouteComponent = () => {
     : searchIdle;
   const searchResult = useAtomValue(searchAtom);
   const pullNextPage = useAtomSet(searchAtom);
-  const isOrderAscending = Boolean(
-    orderAscendingValue && effectiveFilters.order === orderAscendingValue
-  );
+  const isOrderAscending =
+    hasText(orderAscendingValue) &&
+    effectiveFilters.order === orderAscendingValue;
   const pages = asyncResultValue(searchResult)?.items ?? [];
   const results = pages.flatMap((page) => page.items);
   const total = pages.at(0)?.total ?? null;
@@ -474,7 +474,7 @@ const SearchRouteComponent = () => {
               const nextValue = isOrderAscending
                 ? orderDescendingValue
                 : orderAscendingValue;
-              if (nextValue) {
+              if (hasText(nextValue)) {
                 applyFilterValue(orderDefinition, nextValue);
               }
             }}
@@ -541,7 +541,7 @@ const SearchRouteComponent = () => {
       {showSkeleton ||
       showError ||
       asyncResultLoading(sourcesResult) ||
-      sourceId ? null : (
+      hasText(sourceId) ? null : (
         <EmptyState
           description="No enabled sources are connected yet."
           icon="search"
@@ -549,7 +549,7 @@ const SearchRouteComponent = () => {
         />
       )}
 
-      {sourceId &&
+      {hasText(sourceId) &&
       !(showSkeleton || showError || isSearching) &&
       results.length === 0 ? (
         <EmptyState

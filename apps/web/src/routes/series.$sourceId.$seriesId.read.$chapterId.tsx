@@ -22,7 +22,7 @@ import {
   asyncResultLoading,
   asyncResultValue,
 } from "@/lib/async-result";
-import { getErrorMessage, pluralize } from "@/lib/format";
+import { getErrorMessage, hasText, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
 const ReaderSkeleton = () => (
@@ -63,18 +63,20 @@ const ReaderRouteComponent = () => {
       ? chapters[chapterIndex + 1]
       : null;
 
-  const chapterLabel = chapter?.chapterNumber
-    ? `Chapter ${chapter.chapterNumber}`
-    : (chapter?.title ?? "Chapter reader");
+  const chapterNumber = chapter?.chapterNumber ?? null;
+  const chapterTitle = chapter?.title ?? null;
+  const chapterLabel = hasText(chapterNumber)
+    ? `Chapter ${chapterNumber}`
+    : (chapterTitle ?? "Chapter reader");
   const pageCount = pages.length;
+  const translatedLanguage = chapter?.translatedLanguage ?? null;
+  const volumeNumber = chapter?.volumeNumber ?? null;
 
   const readerMeta = [
     series?.title,
-    pageCount ? pluralize(pageCount, "page") : null,
-    chapter?.translatedLanguage
-      ? chapter.translatedLanguage.toUpperCase()
-      : null,
-    chapter?.volumeNumber ? `Volume ${chapter.volumeNumber}` : null,
+    pageCount > 0 ? pluralize(pageCount, "page") : null,
+    hasText(translatedLanguage) ? translatedLanguage.toUpperCase() : null,
+    hasText(volumeNumber) ? `Volume ${volumeNumber}` : null,
   ].filter((item): item is string => Boolean(item));
 
   return (
@@ -142,7 +144,9 @@ const ReaderRouteComponent = () => {
         }
         description={readerMeta.join(" · ")}
         title={
-          chapter?.title ? `${chapterLabel}: ${chapter.title}` : chapterLabel
+          hasText(chapterTitle)
+            ? `${chapterLabel}: ${chapterTitle}`
+            : chapterLabel
         }
       />
 
@@ -159,7 +163,7 @@ const ReaderRouteComponent = () => {
 
       {series && !isLoading && error === undefined ? (
         <div className="flex flex-col items-center gap-6">
-          {pages.length ? (
+          {pages.length > 0 ? (
             <div className="w-full max-w-4xl space-y-2">
               {pages.map((page) => (
                 <img

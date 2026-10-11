@@ -16,7 +16,7 @@ import {
   seriesColumns,
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 import { SourcesService } from "../sources/service";
@@ -34,52 +34,58 @@ const getTrackingPollIntervalMs = (rawIntervalMs: string): number => {
 
 const createEmptySeriesState = (sourceId: string, seriesId: string) => ({
   autoDownload: false,
-  downloadDestinationId: null,
-  downloadDestinationName: null,
+  downloadDestinationId: Option.none<string>(),
+  downloadDestinationName: Option.none<string>(),
   isTracked: false,
-  libraryEntryId: null,
+  libraryEntryId: Option.none<string>(),
   seriesId,
   sourceId,
-  trackingState: null,
+  trackingState: Option.none(),
 });
 
 const seriesStateProjection = Schema.Struct({
-  autoDownload: Schema.NullOr(LibraryEntry.fields.autoDownload),
-  checkFailureCount: Schema.NullOr(TrackedSeriesState.fields.checkFailureCount),
-  downloadDestinationId: Schema.NullOr(DownloadDestination.fields.id),
-  downloadDestinationName: Schema.NullOr(DownloadDestination.fields.name),
-  isTracked: Schema.NullOr(LibraryEntry.fields.isTracked),
+  autoDownload: Schema.OptionFromNullOr(LibraryEntry.fields.autoDownload),
+  checkFailureCount: Schema.OptionFromNullOr(
+    TrackedSeriesState.fields.checkFailureCount
+  ),
+  downloadDestinationId: Schema.OptionFromNullOr(DownloadDestination.fields.id),
+  downloadDestinationName: Schema.OptionFromNullOr(
+    DownloadDestination.fields.name
+  ),
+  isTracked: Schema.OptionFromNullOr(LibraryEntry.fields.isTracked),
   lastCheckedAt: TrackedSeriesState.fields.lastCheckedAt,
   lastSeenChapterExternalId:
     TrackedSeriesState.fields.lastSeenChapterExternalId,
-  libraryEntryId: Schema.NullOr(LibraryEntry.fields.id),
+  libraryEntryId: Schema.OptionFromNullOr(LibraryEntry.fields.id),
   nextCheckAt: TrackedSeriesState.fields.nextCheckAt,
   seriesId: Series.fields.externalId,
   sourceId: Series.fields.sourceId,
-  trackingStateId: Schema.NullOr(TrackedSeriesState.fields.id),
+  trackingStateId: Schema.OptionFromNullOr(TrackedSeriesState.fields.id),
 });
 
 type SeriesStateRow = Schema.Schema.Type<typeof seriesStateProjection>;
 
 const serializeSeriesState = (row: SeriesStateRow) => ({
-  autoDownload: row.autoDownload ?? false,
+  autoDownload: Option.getOrElse(row.autoDownload, () => false),
   downloadDestinationId: row.downloadDestinationId,
   downloadDestinationName: row.downloadDestinationName,
-  isTracked: row.isTracked ?? false,
+  isTracked: Option.getOrElse(row.isTracked, () => false),
   libraryEntryId: row.libraryEntryId,
   seriesId: row.seriesId,
   sourceId: row.sourceId,
-  trackingState: row.trackingStateId
-    ? {
-        checkFailureCount: row.checkFailureCount ?? 0,
-        id: row.trackingStateId,
-        lastCheckedAt: row.lastCheckedAt
-          ? row.lastCheckedAt.toISOString()
-          : null,
-        lastSeenChapterExternalId: row.lastSeenChapterExternalId ?? null,
-        nextCheckAt: row.nextCheckAt ? row.nextCheckAt.toISOString() : null,
-      }
-    : null,
+  trackingState: row.trackingStateId.pipe(
+    Option.map((trackingStateId) => ({
+      checkFailureCount: Option.getOrElse(row.checkFailureCount, () => 0),
+      id: trackingStateId,
+      lastCheckedAt: row.lastCheckedAt.pipe(
+        Option.map((value) => value.toISOString())
+      ),
+      lastSeenChapterExternalId: row.lastSeenChapterExternalId,
+      nextCheckAt: row.nextCheckAt.pipe(
+        Option.map((value) => value.toISOString())
+      ),
+    }))
+  ),
 });
 
 const getSeriesStateRow = (
@@ -133,8 +139,10 @@ const list = (userId: string) =>
     const rows = yield* decodeRows(
       Schema.Struct({
         auto_download: LibraryEntry.fields.autoDownload,
-        cover_image_url: Schema.NullOr(Series.fields.coverImageUrl),
-        destination_name: Schema.NullOr(DownloadDestination.fields.name),
+        cover_image_url: Series.fields.coverImageUrl,
+        destination_name: Schema.OptionFromNullOr(
+          DownloadDestination.fields.name
+        ),
         external_id: Series.fields.externalId,
         id: LibraryEntry.fields.id,
         is_tracked: LibraryEntry.fields.isTracked,
@@ -161,7 +169,7 @@ const list = (userId: string) =>
     return rows.map((row) => ({
       autoDownload: row.auto_download,
       coverImageUrl: row.cover_image_url,
-      destinationName: row.destination_name ?? null,
+      destinationName: row.destination_name,
       id: row.id,
       isTracked: row.is_tracked,
       seriesId: row.external_id,
@@ -181,9 +189,7 @@ const resolveSeriesRecord = (sourceId: string, seriesId: string) =>
     }
 
     const adapter = SourcesService.getSourceOrThrow(sourceId);
-    const seriesItem = yield* Effect.promise(
-      async () => await adapter.getSeries(seriesId)
-    );
+    const seriesItem = yield* adapter.getSeries(seriesId);
 
     return yield* Effect.promise(
       async () => await SourcesStorage.upsertSeriesItem(sourceId, seriesItem)
@@ -193,18 +199,23 @@ const resolveSeriesRecord = (sourceId: string, seriesId: string) =>
 const resolveDestinationId = (
   userId: string,
   requestedDestinationId: string | null | undefined,
-  existingDestinationId: string | null
+  existingDestinationId: Option.Option<string>
 ) =>
   Effect.gen(function* resolveDestinationIdEffect() {
     const sql = yield* SqlClient.SqlClient;
     const destinationId =
       requestedDestinationId === undefined
         ? existingDestinationId
-        : requestedDestinationId;
+        : Option.filter(
+            Option.fromNullishOr(requestedDestinationId),
+            (value) => value.length > 0
+          );
 
-    if (!destinationId) {
-      return null;
+    if (Option.isNone(destinationId)) {
+      return Option.none<string>();
     }
+
+    const destinationIdValue = Option.getOrThrow(destinationId);
 
     const rows = yield* decodeRows(
       Schema.Struct({
@@ -213,17 +224,17 @@ const resolveDestinationId = (
       }),
       yield* sql`SELECT ${column(downloadDestinationColumns, "id")}, ${column(downloadDestinationColumns, "isEnabled")}
         FROM ${table("downloadDestination")}
-        WHERE ${column(downloadDestinationColumns, "id")} = ${destinationId}
+        WHERE ${column(downloadDestinationColumns, "id")} = ${destinationIdValue}
           AND ${column(downloadDestinationColumns, "userId")} = ${userId}
         LIMIT 1`
     );
 
     const [destination] = rows;
-    if (!destination?.is_enabled) {
+    if (destination?.is_enabled !== true) {
       throw new Error("The selected destination is missing or disabled.");
     }
 
-    return destination.id;
+    return Option.some(destination.id);
   });
 
 const upsertTrackedState = (input: {
@@ -252,9 +263,7 @@ const upsertTrackedState = (input: {
 
     if (!(input.isAlreadyTracked && input.hadTrackingState)) {
       const adapter = SourcesService.getSourceOrThrow(input.sourceId);
-      const chapters = yield* Effect.promise(
-        async () => await adapter.getChapters(input.seriesExternalId)
-      );
+      const chapters = yield* adapter.getChapters(input.seriesExternalId);
       yield* Effect.promise(async () => {
         await SourcesStorage.upsertChapters(input.seriesRecordId, chapters);
       });
@@ -336,7 +345,7 @@ const updateSeriesState = (
       existingState.downloadDestinationId
     );
 
-    if (input.autoDownload && !downloadDestinationId) {
+    if (input.autoDownload && Option.isNone(downloadDestinationId)) {
       throw new Error("Choose a destination before enabling auto-download.");
     }
 
@@ -347,7 +356,7 @@ const updateSeriesState = (
         libraryEntryColumns,
         {
           autoDownload: input.autoDownload,
-          downloadDestinationId,
+          downloadDestinationId: Option.getOrNull(downloadDestinationId),
           id: crypto.randomUUID(),
           isTracked,
           seriesId: seriesRecord.id,
@@ -359,7 +368,7 @@ const updateSeriesState = (
           libraryEntryColumns,
           {
             autoDownload: input.autoDownload,
-            downloadDestinationId,
+            downloadDestinationId: Option.getOrNull(downloadDestinationId),
             isTracked,
             updatedAt: new Date(),
           }
@@ -374,7 +383,7 @@ const updateSeriesState = (
 
     const trackedStateStatement = isTracked
       ? upsertTrackedState({
-          hadTrackingState: Boolean(existingState.trackingState),
+          hadTrackingState: Option.isSome(existingState.trackingState),
           isAlreadyTracked: existingState.isTracked,
           libraryEntryId: entry.id,
           seriesExternalId: input.seriesId,
@@ -395,12 +404,12 @@ const removeSeries = (userId: string, sourceId: string, seriesId: string) =>
     const sql = yield* SqlClient.SqlClient;
     const row = yield* getSeriesStateRow(userId, sourceId, seriesId);
 
-    if (!row?.libraryEntryId) {
+    if (row === null || Option.isNone(row.libraryEntryId)) {
       throw new Error("This series is not in your library.");
     }
 
     yield* sql`DELETE FROM ${table("libraryEntry")}
-      WHERE ${column(libraryEntryColumns, "id")} = ${row.libraryEntryId}
+      WHERE ${column(libraryEntryColumns, "id")} = ${Option.getOrThrow(row.libraryEntryId)}
         AND ${column(libraryEntryColumns, "userId")} = ${userId}`;
 
     return {

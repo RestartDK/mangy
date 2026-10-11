@@ -20,11 +20,11 @@ import {
   seriesColumns,
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
-import type { ChapterId } from "@mangy/db/model";
+import type { ChapterId, DownloadDestinationId } from "@mangy/db/model";
 import { env } from "@mangy/env";
 import type { SourceChapter } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 import { queueNotification } from "./notifications";
@@ -71,10 +71,10 @@ const buildTrackedSeriesTitle = (seriesTitle: string): string =>
 export interface ClaimedTrackedSeries {
   autoDownload: boolean;
   checkFailureCount: number;
-  downloadDestinationId: string | null;
-  downloadDestinationName: string | null;
+  downloadDestinationId: Option.Option<DownloadDestinationId>;
+  downloadDestinationName: Option.Option<string>;
   id: string;
-  lastSeenChapterExternalId: string | null;
+  lastSeenChapterExternalId: Option.Option<string>;
   libraryEntryId: string;
   seriesExternalId: string;
   seriesRecordId: string;
@@ -86,10 +86,10 @@ export interface ClaimedTrackedSeries {
 const claimedTrackedSeriesProjection = Schema.Struct({
   autoDownload: LibraryEntry.fields.autoDownload,
   checkFailureCount: TrackedSeriesState.fields.checkFailureCount,
-  downloadDestinationId: Schema.NullOr(
-    LibraryEntry.fields.downloadDestinationId
+  downloadDestinationId: LibraryEntry.fields.downloadDestinationId,
+  downloadDestinationName: Schema.OptionFromNullOr(
+    DownloadDestination.fields.name
   ),
-  downloadDestinationName: Schema.NullOr(DownloadDestination.fields.name),
   id: TrackedSeriesState.fields.id,
   lastSeenChapterExternalId:
     TrackedSeriesState.fields.lastSeenChapterExternalId,
@@ -132,14 +132,15 @@ const upsertTrackedChapters = (seriesId: string, items: SourceChapter[]) =>
 
 const collectNewChapters = (
   chapters: SourceChapter[],
-  lastSeenChapterExternalId: string | null
+  lastSeenChapterExternalId: Option.Option<string>
 ): SourceChapter[] => {
-  if (!lastSeenChapterExternalId) {
+  if (Option.isNone(lastSeenChapterExternalId)) {
     return [];
   }
 
+  const lastSeenChapterId = Option.getOrThrow(lastSeenChapterExternalId);
   const hasSeenChapter = chapters.some(
-    (item) => item.externalId === lastSeenChapterExternalId
+    (item) => item.externalId === lastSeenChapterId
   );
   if (!hasSeenChapter) {
     return [];
@@ -148,7 +149,7 @@ const collectNewChapters = (
   const newChapters: SourceChapter[] = [];
 
   for (const item of chapters) {
-    if (item.externalId === lastSeenChapterExternalId) {
+    if (item.externalId === lastSeenChapterId) {
       break;
     }
 
@@ -165,9 +166,12 @@ const queueTrackedChapters = (
   Effect.gen(function* queueTrackedChaptersEffect() {
     const sql = yield* SqlClient.SqlClient;
 
-    if (!trackedSeries.downloadDestinationId) {
+    if (Option.isNone(trackedSeries.downloadDestinationId)) {
       throw new Error("Tracked auto-download is missing a destination.");
     }
+    const downloadDestinationId = Option.getOrThrow(
+      trackedSeries.downloadDestinationId
+    );
 
     const chapterExternalIds = newChapters.map((item) => item.externalId);
     const storedChapters = yield* decodeRows(
@@ -198,9 +202,9 @@ const queueTrackedChapters = (
       : [];
 
     const activeChapterIds = new Set(
-      activeJobs
-        .map((item) => item.chapter_id)
-        .filter((chapterId): chapterId is ChapterId => Boolean(chapterId))
+      activeJobs.flatMap((item) =>
+        Option.isSome(item.chapter_id) ? [item.chapter_id.value] : []
+      )
     );
     const chaptersByExternalId = new Map(
       storedChapters.map((item) => [item.external_id, item])
@@ -234,7 +238,7 @@ const queueTrackedChapters = (
       downloadJobColumns,
       queueableChapters.map((item) => ({
         chapterId: item.id,
-        downloadDestinationId: trackedSeries.downloadDestinationId,
+        downloadDestinationId,
         id: crypto.randomUUID(),
         progressPercent: 0,
         seriesId: trackedSeries.seriesRecordId,
@@ -247,12 +251,15 @@ const queueTrackedChapters = (
 
 const completeTrackedSeriesCheck = (
   trackedSeries: ClaimedTrackedSeries,
-  latestChapterExternalId: string | null,
+  latestChapterExternalId: Option.Option<string>,
   notificationBody: string | null
 ) =>
   Effect.gen(function* completeTrackedSeriesCheckEffect() {
     const sql = yield* SqlClient.SqlClient;
     const now = new Date();
+    const lastSeenChapterExternalId = Option.isSome(latestChapterExternalId)
+      ? latestChapterExternalId.value
+      : Option.getOrNull(trackedSeries.lastSeenChapterExternalId);
 
     yield* sql.withTransaction(
       Effect.gen(function* completeCheck() {
@@ -262,16 +269,14 @@ const completeTrackedSeriesCheck = (
           {
             checkFailureCount: 0,
             lastCheckedAt: now,
-            lastSeenChapterExternalId:
-              latestChapterExternalId ??
-              trackedSeries.lastSeenChapterExternalId,
+            lastSeenChapterExternalId,
             nextCheckAt: getNextCheckAt(),
             updatedAt: now,
           }
         )}
           WHERE ${column(trackedSeriesStateColumns, "id")} = ${trackedSeries.id}`;
 
-        if (notificationBody) {
+        if (notificationBody !== null && notificationBody.length > 0) {
           yield* queueNotification({
             body: notificationBody,
             title: buildTrackedSeriesTitle(trackedSeries.seriesTitle),
@@ -311,7 +316,7 @@ export const claimDueTrackedSeries =
       })
     );
 
-    if (!trackedStateId) {
+    if (trackedStateId === null || trackedStateId.length === 0) {
       return null;
     }
 
@@ -357,38 +362,51 @@ export const processTrackedSeries = async (
     );
   }
 
-  const chapters = await adapter.getChapters(trackedSeries.seriesExternalId);
-  await runSql(upsertTrackedChapters(trackedSeries.seriesRecordId, chapters));
+  await runSql(
+    Effect.gen(function* processTrackedSeriesEffect() {
+      const chapters = yield* adapter.getChapters(
+        trackedSeries.seriesExternalId
+      );
+      yield* upsertTrackedChapters(trackedSeries.seriesRecordId, chapters);
 
-  const latestChapterExternalId =
-    chapters[0]?.externalId ?? trackedSeries.lastSeenChapterExternalId;
-  const newChapters = collectNewChapters(
-    chapters,
-    trackedSeries.lastSeenChapterExternalId
-  );
-
-  let notificationBody: string | null = null;
-
-  if (newChapters.length > 0) {
-    if (trackedSeries.autoDownload) {
-      const queuedCount = await runSql(
-        queueTrackedChapters(trackedSeries, newChapters)
+      const firstChapterExternalId = chapters[0]?.externalId;
+      const latestChapterExternalId =
+        firstChapterExternalId === undefined
+          ? trackedSeries.lastSeenChapterExternalId
+          : Option.some(firstChapterExternalId);
+      const newChapters = collectNewChapters(
+        chapters,
+        trackedSeries.lastSeenChapterExternalId
       );
 
-      if (queuedCount > 0) {
-        notificationBody = `${queuedCount} new ${pluralize(queuedCount, "chapter", "chapters")} queued${trackedSeries.downloadDestinationName ? ` to ${trackedSeries.downloadDestinationName}` : ""}.`;
-      }
-    } else {
-      notificationBody = `${newChapters.length} new ${pluralize(newChapters.length, "chapter", "chapters")} found. Auto-download is off.`;
-    }
-  }
+      let notificationBody: string | null = null;
 
-  await runSql(
-    completeTrackedSeriesCheck(
-      trackedSeries,
-      latestChapterExternalId,
-      notificationBody
-    )
+      if (newChapters.length > 0) {
+        if (trackedSeries.autoDownload) {
+          const queuedCount = yield* queueTrackedChapters(
+            trackedSeries,
+            newChapters
+          );
+
+          if (queuedCount > 0) {
+            const destinationSuffix = Option.isSome(
+              trackedSeries.downloadDestinationName
+            )
+              ? ` to ${trackedSeries.downloadDestinationName.value}`
+              : "";
+            notificationBody = `${queuedCount} new ${pluralize(queuedCount, "chapter", "chapters")} queued${destinationSuffix}.`;
+          }
+        } else {
+          notificationBody = `${newChapters.length} new ${pluralize(newChapters.length, "chapter", "chapters")} found. Auto-download is off.`;
+        }
+      }
+
+      yield* completeTrackedSeriesCheck(
+        trackedSeries,
+        latestChapterExternalId,
+        notificationBody
+      );
+    })
   );
 };
 

@@ -11,7 +11,7 @@ const liveSourceTestsEnabled = process.env.LIVE_SOURCE_TESTS === "1";
 const sessionCookiePattern = /better-auth\.session_token=(?<token>[^;]+)/u;
 const liveSourceIds = ["mangaWorld", "weebCentral"] as const;
 
-const assert = (condition: unknown, message: string): asserts condition => {
+const assert = (condition: boolean, message: string): asserts condition => {
   if (!condition) {
     throw new Error(message);
   }
@@ -43,7 +43,10 @@ const signUpAndGetSessionCookie = async (
   const setCookieHeader = response.headers.get("set-cookie") ?? "";
   const sessionMatch = sessionCookiePattern.exec(setCookieHeader);
 
-  assert(sessionMatch, "Sign-up did not return a Better Auth session cookie.");
+  assert(
+    sessionMatch !== null,
+    "Sign-up did not return a Better Auth session cookie."
+  );
   return `better-auth.session_token=${sessionMatch.groups?.token ?? ""}`;
 };
 
@@ -123,7 +126,10 @@ if (liveSourceTestsEnabled) {
       };
       const [firstSeries] = searchResult.items;
 
-      assert(firstSeries, `${sourceId} search did not return any live series.`);
+      assert(
+        firstSeries !== undefined,
+        `${sourceId} search did not return any live series.`
+      );
 
       const seriesResponse = await requestContext.get(
         `${baseUrl}/api/series/${encodeURIComponent(firstSeries.seriesId)}?sourceId=${sourceId}`
@@ -147,7 +153,7 @@ if (liveSourceTestsEnabled) {
       const firstChapter = chapters.find((chapter) => !chapter.isUnavailable);
 
       assert(
-        firstChapter,
+        firstChapter !== undefined,
         `${sourceId} chapter route did not return any available chapters.`
       );
 
@@ -163,7 +169,10 @@ if (liveSourceTestsEnabled) {
       };
       const [firstPage] = pageList.pages;
 
-      assert(firstPage, `${sourceId} pages route returned an empty page list.`);
+      assert(
+        firstPage !== undefined,
+        `${sourceId} pages route returned an empty page list.`
+      );
 
       const imageResponse = await requestContext.get(firstPage.imageUrl);
       assert(

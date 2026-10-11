@@ -12,7 +12,7 @@ export const destinationSchema = Schema.Struct({
   id: Schema.String,
   isDefault: Schema.Boolean,
   isEnabled: Schema.Boolean,
-  komgaLibraryId: Schema.NullOr(Schema.String),
+  komgaLibraryId: Schema.OptionFromNullOr(Schema.String),
   name: Schema.String,
 });
 export type Destination = typeof destinationSchema.Type;
@@ -52,9 +52,9 @@ export const browserPushSettingsSchema = Schema.Struct({
   activeSubscriptionCount: Schema.Int,
   isConfigured: Schema.Boolean,
   isEnabled: Schema.Boolean,
-  lastDeliveredAt: Schema.NullOr(isoDateTimeString),
-  lastError: Schema.NullOr(Schema.String),
-  lastErrorAt: Schema.NullOr(isoDateTimeString),
+  lastDeliveredAt: Schema.OptionFromNullOr(isoDateTimeString),
+  lastError: Schema.OptionFromNullOr(Schema.String),
+  lastErrorAt: Schema.OptionFromNullOr(isoDateTimeString),
   notifyOnDownloadCompleted: Schema.Boolean,
   notifyOnDownloadFailed: Schema.Boolean,
   notifyOnSystemWarning: Schema.Boolean,

@@ -29,7 +29,12 @@ const createBasicAuthHeader = (
   username: string | undefined,
   password: string | undefined
 ): string | null => {
-  if (!(username && password)) {
+  if (
+    username === undefined ||
+    username.length === 0 ||
+    password === undefined ||
+    password.length === 0
+  ) {
     return null;
   }
 
@@ -39,7 +44,7 @@ const createBasicAuthHeader = (
 const createKomgaHeaders = (config: KomgaConfig): Headers => {
   const headers = new Headers();
 
-  if (config.apiKey) {
+  if (config.apiKey !== undefined && config.apiKey.length > 0) {
     headers.set("X-API-Key", config.apiKey);
     return headers;
   }
@@ -48,7 +53,7 @@ const createKomgaHeaders = (config: KomgaConfig): Headers => {
     config.username,
     config.password
   );
-  if (basicAuthHeader) {
+  if (basicAuthHeader !== null) {
     headers.set("Authorization", basicAuthHeader);
   }
 
@@ -62,12 +67,12 @@ export const setKomgaConfigForTests = (config: KomgaConfig | null): void => {
 export const scanKomgaLibrary = async ({
   libraryId,
 }: KomgaScanInput): Promise<Date | null> => {
-  if (!libraryId) {
+  if (libraryId === null || libraryId.length === 0) {
     return null;
   }
 
   const config = getKomgaConfig();
-  if (!config.baseUrl) {
+  if (config.baseUrl === undefined || config.baseUrl.length === 0) {
     throw new Error(
       "This destination has a Komga library ID, but KOMGA_BASE_URL is not configured."
     );

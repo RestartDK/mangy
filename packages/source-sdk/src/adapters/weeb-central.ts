@@ -1,5 +1,7 @@
 import type { CheerioAPI } from "cheerio";
+import { Effect } from "effect";
 
+import { SourceParseError } from "../errors";
 import type {
   SourceAdapter,
   SourceChapter,
@@ -14,12 +16,14 @@ import type {
 } from "../types";
 import { BrowserUnavailableError, withBrowserPage } from "./shared/browser";
 import {
+  hasText,
   loadDocument,
   normalizeText,
   nullableText,
   uniqueStrings,
 } from "./shared/html";
 import { fetchHtmlPage, resolveUrl } from "./shared/http";
+import type { HttpError } from "./shared/http";
 
 const sourceBaseUrl = "https://weebcentral.com/";
 const searchPageUrl = new URL("search", sourceBaseUrl);
@@ -53,7 +57,9 @@ const publicationDemographics = new Set([
 ]);
 
 interface WeebCentralDependencies {
-  renderChapterPageImages: (chapterId: string) => Promise<string[]>;
+  renderChapterPageImages: (
+    chapterId: string
+  ) => Effect.Effect<string[], BrowserUnavailableError>;
 }
 
 interface BrowserImageElement {
@@ -98,8 +104,10 @@ const parseSeriesId = (
   const [seriesKey, ...slugParts] = seriesId.split(":");
   const slug = slugParts.join(":");
 
-  if (!(seriesKey && slug)) {
-    throw new Error(`Invalid WeebCentral series id: ${seriesId}`);
+  if (!hasText(seriesKey) || !hasText(slug)) {
+    throw new SourceParseError({
+      message: `Invalid WeebCentral series id: ${seriesId}`,
+    });
   }
 
   return {
@@ -113,8 +121,10 @@ const parseSeriesContext = (url: string): WeebCentralSeriesContext => {
   const seriesKey = match?.groups?.seriesKey;
   const slug = match?.groups?.slug;
 
-  if (!(seriesKey && slug)) {
-    throw new Error(`Unable to parse WeebCentral series url: ${url}`);
+  if (!hasText(seriesKey) || !hasText(slug)) {
+    throw new SourceParseError({
+      message: `Unable to parse WeebCentral series url: ${url}`,
+    });
   }
 
   return {
@@ -232,70 +242,88 @@ const getDefaultSelectValue = (
   nullableText($(`input[name="${name}"][checked]`).first().attr("value")) ??
   undefined;
 
-const getCachedFilters = async (): Promise<SourceFilterDefinition[]> => {
-  if (cachedFilters && cachedFilters.expiresAt > Date.now()) {
-    return cachedFilters.filters;
-  }
+const attemptParse = <TResult>(
+  evaluate: () => TResult
+): Effect.Effect<TResult, SourceParseError> =>
+  Effect.try({
+    catch: (cause) =>
+      cause instanceof SourceParseError
+        ? cause
+        : new SourceParseError({
+            cause,
+            message: cause instanceof Error ? cause.message : String(cause),
+          }),
+    try: evaluate,
+  });
 
-  const { html } = await fetchHtmlPage(searchPageUrl);
-  const $ = loadDocument(html);
-  const filters: SourceFilterDefinition[] = [
-    {
-      defaultValue: getDefaultSelectValue($, "sort"),
-      key: "sort",
-      label: "Sort by",
-      options: parseSelectOptions($, "sort"),
-      type: "select",
-    },
-    {
-      defaultValue: getDefaultSelectValue($, "order"),
-      key: "order",
-      label: "Order",
-      options: parseSelectOptions($, "order"),
-      type: "select",
-    },
-    {
-      defaultValue: getDefaultSelectValue($, "official"),
-      key: "official",
-      label: "Official translation",
-      options: parseSelectOptions($, "official"),
-      type: "select",
-    },
-    {
-      defaultValue: getDefaultSelectValue($, "anime"),
-      key: "anime",
-      label: "Anime adaptation",
-      options: parseSelectOptions($, "anime"),
-      type: "select",
-    },
-    {
-      defaultValue: getDefaultSelectValue($, "adult"),
-      key: "adult",
-      label: "Adult content",
-      options: parseSelectOptions($, "adult"),
-      type: "select",
-    },
-    {
-      key: "included_status",
-      label: "Series status",
-      options: parseSelectOptions($, "included_status"),
-      type: "multiSelect",
-    },
-    {
-      key: "included_type",
-      label: "Series type",
-      options: parseSelectOptions($, "included_type"),
-      type: "multiSelect",
-    },
-  ];
+const getCachedFilters = (): Effect.Effect<
+  SourceFilterDefinition[],
+  HttpError
+> =>
+  Effect.gen(function* getCachedFiltersEffect() {
+    if (cachedFilters && cachedFilters.expiresAt > Date.now()) {
+      return cachedFilters.filters;
+    }
 
-  cachedFilters = {
-    expiresAt: Date.now() + filterCacheTtlMs,
-    filters,
-  };
+    const { html } = yield* fetchHtmlPage(searchPageUrl);
+    const $ = loadDocument(html);
+    const filters: SourceFilterDefinition[] = [
+      {
+        defaultValue: getDefaultSelectValue($, "sort"),
+        key: "sort",
+        label: "Sort by",
+        options: parseSelectOptions($, "sort"),
+        type: "select",
+      },
+      {
+        defaultValue: getDefaultSelectValue($, "order"),
+        key: "order",
+        label: "Order",
+        options: parseSelectOptions($, "order"),
+        type: "select",
+      },
+      {
+        defaultValue: getDefaultSelectValue($, "official"),
+        key: "official",
+        label: "Official translation",
+        options: parseSelectOptions($, "official"),
+        type: "select",
+      },
+      {
+        defaultValue: getDefaultSelectValue($, "anime"),
+        key: "anime",
+        label: "Anime adaptation",
+        options: parseSelectOptions($, "anime"),
+        type: "select",
+      },
+      {
+        defaultValue: getDefaultSelectValue($, "adult"),
+        key: "adult",
+        label: "Adult content",
+        options: parseSelectOptions($, "adult"),
+        type: "select",
+      },
+      {
+        key: "included_status",
+        label: "Series status",
+        options: parseSelectOptions($, "included_status"),
+        type: "multiSelect",
+      },
+      {
+        key: "included_type",
+        label: "Series type",
+        options: parseSelectOptions($, "included_type"),
+        type: "multiSelect",
+      },
+    ];
 
-  return filters;
-};
+    cachedFilters = {
+      expiresAt: Date.now() + filterCacheTtlMs,
+      filters,
+    };
+
+    return filters;
+  });
 
 const getFilterStrings = (value: unknown): string[] => {
   if (typeof value === "string") {
@@ -333,7 +361,7 @@ const applySearchFilters = (
   for (const key of ["official", "anime", "adult", "order", "sort"] as const) {
     const [value] = getFilterStrings(filters[key]);
 
-    if (value) {
+    if (hasText(value)) {
       searchParams.set(key, value);
     }
   }
@@ -415,16 +443,22 @@ const parseLatestChapterLabel = ($: CheerioAPI): string | null => {
   return match?.groups?.chapterNumber ?? null;
 };
 
-const fetchSeriesDetail = async (
+const fetchSeriesDetail = (
   seriesId: string
-): Promise<{ context: WeebCentralSeriesContext; html: string }> => {
-  const { html, response } = await fetchHtmlPage(createSeriesUrl(seriesId));
+): Effect.Effect<
+  { context: WeebCentralSeriesContext; html: string },
+  HttpError | SourceParseError
+> =>
+  Effect.gen(function* fetchSeriesDetailEffect() {
+    const url = yield* attemptParse(() => createSeriesUrl(seriesId));
+    const { html, response } = yield* fetchHtmlPage(url);
+    const context = yield* attemptParse(() => parseSeriesContext(response.url));
 
-  return {
-    context: parseSeriesContext(response.url),
-    html,
-  };
-};
+    return {
+      context,
+      html,
+    };
+  });
 
 const parseSeriesDetail = (
   html: string,
@@ -479,14 +513,14 @@ const parseChapters = (html: string): SourceChapter[] => {
       const link = $(element);
       const href = link.attr("href");
 
-      if (!href) {
+      if (!hasText(href)) {
         return null;
       }
 
       const chapterUrl = resolveUrl(sourceBaseUrl, href);
       const chapterId = parseChapterId(chapterUrl);
 
-      if (!chapterId || seenChapterIds.has(chapterId)) {
+      if (!hasText(chapterId) || seenChapterIds.has(chapterId)) {
         return null;
       }
 
@@ -506,9 +540,11 @@ const parseChapters = (html: string): SourceChapter[] => {
         externalUrl: chapterUrl,
         isUnavailable: false,
         pageCount: null,
-        publishedAt: publishedAtValue ? new Date(publishedAtValue) : null,
+        publishedAt: hasText(publishedAtValue)
+          ? new Date(publishedAtValue)
+          : null,
         sourceOrder: chapterNumber ?? chapterId,
-        title: title && title !== chapterLabel ? title : null,
+        title: hasText(title) && title !== chapterLabel ? title : null,
         translatedLanguage: sourceLanguage,
         volumeNumber: null,
       } satisfies SourceChapter;
@@ -536,26 +572,31 @@ const parsePageImageUrls = (html: string): string[] => {
   );
 };
 
-const renderChapterPageImages = async (
+const renderChapterPageImages = (
   chapterId: string
-): Promise<string[]> => {
+): Effect.Effect<string[], BrowserUnavailableError> => {
   const chapterUrl = createChapterUrl(chapterId);
 
-  return await withBrowserPage(
+  return withBrowserPage(
     chapterUrl,
-    async (page) => {
-      const imageUrls = await page.evaluate((selector: string) => {
-        const pageDocument = globalThis as unknown as {
-          document: BrowserDocumentLike;
-        };
+    (page) =>
+      Effect.tryPromise({
+        catch: (cause) =>
+          new BrowserUnavailableError({
+            cause,
+            message: "Unable to read chapter page images.",
+          }),
+        try: async () =>
+          await page.evaluate((selector: string) => {
+            const pageDocument = globalThis as unknown as {
+              document: BrowserDocumentLike;
+            };
 
-        return [...pageDocument.document.querySelectorAll(selector)]
-          .map((image) => image.src ?? image.dataset?.src ?? "")
-          .filter((value) => value.includes("/manga/"));
-      }, pageImageSelector);
-
-      return imageUrls;
-    },
+            return [...pageDocument.document.querySelectorAll(selector)]
+              .map((image) => image.src ?? image.dataset?.src ?? "")
+              .filter((value) => value.includes("/manga/"));
+          }, pageImageSelector),
+      }),
     {
       localStorage: {
         reading_style: browserReadingStyle,
@@ -576,19 +617,18 @@ const parseSearchResultCard = (
   const details = card.children("section").last();
   const href = card.find('a[href*="/series/"]').first().attr("href");
 
-  if (!href) {
+  if (!hasText(href)) {
     return null;
   }
 
   const canonicalUrl = resolveUrl(sourceBaseUrl, href);
   const context = parseSeriesContext(canonicalUrl);
+  const coverImageSrc = card
+    .find('picture img[alt*="cover"]')
+    .first()
+    .attr("src");
   const coverImageUrl = nullableText(
-    card.find('picture img[alt*="cover"]').first().attr("src")
-      ? resolveUrl(
-          sourceBaseUrl,
-          card.find('picture img[alt*="cover"]').first().attr("src") ?? ""
-        )
-      : null
+    hasText(coverImageSrc) ? resolveUrl(sourceBaseUrl, coverImageSrc) : null
   );
   const title = cleanTitle(
     details.find('a[href*="/series/"]').last().text() ||
@@ -649,37 +689,44 @@ const parseSearchResultCard = (
   };
 };
 
-const searchSeriesList = async (
+const searchSeriesList = (
   input: SourceSearchInput,
   sort: string,
   order = "Descending"
-): Promise<SourceListResponse<SourceSeries>> => {
-  const page = normalizePage(input.page);
-  const pageSize = normalizePageSize(input.pageSize);
-  const searchParams = new URLSearchParams();
+): Effect.Effect<
+  SourceListResponse<SourceSeries>,
+  HttpError | SourceParseError
+> =>
+  Effect.gen(function* searchSeriesListEffect() {
+    const page = normalizePage(input.page);
+    const pageSize = normalizePageSize(input.pageSize);
+    const searchParams = new URLSearchParams();
 
-  searchParams.set("limit", String(pageSize));
-  searchParams.set("offset", String((page - 1) * pageSize));
-  searchParams.set("text", input.query?.trim() ?? "");
-  applySearchFilters(searchParams, input.filters, sort, order);
+    searchParams.set("limit", String(pageSize));
+    searchParams.set("offset", String((page - 1) * pageSize));
+    searchParams.set("text", input.query?.trim() ?? "");
+    applySearchFilters(searchParams, input.filters, sort, order);
 
-  const { html } = await fetchHtmlPage(
-    new URL(`search/data?${searchParams.toString()}`, sourceBaseUrl)
-  );
-  const $ = loadDocument(html);
-  const items = $("article")
-    .toArray()
-    .map((element) => parseSearchResultCard($, element))
-    .filter((item): item is SourceSeries => item !== null);
+    const { html } = yield* fetchHtmlPage(
+      new URL(`search/data?${searchParams.toString()}`, sourceBaseUrl)
+    );
+    const items = yield* attemptParse(() => {
+      const $ = loadDocument(html);
 
-  return {
-    hasNextPage: items.length === pageSize,
-    items,
-    page,
-    pageSize,
-    total: null,
-  };
-};
+      return $("article")
+        .toArray()
+        .map((element) => parseSearchResultCard($, element))
+        .filter((item): item is SourceSeries => item !== null);
+    });
+
+    return {
+      hasNextPage: items.length === pageSize,
+      items,
+      page,
+      pageSize,
+      total: null,
+    };
+  });
 
 export const createWeebCentralSourceAdapter = (
   dependencies: Partial<WeebCentralDependencies> = {}
@@ -688,70 +735,61 @@ export const createWeebCentralSourceAdapter = (
     dependencies.renderChapterPageImages ?? renderChapterPageImages;
 
   return {
-    async getChapters(seriesId) {
-      const { html } = await fetchHtmlPage(createFullChapterListUrl(seriesId));
-      return parseChapters(html);
-    },
-    async getFilters() {
-      return await getCachedFilters();
-    },
-    async getLatest(page, pageSize) {
-      return await searchSeriesList(
-        {
-          page,
-          pageSize,
-        },
-        "Latest Updates"
-      );
-    },
-    async getPages(chapterId) {
-      let imageUrls: string[] = [];
-
-      try {
-        imageUrls = await browserChapterImageRenderer(chapterId);
-      } catch (error) {
-        if (!(error instanceof BrowserUnavailableError)) {
-          imageUrls = [];
-        }
-      }
-
-      if (imageUrls.length === 0) {
-        const { html } = await fetchHtmlPage(
-          createChapterImagesUrl(chapterId),
-          {
-            referer: createChapterUrl(chapterId),
-          }
+    getChapters: (seriesId) =>
+      Effect.gen(function* getChaptersEffect() {
+        const url = yield* attemptParse(() =>
+          createFullChapterListUrl(seriesId)
         );
-        imageUrls = parsePageImageUrls(html);
-      }
+        const { html } = yield* fetchHtmlPage(url);
 
-      const chapterUrl = createChapterUrl(chapterId);
-      const pages: SourcePage[] = imageUrls.map((imageUrl, index) => ({
-        headers: { ...imageRequestHeaders },
-        imageUrl,
-        index,
-        referer: chapterUrl,
-      }));
+        return parseChapters(html);
+      }),
+    getFilters: getCachedFilters(),
+    getLatest: (page, pageSize) =>
+      searchSeriesList({ page, pageSize }, "Latest Updates"),
+    getPages: (chapterId) =>
+      Effect.gen(function* getPagesEffect() {
+        const chapterUrl = createChapterUrl(chapterId);
+        const renderedImageUrls = yield* browserChapterImageRenderer(
+          chapterId
+        ).pipe(
+          Effect.catchTag("BrowserUnavailableError", () =>
+            Effect.succeed<string[]>([])
+          )
+        );
 
-      const pageList: SourcePageList = {
-        pages,
-      };
+        let imageUrls = renderedImageUrls;
+        if (imageUrls.length === 0) {
+          const { html } = yield* fetchHtmlPage(
+            createChapterImagesUrl(chapterId),
+            {
+              referer: chapterUrl,
+            }
+          );
+          imageUrls = parsePageImageUrls(html);
+        }
 
-      return pageList;
-    },
-    async getPopular(page, pageSize) {
-      return await searchSeriesList(
-        {
-          page,
-          pageSize,
-        },
-        "Popularity"
-      );
-    },
-    async getSeries(seriesId) {
-      const { context, html } = await fetchSeriesDetail(seriesId);
-      return parseSeriesDetail(html, context);
-    },
+        const pages: SourcePage[] = imageUrls.map((imageUrl, index) => ({
+          headers: { ...imageRequestHeaders },
+          imageUrl,
+          index,
+          referer: chapterUrl,
+        }));
+
+        const pageList: SourcePageList = {
+          pages,
+        };
+
+        return pageList;
+      }),
+    getPopular: (page, pageSize) =>
+      searchSeriesList({ page, pageSize }, "Popularity"),
+    getSeries: (seriesId) =>
+      Effect.gen(function* getSeriesEffect() {
+        const { context, html } = yield* fetchSeriesDetail(seriesId);
+
+        return parseSeriesDetail(html, context);
+      }),
     metadata: {
       capabilities: {
         supportsChapterFeed: true,
@@ -772,8 +810,6 @@ export const createWeebCentralSourceAdapter = (
       supportedLanguages: [sourceLanguage],
       websiteUrl: sourceBaseUrl,
     },
-    async searchSeries(input) {
-      return await searchSeriesList(input, "Best Match", "Ascending");
-    },
+    searchSeries: (input) => searchSeriesList(input, "Best Match", "Ascending"),
   };
 };

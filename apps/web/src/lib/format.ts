@@ -1,3 +1,6 @@
+export const hasText = (value: string | null | undefined): value is string =>
+  value !== null && value !== undefined && value.length > 0;
+
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",
@@ -8,7 +11,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 export const formatDateTime = (value: string | null | undefined): string => {
-  if (!value) {
+  if (!hasText(value)) {
     return "Not available";
   }
 
@@ -21,7 +24,7 @@ export const formatDateTime = (value: string | null | undefined): string => {
 };
 
 export const formatDate = (value: string | null | undefined): string => {
-  if (!value) {
+  if (!hasText(value)) {
     return "Not available";
   }
 
@@ -42,7 +45,7 @@ export const getErrorMessage = (error: unknown, fallback: string): string => {
 };
 
 export const getInitials = (value: string | null | undefined): string => {
-  if (!value) {
+  if (!hasText(value)) {
     return "MG";
   }
 

@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -60,7 +61,7 @@ import {
   subscribeCurrentBrowserToPush,
   unsubscribeCurrentBrowserFromPush,
 } from "@/lib/browser-push";
-import { formatDateTime, getErrorMessage } from "@/lib/format";
+import { formatDateTime, getErrorMessage, hasText } from "@/lib/format";
 import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -242,11 +243,10 @@ const SettingsRouteComponent = () => {
     asyncResultError(pushSettingsResult) ??
     asyncResultError(clientStateResult);
 
-  const isCurrentBrowserPushEnabled = Boolean(
-    pushSettings?.isEnabled &&
-    browserPushClientStateValue?.isSubscribed &&
-    browserPushClientStateValue?.permission === "granted"
-  );
+  const isCurrentBrowserPushEnabled =
+    pushSettings?.isEnabled === true &&
+    browserPushClientStateValue?.isSubscribed === true &&
+    browserPushClientStateValue?.permission === "granted";
 
   const browserPushPermissionLabel =
     browserPushClientStateValue?.permission === "secureContextRequired"
@@ -254,6 +254,11 @@ const SettingsRouteComponent = () => {
       : (browserPushClientStateValue?.permission ?? "unknown");
 
   const isBrowserPushTogglePending = isConnectingPush || isDisconnectingPush;
+  const isBrowserPushReady =
+    pushSettings?.isConfigured === true &&
+    browserPushClientStateValue !== undefined &&
+    browserPushClientStateValue.isSupported &&
+    browserPushClientStateValue.isSecureContext;
 
   const handleBrowserPushToggle = async (checked: boolean) => {
     if (!(pushSettings && browserPushClientStateValue)) {
@@ -261,7 +266,7 @@ const SettingsRouteComponent = () => {
     }
 
     if (checked) {
-      if (!pushSettings.vapidPublicKey) {
+      if (!hasText(pushSettings.vapidPublicKey)) {
         return;
       }
 
@@ -288,7 +293,7 @@ const SettingsRouteComponent = () => {
 
     const endpoint = await unsubscribeCurrentBrowserFromPush();
 
-    if (!endpoint) {
+    if (!hasText(endpoint)) {
       return;
     }
 
@@ -496,12 +501,12 @@ const SettingsRouteComponent = () => {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <StatusBadge
                     tone={
-                      browserPushClientStateValue?.isSupported
+                      browserPushClientStateValue?.isSupported === true
                         ? "success"
                         : "neutral"
                     }
                   >
-                    {browserPushClientStateValue?.isSupported
+                    {browserPushClientStateValue?.isSupported === true
                       ? "Supported"
                       : "Not supported"}
                   </StatusBadge>
@@ -515,12 +520,7 @@ const SettingsRouteComponent = () => {
                 <ToggleRow
                   checked={isCurrentBrowserPushEnabled}
                   description="Register this browser for push delivery."
-                  disabled={
-                    isBrowserPushTogglePending ||
-                    !pushSettings?.isConfigured ||
-                    !browserPushClientStateValue?.isSupported ||
-                    !browserPushClientStateValue?.isSecureContext
-                  }
+                  disabled={isBrowserPushTogglePending || !isBrowserPushReady}
                   label="Enable on this browser"
                   onCheckedChange={(checked) => {
                     void handleBrowserPushToggle(checked);
@@ -557,18 +557,25 @@ const SettingsRouteComponent = () => {
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <dt className="meta">Last delivery</dt>
                     <dd className="text-xs">
-                      {formatDateTime(pushSettings?.lastDeliveredAt)}
+                      {formatDateTime(
+                        Option.getOrNull(
+                          pushSettings?.lastDeliveredAt ?? Option.none()
+                        )
+                      )}
                     </dd>
                   </div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <dt className="meta">Last error</dt>
                     <dd className="text-xs">
-                      {pushSettings?.lastError ?? "None"}
+                      {Option.getOrElse(
+                        pushSettings?.lastError ?? Option.none(),
+                        () => "None"
+                      )}
                     </dd>
                   </div>
                 </dl>
 
-                {pushSettings?.isConfigured ? null : (
+                {pushSettings?.isConfigured === true ? null : (
                   <Alert>
                     <AlertTitle>Browser push is not configured</AlertTitle>
                     <AlertDescription>
@@ -587,7 +594,7 @@ const SettingsRouteComponent = () => {
                   </Alert>
                 ) : null}
 
-                {browserPushClientStateValue?.isSupported &&
+                {browserPushClientStateValue?.isSupported === true &&
                 !browserPushClientStateValue.isSecureContext ? (
                   <Alert variant="destructive">
                     <AlertTitle>Needs HTTPS or localhost</AlertTitle>
@@ -632,7 +639,7 @@ const SettingsRouteComponent = () => {
                 <Button
                   disabled={
                     isSendingPushTest ||
-                    !pushSettings?.isConfigured ||
+                    pushSettings?.isConfigured !== true ||
                     !isCurrentBrowserPushEnabled
                   }
                   onClick={() => {
@@ -655,7 +662,8 @@ const SettingsRouteComponent = () => {
               </span>
             </div>
 
-            {settings?.destinations.length ? (
+            {settings !== undefined &&
+            settings.destinations.length > 0 ? (
               <div className="rows">
                 {settings.destinations.map((destination) => (
                   <div className="row" key={destination.id}>
@@ -674,9 +682,9 @@ const SettingsRouteComponent = () => {
                       <p className="meta break-all">
                         {destination.absolutePath}
                       </p>
-                      {destination.komgaLibraryId ? (
+                      {Option.isSome(destination.komgaLibraryId) ? (
                         <p className="meta break-all">
-                          Komga library {destination.komgaLibraryId}
+                          Komga library {destination.komgaLibraryId.value}
                         </p>
                       ) : null}
                     </div>
@@ -812,7 +820,7 @@ const SettingsRouteComponent = () => {
             <Button
               onClick={() => {
                 const destinationId = destinationPendingRemoval?.id;
-                if (!destinationId) {
+                if (destinationId === undefined || destinationId.length === 0) {
                   return;
                 }
 

@@ -11,10 +11,10 @@ export class TrackedSeriesState extends Model.Class<TrackedSeriesState>(
   checkFailureCount: Schema.Int,
   createdAt: Schema.Date,
   id: TrackedSeriesStateIdSchema,
-  lastCheckedAt: Schema.NullOr(Schema.Date),
-  lastSeenChapterExternalId: Schema.NullOr(Schema.String),
+  lastCheckedAt: Schema.OptionFromNullOr(Schema.Date),
+  lastSeenChapterExternalId: Schema.OptionFromNullOr(Schema.String),
   libraryEntryId: LibraryEntryIdSchema,
-  nextCheckAt: Schema.NullOr(Schema.Date),
+  nextCheckAt: Schema.OptionFromNullOr(Schema.Date),
   updatedAt: Schema.Date,
 }) {}
 

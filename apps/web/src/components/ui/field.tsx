@@ -145,12 +145,12 @@ const FieldSeparator = ({
       "relative -my-2 h-5 text-xs/relaxed group-data-[variant=outline]/field-group:-mb-2",
       className
     )}
-    data-content={!!children}
+    data-content={Boolean(children)}
     data-slot="field-separator"
     {...props}
   >
     <Separator className="absolute inset-0 top-1/2" />
-    {children && (
+    {children === undefined || children === null ? null : (
       <span
         className="bg-background text-muted-foreground relative mx-auto block w-fit px-2"
         data-slot="field-separator-content"
@@ -170,11 +170,11 @@ const FieldError = ({
   errors?: ({ message?: string } | undefined)[];
 }) => {
   const content = useMemo((): ReactNode => {
-    if (children) {
+    if (children !== undefined && children !== null) {
       return children;
     }
 
-    if (!errors?.length) {
+    if (errors === undefined || errors.length === 0) {
       return null;
     }
 
@@ -188,15 +188,16 @@ const FieldError = ({
 
     return (
       <ul className="ml-4 flex list-disc flex-col gap-1">
-        {uniqueErrors.map(
-          (error, index) =>
-            error?.message && <li key={index}>{error.message}</li>
+        {uniqueErrors.map((error, index) =>
+          error?.message === undefined || error.message.length === 0 ? null : (
+            <li key={index}>{error.message}</li>
+          )
         )}
       </ul>
     );
   }, [children, errors]);
 
-  if (!content) {
+  if (content === undefined || content === null) {
     return null;
   }
 

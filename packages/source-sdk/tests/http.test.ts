@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
+import { Effect, Exit } from "effect";
+
 import { fetchHtmlPage, HttpError } from "../src/adapters/shared/http";
 
 const originalFetch = globalThis.fetch;
@@ -28,10 +30,14 @@ const htmlResponse = (body: string): Response =>
   });
 
 describe("fetchHtmlPage retry policy", () => {
-  test("does not retry a permanent 4xx", () => {
+  test("does not retry a permanent 4xx", async () => {
     const calls = stubFetch(() => new Response("nope", { status: 404 }));
 
-    expect(fetchHtmlPage("https://example.test/x")).rejects.toThrow();
+    const outcome = await Effect.runPromiseExit(
+      fetchHtmlPage("https://example.test/x")
+    );
+
+    expect(Exit.isFailure(outcome)).toBe(true);
     expect(calls()).toBe(1);
   });
 
@@ -42,7 +48,9 @@ describe("fetchHtmlPage retry policy", () => {
         : htmlResponse("<p>ok</p>")
     );
 
-    const result = await fetchHtmlPage("https://example.test/x");
+    const result = await Effect.runPromise(
+      fetchHtmlPage("https://example.test/x")
+    );
 
     expect(result.html).toBe("<p>ok</p>");
     expect(calls()).toBe(3);
@@ -55,26 +63,27 @@ describe("fetchHtmlPage retry policy", () => {
         : htmlResponse("<p>ok</p>")
     );
 
-    await fetchHtmlPage("https://example.test/x");
+    await Effect.runPromise(fetchHtmlPage("https://example.test/x"));
 
     expect(calls()).toBe(2);
   });
 
-  test("stops after the configured retry count", () => {
+  test("stops after the configured retry count", async () => {
     const calls = stubFetch(() => new Response("busy", { status: 500 }));
 
-    expect(
+    const outcome = await Effect.runPromiseExit(
       fetchHtmlPage("https://example.test/x", { retries: 1 })
-    ).rejects.toThrow();
+    );
 
+    expect(Exit.isFailure(outcome)).toBe(true);
     expect(calls()).toBe(2);
   });
 
   test("reports the status and retryability on failure", async () => {
     stubFetch(() => new Response("nope", { status: 404 }));
 
-    const failure = await fetchHtmlPage("https://example.test/x").catch(
-      (error: unknown) => error
+    const failure = await Effect.runPromise(
+      Effect.flip(fetchHtmlPage("https://example.test/x"))
     );
 
     expect(failure).toBeInstanceOf(HttpError);

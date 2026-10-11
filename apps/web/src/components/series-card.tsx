@@ -2,6 +2,7 @@ import type { DiscoverSection } from "@mangy/contract";
 import { Link } from "@tanstack/react-router";
 
 import { SeriesCover } from "@/components/series-cover";
+import { hasText } from "@/lib/format";
 
 type SeriesCardItem = DiscoverSection["items"][number];
 
@@ -28,7 +29,9 @@ export const SeriesCard = ({ item }: SeriesCardProps) => (
         {item.status ? (
           <span className="capitalize">{item.status.replaceAll("-", " ")}</span>
         ) : null}
-        {item.latestChapter ? <span>Latest {item.latestChapter}</span> : null}
+        {hasText(item.latestChapter) ? (
+          <span>Latest {item.latestChapter}</span>
+        ) : null}
       </div>
     </div>
   </Link>

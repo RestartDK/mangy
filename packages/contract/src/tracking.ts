@@ -9,9 +9,9 @@ import { isoDateTimeString } from "./timestamps";
 export const trackedSeriesSchema = Schema.Struct({
   checkFailureCount: Schema.Int,
   id: Schema.String,
-  lastCheckedAt: Schema.NullOr(isoDateTimeString),
-  lastSeenChapterExternalId: Schema.NullOr(Schema.String),
-  nextCheckAt: Schema.NullOr(isoDateTimeString),
+  lastCheckedAt: Schema.OptionFromNullOr(isoDateTimeString),
+  lastSeenChapterExternalId: Schema.OptionFromNullOr(Schema.String),
+  nextCheckAt: Schema.OptionFromNullOr(isoDateTimeString),
   seriesId: SeriesIdSchema,
   sourceId: SourceIdSchema,
   title: Schema.String,

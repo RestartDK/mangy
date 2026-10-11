@@ -27,7 +27,7 @@ import type {
 } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { serve } from "bun";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { SqlError } from "effect/sql";
 import { unzipSync } from "fflate";
@@ -52,7 +52,7 @@ const sessionCookieRegex = /better-auth\.session_token=(?<token>[^;]+)/u;
 const decoder = new TextDecoder();
 
 const extractSessionCookie = (header: string | null): string | null => {
-  if (!header) {
+  if (header === null || header.length === 0) {
     return null;
   }
 
@@ -112,9 +112,7 @@ const query = async <A, I>(
 const createFakeAdapter = (config: {
   adapterId: string;
   chapters: SourceChapter[];
-  getPages?:
-    | ((chapterId: string) => Promise<{ pages: SourcePage[] }>)
-    | ((chapterId: string) => { pages: SourcePage[] });
+  getPages?: (chapterId: string) => Effect.Effect<{ pages: SourcePage[] }>;
   series: SourceSeries;
 }) => {
   const state = {
@@ -122,70 +120,55 @@ const createFakeAdapter = (config: {
     series: config.series,
   };
 
+  const listResponse = () => ({
+    hasNextPage: false,
+    items: [state.series],
+    page: 1,
+    pageSize: 1,
+    total: 1,
+  });
+
   const adapter: SourceAdapter = {
-    async getChapters(seriesId) {
-      if (seriesId !== state.series.externalId) {
-        throw new Error("Unexpected series requested in fake adapter.");
-      }
+    getChapters: (seriesId) =>
+      Effect.sync(() => {
+        if (seriesId !== state.series.externalId) {
+          throw new Error("Unexpected series requested in fake adapter.");
+        }
 
-      return [...state.chapters];
-    },
-    async getFilters() {
-      return [];
-    },
-    async getLatest() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
-    async getPages(chapterId) {
-      if (config.getPages) {
-        return await config.getPages(chapterId);
-      }
+        return [...state.chapters];
+      }),
+    getFilters: () => Effect.succeed([]),
+    getLatest: () => Effect.succeed(listResponse()),
+    getPages: (chapterId) =>
+      Effect.gen(function* getPagesEffect() {
+        if (config.getPages) {
+          return yield* config.getPages(chapterId);
+        }
 
-      const chapter = state.chapters.find(
-        (item) => item.externalId === chapterId
-      );
-      if (!chapter) {
-        throw new Error("Unexpected chapter requested in fake adapter.");
-      }
+        const chapter = state.chapters.find(
+          (item) => item.externalId === chapterId
+        );
+        if (!chapter) {
+          throw new Error("Unexpected chapter requested in fake adapter.");
+        }
 
-      return {
-        pages: Array.from({ length: chapter.pageCount ?? 1 }, (_, index) => ({
-          imageUrl: pngDataUrl,
-          index,
-        })),
-      };
-    },
-    async getPopular() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
-    async getSeries(seriesId) {
-      if (seriesId !== state.series.externalId) {
-        throw new Error("Unexpected series requested in fake adapter.");
-      }
+        return {
+          pages: Array.from({ length: chapter.pageCount ?? 1 }, (_, index) => ({
+            imageUrl: pngDataUrl,
+            index,
+          })),
+        };
+      }),
+    getPopular: () => Effect.succeed(listResponse()),
+    getSeries: (seriesId) =>
+      Effect.sync(() => {
+        if (seriesId !== state.series.externalId) {
+          throw new Error("Unexpected series requested in fake adapter.");
+        }
 
-      return state.series;
-    },
-    async getTrending() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
+        return state.series;
+      }),
+    getTrending: () => Effect.succeed(listResponse()),
     metadata: {
       capabilities: {
         supportsChapterFeed: true,
@@ -204,15 +187,7 @@ const createFakeAdapter = (config: {
       supportedLanguages: ["en"],
       websiteUrl: "https://example.test",
     },
-    async searchSeries() {
-      return {
-        hasNextPage: false,
-        items: [state.series],
-        page: 1,
-        pageSize: 1,
-        total: 1,
-      };
-    },
+    searchSeries: () => Effect.succeed(listResponse()),
   };
 
   return {
@@ -240,7 +215,7 @@ const createApiClient = async (
         body: JSON.stringify(body),
         headers: {
           "content-type": "application/json",
-          ...(origin ? { origin } : {}),
+          ...(origin !== undefined && origin.length > 0 ? { origin } : {}),
         },
         method: "POST",
       })
@@ -248,7 +223,7 @@ const createApiClient = async (
 
   const setSessionCookie = (response: Response) => {
     const cookie = extractSessionCookie(response.headers.get("set-cookie"));
-    if (cookie) {
+    if (cookie !== null && cookie.length > 0) {
       headers.set("cookie", `better-auth.session_token=${cookie}`);
     }
   };
@@ -260,7 +235,8 @@ const createApiClient = async (
   });
   setSessionCookie(signUpResponse);
 
-  if (!headers.get("cookie")) {
+  const sessionCookie = headers.get("cookie");
+  if (sessionCookie === null || sessionCookie.length === 0) {
     const signInResponse = await authRequest("/api/auth/sign-in/email", {
       email,
       password,
@@ -271,7 +247,7 @@ const createApiClient = async (
   const apiFetch = async (path: string, init?: RequestInit) => {
     const requestHeaders = new Headers(init?.headers);
     const cookie = headers.get("cookie");
-    if (cookie) {
+    if (cookie !== null && cookie.length > 0) {
       requestHeaders.set("cookie", cookie);
     }
 
@@ -280,7 +256,7 @@ const createApiClient = async (
         ...init,
         headers: {
           ...Object.fromEntries(requestHeaders.entries()),
-          ...(origin ? { origin } : {}),
+          ...(origin !== undefined && origin.length > 0 ? { origin } : {}),
         },
       })
     );
@@ -801,7 +777,9 @@ describe("server and worker integration", () => {
 
       const claimedJob = await processNextDownloadJob("komga-worker");
       expect(claimedJob?.id).toBe(queuedJob.id);
-      expect(claimedJob?.destinationKomgaLibraryId).toBe(komgaLibraryId);
+      expect(
+        Option.getOrNull(claimedJob?.destinationKomgaLibraryId ?? Option.none())
+      ).toBe(komgaLibraryId);
       assert.ok(claimedJob, "Expected a claimed download job.");
 
       expect(scanRequests).toEqual([
@@ -830,7 +808,9 @@ describe("server and worker integration", () => {
       expect(artifact?.output_path).toContain(tempDirectory);
       expect(artifact?.output_path.endsWith(".cbz")).toBe(true);
       expect(artifact?.package_format).toBe("cbz");
-      expect(artifact?.imported_to_komga_at).toBeInstanceOf(Date);
+      expect(
+        Option.getOrNull(artifact?.imported_to_komga_at ?? Option.none())
+      ).toBeInstanceOf(Date);
     } finally {
       void komgaServer.stop(true);
     }
@@ -1578,7 +1558,7 @@ describe("server and worker integration", () => {
             throw new Error("Unexpected chapter requested in fake adapter.");
           }
 
-          return {
+          return Effect.succeed({
             pages: [
               {
                 headers: {
@@ -1589,7 +1569,7 @@ describe("server and worker integration", () => {
                 referer: requiredReferer,
               },
             ],
-          };
+          });
         },
         series,
       });

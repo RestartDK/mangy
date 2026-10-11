@@ -8,7 +8,7 @@ import {
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
 import type { SeriesId, SourceId, UserId } from "@mangy/db/model";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { Fragment } from "effect/sql/Statement";
 
@@ -28,9 +28,11 @@ type TrackedSeries = Schema.Schema.Type<typeof trackedSeriesProjection>;
 
 const serializeTrackedSeries = (row: TrackedSeries) => ({
   ...row,
-  lastCheckedAt: row.lastCheckedAt ? row.lastCheckedAt.toISOString() : null,
-  lastSeenChapterExternalId: row.lastSeenChapterExternalId ?? null,
-  nextCheckAt: row.nextCheckAt ? row.nextCheckAt.toISOString() : null,
+  lastCheckedAt: row.lastCheckedAt.pipe(
+    Option.map((value) => value.toISOString())
+  ),
+  lastSeenChapterExternalId: row.lastSeenChapterExternalId,
+  nextCheckAt: row.nextCheckAt.pipe(Option.map((value) => value.toISOString())),
 });
 
 const baseQuery = (
@@ -102,11 +104,11 @@ const requestRefresh = (
 
     return {
       ...trackedState,
-      lastCheckedAt: trackedState.lastCheckedAt
-        ? trackedState.lastCheckedAt.toISOString()
-        : null,
-      lastSeenChapterExternalId: trackedState.lastSeenChapterExternalId ?? null,
-      nextCheckAt: new Date().toISOString(),
+      lastCheckedAt: trackedState.lastCheckedAt.pipe(
+        Option.map((value) => value.toISOString())
+      ),
+      lastSeenChapterExternalId: trackedState.lastSeenChapterExternalId,
+      nextCheckAt: Option.some(new Date().toISOString()),
     };
   });
 

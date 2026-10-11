@@ -18,7 +18,7 @@ import {
 } from "@mangy/db/model";
 import { BrowserPushError, sendBrowserPush } from "@mangy/push";
 import type { BrowserPushPayload } from "@mangy/push";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 type NotificationType = Schema.Schema.Type<typeof Notification.fields.type>;
@@ -37,14 +37,14 @@ export interface ClaimedPushDelivery {
   id: string;
   maxAttempts: number;
   notificationBody: string;
-  notificationEndpointId: string | null;
+  notificationEndpointId: Option.Option<string>;
   notificationId: string;
   notificationTitle: string;
   notificationType: NotificationType;
-  pushSubscriptionAuth: string | null;
-  pushSubscriptionEndpoint: string | null;
-  pushSubscriptionId: string | null;
-  pushSubscriptionP256dh: string | null;
+  pushSubscriptionAuth: Option.Option<string>;
+  pushSubscriptionEndpoint: Option.Option<string>;
+  pushSubscriptionId: Option.Option<string>;
+  pushSubscriptionP256dh: Option.Option<string>;
 }
 
 const claimedPushDeliveryProjection = Schema.Struct({
@@ -56,10 +56,14 @@ const claimedPushDeliveryProjection = Schema.Struct({
   notificationId: Notification.fields.id,
   notificationTitle: Notification.fields.title,
   notificationType: Notification.fields.type,
-  pushSubscriptionAuth: Schema.NullOr(PushSubscription.fields.auth),
-  pushSubscriptionEndpoint: Schema.NullOr(PushSubscription.fields.endpoint),
-  pushSubscriptionId: Schema.NullOr(PushSubscription.fields.id),
-  pushSubscriptionP256dh: Schema.NullOr(PushSubscription.fields.p256dh),
+  pushSubscriptionAuth: Schema.OptionFromNullOr(PushSubscription.fields.auth),
+  pushSubscriptionEndpoint: Schema.OptionFromNullOr(
+    PushSubscription.fields.endpoint
+  ),
+  pushSubscriptionId: Schema.OptionFromNullOr(PushSubscription.fields.id),
+  pushSubscriptionP256dh: Schema.OptionFromNullOr(
+    PushSubscription.fields.p256dh
+  ),
 });
 
 const buildBrowserPushPayload = (
@@ -239,7 +243,7 @@ export const claimNextPushDelivery = async (
     })
   );
 
-  if (!claimedDeliveryId) {
+  if (claimedDeliveryId === null || claimedDeliveryId.length === 0) {
     return null;
   }
 
@@ -277,13 +281,13 @@ export const claimNextPushDelivery = async (
 export const processPushDelivery = async (
   delivery: ClaimedPushDelivery
 ): Promise<void> => {
-  if (
-    !(
-      delivery.pushSubscriptionEndpoint &&
-      delivery.pushSubscriptionAuth &&
-      delivery.pushSubscriptionP256dh
-    )
-  ) {
+  const pushSubscription = Option.all({
+    auth: delivery.pushSubscriptionAuth,
+    endpoint: delivery.pushSubscriptionEndpoint,
+    p256dh: delivery.pushSubscriptionP256dh,
+  });
+
+  if (Option.isNone(pushSubscription)) {
     throw new BrowserPushError(
       "This browser subscription is no longer valid.",
       {
@@ -294,10 +298,10 @@ export const processPushDelivery = async (
 
   await sendBrowserPush(
     {
-      endpoint: delivery.pushSubscriptionEndpoint,
+      endpoint: pushSubscription.value.endpoint,
       keys: {
-        auth: delivery.pushSubscriptionAuth,
-        p256dh: delivery.pushSubscriptionP256dh,
+        auth: pushSubscription.value.auth,
+        p256dh: pushSubscription.value.p256dh,
       },
     },
     buildBrowserPushPayload(delivery)
@@ -324,7 +328,7 @@ export const processPushDelivery = async (
           )}
             WHERE ${column(notificationDeliveryColumns, "id")} = ${delivery.id}`;
 
-          if (delivery.notificationEndpointId) {
+          if (Option.isSome(delivery.notificationEndpointId)) {
             yield* sql`UPDATE ${table("notificationEndpoint")} SET ${updateRow(
               sql,
               notificationEndpointColumns,
@@ -335,10 +339,10 @@ export const processPushDelivery = async (
                 updatedAt: now,
               }
             )}
-              WHERE ${column(notificationEndpointColumns, "id")} = ${delivery.notificationEndpointId}`;
+              WHERE ${column(notificationEndpointColumns, "id")} = ${delivery.notificationEndpointId.value}`;
           }
 
-          if (delivery.pushSubscriptionId) {
+          if (Option.isSome(delivery.pushSubscriptionId)) {
             yield* sql`UPDATE ${table("pushSubscription")} SET ${updateRow(
               sql,
               pushSubscriptionColumns,
@@ -348,7 +352,7 @@ export const processPushDelivery = async (
                 updatedAt: now,
               }
             )}
-              WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
+              WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId.value}`;
           }
         })
       );
@@ -394,7 +398,7 @@ export const failPushDelivery = async (
           )}
             WHERE ${column(notificationDeliveryColumns, "id")} = ${delivery.id}`;
 
-          if (delivery.notificationEndpointId) {
+          if (Option.isSome(delivery.notificationEndpointId)) {
             yield* sql`UPDATE ${table("notificationEndpoint")} SET ${updateRow(
               sql,
               notificationEndpointColumns,
@@ -404,10 +408,10 @@ export const failPushDelivery = async (
                 updatedAt: now,
               }
             )}
-              WHERE ${column(notificationEndpointColumns, "id")} = ${delivery.notificationEndpointId}`;
+              WHERE ${column(notificationEndpointColumns, "id")} = ${delivery.notificationEndpointId.value}`;
           }
 
-          if (delivery.pushSubscriptionId) {
+          if (Option.isSome(delivery.pushSubscriptionId)) {
             const subscriptionValues = shouldDeactivateSubscription
               ? { isActive: false, lastError: message, updatedAt: now }
               : { lastError: message, updatedAt: now };
@@ -417,7 +421,7 @@ export const failPushDelivery = async (
               pushSubscriptionColumns,
               subscriptionValues
             )}
-              WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId}`;
+              WHERE ${column(pushSubscriptionColumns, "id")} = ${delivery.pushSubscriptionId.value}`;
           }
         })
       );

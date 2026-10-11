@@ -13,7 +13,7 @@ export class DownloadDestination extends Model.Class<DownloadDestination>(
   id: DownloadDestinationIdSchema,
   isDefault: Schema.Boolean,
   isEnabled: Schema.Boolean,
-  komgaLibraryId: Schema.NullOr(Schema.String),
+  komgaLibraryId: Schema.OptionFromNullOr(Schema.String),
   name: Schema.String,
   updatedAt: Schema.Date,
   userId: UserIdSchema,

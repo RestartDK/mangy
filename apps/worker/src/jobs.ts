@@ -6,6 +6,7 @@ import {
   table,
   updateRow,
 } from "@mangy/db";
+import type { ChapterId } from "@mangy/db/model";
 import {
   Chapter,
   DownloadDestination,
@@ -17,25 +18,25 @@ import {
   downloadJobColumns,
   seriesColumns,
 } from "@mangy/db/model";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
 import { queueNotification } from "./notifications";
 
 export interface ClaimedDownloadJob {
   attempts: number;
-  chapterExternalId: string | null;
-  chapterNumber: string | null;
-  chapterRecordId: string | null;
-  chapterTitle: string | null;
-  destinationKomgaLibraryId: string | null;
-  destinationName: string | null;
-  destinationPath: string | null;
+  chapterExternalId: Option.Option<string>;
+  chapterNumber: Option.Option<string>;
+  chapterRecordId: Option.Option<ChapterId>;
+  chapterTitle: Option.Option<string>;
+  destinationKomgaLibraryId: Option.Option<string>;
+  destinationName: Option.Option<string>;
+  destinationPath: Option.Option<string>;
   id: string;
   maxAttempts: number;
-  queueId: string | null;
-  seriesSourceId: string | null;
-  seriesTitle: string | null;
+  queueId: Option.Option<string>;
+  seriesSourceId: Option.Option<string>;
+  seriesTitle: Option.Option<string>;
   status: Schema.Schema.Type<typeof DownloadJob.fields.status>;
   userId: string;
 }
@@ -51,38 +52,41 @@ interface CompletedArtifact {
 
 const claimedJobProjection = Schema.Struct({
   attempts: DownloadJob.fields.attempts,
-  chapterExternalId: Schema.NullOr(Chapter.fields.externalId),
-  chapterNumber: Schema.NullOr(Chapter.fields.chapterNumber),
-  chapterRecordId: Schema.NullOr(Chapter.fields.id),
-  chapterTitle: Schema.NullOr(Chapter.fields.title),
-  destinationKomgaLibraryId: Schema.NullOr(
-    DownloadDestination.fields.komgaLibraryId
+  chapterExternalId: Schema.OptionFromNullOr(Chapter.fields.externalId),
+  chapterNumber: Chapter.fields.chapterNumber,
+  chapterRecordId: Schema.OptionFromNullOr(Chapter.fields.id),
+  chapterTitle: Chapter.fields.title,
+  destinationKomgaLibraryId: DownloadDestination.fields.komgaLibraryId,
+  destinationName: Schema.OptionFromNullOr(DownloadDestination.fields.name),
+  destinationPath: Schema.OptionFromNullOr(
+    DownloadDestination.fields.absolutePath
   ),
-  destinationName: Schema.NullOr(DownloadDestination.fields.name),
-  destinationPath: Schema.NullOr(DownloadDestination.fields.absolutePath),
   id: DownloadJob.fields.id,
   maxAttempts: DownloadJob.fields.maxAttempts,
   queueId: DownloadJob.fields.queueId,
-  seriesSourceId: Schema.NullOr(Series.fields.sourceId),
-  seriesTitle: Schema.NullOr(Series.fields.title),
+  seriesSourceId: Schema.OptionFromNullOr(Series.fields.sourceId),
+  seriesTitle: Schema.OptionFromNullOr(Series.fields.title),
   status: DownloadJob.fields.status,
   userId: DownloadJob.fields.userId,
 });
 
 const buildChapterLabel = (job: ClaimedDownloadJob): string => {
-  if (job.chapterNumber && job.chapterTitle) {
-    return `Chapter ${job.chapterNumber} - ${job.chapterTitle}`;
+  const chapterNumber = Option.getOrUndefined(job.chapterNumber);
+  const chapterTitle = Option.getOrUndefined(job.chapterTitle);
+
+  if (chapterNumber !== undefined && chapterTitle !== undefined) {
+    return `Chapter ${chapterNumber} - ${chapterTitle}`;
   }
 
-  if (job.chapterNumber) {
-    return `Chapter ${job.chapterNumber}`;
+  if (chapterNumber !== undefined) {
+    return `Chapter ${chapterNumber}`;
   }
 
-  return job.chapterTitle ?? "Special chapter";
+  return chapterTitle ?? "Special chapter";
 };
 
 const buildDownloadTitle = (job: ClaimedDownloadJob): string =>
-  job.seriesTitle ?? "Queued chapter";
+  Option.getOrElse(job.seriesTitle, () => "Queued chapter");
 
 export const loadClaimedDownloadJob = (jobId: string) =>
   Effect.gen(function* loadClaimedDownloadJobEffect() {
@@ -174,7 +178,9 @@ export const completeDownloadJob = async (
           )}
             WHERE ${column(downloadJobColumns, "id")} = ${job.id}`;
 
-          if (job.chapterRecordId) {
+          if (Option.isSome(job.chapterRecordId)) {
+            const chapterRecordId = job.chapterRecordId.value;
+
             yield* sql`UPDATE ${table("chapter")} SET ${updateRow(
               sql,
               chapterColumns,
@@ -183,13 +189,13 @@ export const completeDownloadJob = async (
                 updatedAt: now,
               }
             )}
-              WHERE ${column(chapterColumns, "id")} = ${job.chapterRecordId}`;
+              WHERE ${column(chapterColumns, "id")} = ${chapterRecordId}`;
 
             yield* sql`INSERT INTO ${table("downloadArtifact")} ${insertRow(
               sql,
               downloadArtifactColumns,
               {
-                chapterId: job.chapterRecordId,
+                chapterId: chapterRecordId,
                 downloadJobId: job.id,
                 fileSizeBytes: artifact.fileSizeBytes,
                 id: crypto.randomUUID(),
@@ -201,7 +207,7 @@ export const completeDownloadJob = async (
           }
 
           yield* queueNotification({
-            body: `${chapterLabel} finished and was written to ${job.destinationName ?? "your destination"}.`,
+            body: `${chapterLabel} finished and was written to ${Option.getOrElse(job.destinationName, () => "your destination")}.`,
             title: buildDownloadTitle(job),
             type: "downloadCompleted",
             userId: job.userId,

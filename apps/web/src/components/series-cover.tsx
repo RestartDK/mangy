@@ -16,7 +16,11 @@ export const SeriesCover = ({
   <div
     className={cn("bg-muted relative overflow-hidden rounded-lg", className)}
   >
-    {url ? (
+    {url === null || url.length === 0 ? (
+      <div className="font-heading text-muted-foreground flex size-full items-center justify-center px-3 text-center text-xs">
+        <span className="line-clamp-3">{title}</span>
+      </div>
+    ) : (
       <img
         alt={alt ?? title}
         className="size-full object-cover"
@@ -26,10 +30,6 @@ export const SeriesCover = ({
         src={url}
         width={720}
       />
-    ) : (
-      <div className="font-heading text-muted-foreground flex size-full items-center justify-center px-3 text-center text-xs">
-        <span className="line-clamp-3">{title}</span>
-      </div>
     )}
   </div>
 );

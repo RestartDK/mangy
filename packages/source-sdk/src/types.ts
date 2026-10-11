@@ -1,3 +1,7 @@
+import type { Effect } from "effect";
+
+import type { SourceAdapterError } from "./errors";
+
 export interface SourceCapabilities {
   supportsPopular: boolean;
   supportsLatest: boolean;
@@ -116,25 +120,30 @@ export interface SourceSearchInput {
   filters?: Record<string, unknown>;
 }
 
+export type SourceAdapterEffect<TResult> = Effect.Effect<
+  TResult,
+  SourceAdapterError
+>;
+
 export interface SourceAdapter {
   metadata: SourceMetadata;
-  getFilters: () => Promise<SourceFilterDefinition[]>;
+  getFilters: SourceAdapterEffect<SourceFilterDefinition[]>;
   getPopular: (
     page?: number,
     pageSize?: number
-  ) => Promise<SourceListResponse<SourceSeries>>;
+  ) => SourceAdapterEffect<SourceListResponse<SourceSeries>>;
   getLatest: (
     page?: number,
     pageSize?: number
-  ) => Promise<SourceListResponse<SourceSeries>>;
+  ) => SourceAdapterEffect<SourceListResponse<SourceSeries>>;
   getTrending?: (
     page?: number,
     pageSize?: number
-  ) => Promise<SourceListResponse<SourceSeries>>;
+  ) => SourceAdapterEffect<SourceListResponse<SourceSeries>>;
   searchSeries: (
     input: SourceSearchInput
-  ) => Promise<SourceListResponse<SourceSeries>>;
-  getSeries: (seriesId: string) => Promise<SourceSeries>;
-  getChapters: (seriesId: string) => Promise<SourceChapter[]>;
-  getPages: (chapterId: string) => Promise<SourcePageList>;
+  ) => SourceAdapterEffect<SourceListResponse<SourceSeries>>;
+  getSeries: (seriesId: string) => SourceAdapterEffect<SourceSeries>;
+  getChapters: (seriesId: string) => SourceAdapterEffect<SourceChapter[]>;
+  getPages: (chapterId: string) => SourceAdapterEffect<SourcePageList>;
 }

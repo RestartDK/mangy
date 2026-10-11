@@ -12,12 +12,12 @@ export const downloadArtifactTable = "download_artifact";
 export class DownloadArtifact extends Model.Class<DownloadArtifact>(
   "DownloadArtifact"
 )({
-  chapterId: Schema.NullOr(ChapterIdSchema),
+  chapterId: Schema.OptionFromNullOr(ChapterIdSchema),
   createdAt: Schema.Date,
   downloadJobId: DownloadJobIdSchema,
-  fileSizeBytes: Schema.NullOr(Schema.Int),
+  fileSizeBytes: Schema.OptionFromNullOr(Schema.Int),
   id: DownloadArtifactIdSchema,
-  importedToKomgaAt: Schema.NullOr(Schema.Date),
+  importedToKomgaAt: Schema.OptionFromNullOr(Schema.Date),
   outputPath: Schema.String,
   packageFormat: Schema.String,
   updatedAt: Schema.Date,

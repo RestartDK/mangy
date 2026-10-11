@@ -7,8 +7,8 @@ import { isoDateTimeString } from "./timestamps";
 
 export const libraryItemSchema = Schema.Struct({
   autoDownload: Schema.Boolean,
-  coverImageUrl: Schema.NullOr(Schema.String),
-  destinationName: Schema.NullOr(Schema.String),
+  coverImageUrl: Schema.OptionFromNullOr(Schema.String),
+  destinationName: Schema.OptionFromNullOr(Schema.String),
   id: Schema.String,
   isTracked: Schema.Boolean,
   seriesId: Schema.String,
@@ -26,20 +26,20 @@ export const librarySeriesQuerySchema = Schema.Struct({
 export const trackedSeriesStateSummarySchema = Schema.Struct({
   checkFailureCount: Schema.Int,
   id: Schema.String,
-  lastCheckedAt: Schema.NullOr(isoDateTimeString),
-  lastSeenChapterExternalId: Schema.NullOr(Schema.String),
-  nextCheckAt: Schema.NullOr(isoDateTimeString),
+  lastCheckedAt: Schema.OptionFromNullOr(isoDateTimeString),
+  lastSeenChapterExternalId: Schema.OptionFromNullOr(Schema.String),
+  nextCheckAt: Schema.OptionFromNullOr(isoDateTimeString),
 });
 
 export const librarySeriesStateSchema = Schema.Struct({
   autoDownload: Schema.Boolean,
-  downloadDestinationId: Schema.NullOr(Schema.String),
-  downloadDestinationName: Schema.NullOr(Schema.String),
+  downloadDestinationId: Schema.OptionFromNullOr(Schema.String),
+  downloadDestinationName: Schema.OptionFromNullOr(Schema.String),
   isTracked: Schema.Boolean,
-  libraryEntryId: Schema.NullOr(Schema.String),
+  libraryEntryId: Schema.OptionFromNullOr(Schema.String),
   seriesId: Schema.String,
   sourceId: Schema.String,
-  trackingState: Schema.NullOr(trackedSeriesStateSummarySchema),
+  trackingState: Schema.OptionFromNullOr(trackedSeriesStateSummarySchema),
 });
 export type LibrarySeriesState = typeof librarySeriesStateSchema.Type;
 

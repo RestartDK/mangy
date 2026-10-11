@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -37,12 +38,12 @@ interface LibraryRouteItem {
   sourceId: string;
   seriesId: string;
   title: string;
-  destinationName: string | null;
+  destinationName: Option.Option<string>;
   isTracked: boolean;
   autoDownload: boolean;
   trackingState: {
-    nextCheckAt: string | null;
-    lastCheckedAt: string | null;
+    nextCheckAt: Option.Option<string>;
+    lastCheckedAt: Option.Option<string>;
   } | null;
 }
 
@@ -59,8 +60,14 @@ const LibraryList = ({ items, onRemove }: LibraryListProps) => {
   return (
     <div className="panel rows">
       {items.map((item) => {
-        const lastCheckedAt = item.trackingState?.lastCheckedAt ?? null;
-        const nextCheckAt = item.trackingState?.nextCheckAt ?? null;
+        const lastCheckedAt =
+          item.trackingState === null
+            ? Option.none<string>()
+            : item.trackingState.lastCheckedAt;
+        const nextCheckAt =
+          item.trackingState === null
+            ? Option.none<string>()
+            : item.trackingState.nextCheckAt;
         const state = [
           item.isTracked ? "Tracked" : "Saved",
           item.autoDownload ? "Auto-download on" : "Manual",
@@ -81,20 +88,23 @@ const LibraryList = ({ items, onRemove }: LibraryListProps) => {
                 >
                   {item.title}
                 </Link>
-                {item.destinationName ? null : (
+                {Option.isSome(item.destinationName) ? null : (
                   <StatusBadge tone="warning">Needs destination</StatusBadge>
                 )}
               </div>
               <p className="meta truncate">
-                {state} · {item.destinationName ?? "No destination"}
+                {state} ·{" "}
+                {Option.getOrElse(item.destinationName, () => "No destination")}
               </p>
-              {lastCheckedAt || nextCheckAt ? (
+              {Option.isSome(lastCheckedAt) || Option.isSome(nextCheckAt) ? (
                 <p className="meta truncate">
                   {[
-                    lastCheckedAt
-                      ? `Last checked ${formatDateTime(lastCheckedAt)}`
+                    Option.isSome(lastCheckedAt)
+                      ? `Last checked ${formatDateTime(lastCheckedAt.value)}`
                       : null,
-                    nextCheckAt ? `Next ${formatDateTime(nextCheckAt)}` : null,
+                    Option.isSome(nextCheckAt)
+                      ? `Next ${formatDateTime(nextCheckAt.value)}`
+                      : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -177,8 +187,8 @@ const LibraryRouteComponent = () => {
     )
     .map((item) => ({
       autoDownload: false,
-      coverImageUrl: null,
-      destinationName: null,
+      coverImageUrl: Option.none<string>(),
+      destinationName: Option.none<string>(),
       id: item.id,
       isTracked: true,
       seriesId: item.seriesId,
@@ -190,7 +200,9 @@ const LibraryRouteComponent = () => {
   const items: LibraryRouteItem[] = [...libraryItems, ...trackingOnlyItems];
   const trackedItems = items.filter((item) => item.isTracked);
   const autoDownloadItems = items.filter((item) => item.autoDownload);
-  const needsDestinationItems = items.filter((item) => !item.destinationName);
+  const needsDestinationItems = items.filter((item) =>
+    Option.isNone(item.destinationName)
+  );
 
   const removePendingSeries = async (item: LibraryRouteItem): Promise<void> => {
     const removed = await notifyMutation(
