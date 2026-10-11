@@ -10,13 +10,12 @@
     "start": "./worker"
   },
   "dependencies": {
+    "@effect/platform-bun": "catalog:",
     "@mangy/db": "workspace:*",
     "@mangy/downloader": "workspace:*",
     "@mangy/env": "workspace:*",
     "@mangy/push": "workspace:*",
     "@mangy/source-sdk": "workspace:*",
-    "@effect/platform-bun": "catalog:",
-    "drizzle-orm": "^0.45.4",
     "effect": "catalog:"
   },
   "devDependencies": {

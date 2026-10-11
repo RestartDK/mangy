@@ -20,7 +20,6 @@ export const env = {
   DATABASE_URL: required("DATABASE_URL"),
 
   // Auth
-  AUTH_ADAPTER: optional("AUTH_ADAPTER", "drizzle"),
   BETTER_AUTH_SECRET: required("BETTER_AUTH_SECRET"),
   BETTER_AUTH_URL: required("BETTER_AUTH_URL"),
 

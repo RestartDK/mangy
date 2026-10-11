@@ -10,6 +10,7 @@ import {
   UserIdSchema,
 } from "./ids";
 
+export const downloadDestinationTable = "download_destination";
 export const downloadDestinationRow = Schema.Struct({
   absolutePath: Schema.String,
   createdAt: Schema.Date,
@@ -33,6 +34,7 @@ export const downloadDestinationRow = Schema.Struct({
 );
 export const downloadDestinationColumns = fieldColumns(downloadDestinationRow);
 
+export const libraryEntryTable = "library_entry";
 export const libraryEntryRow = Schema.Struct({
   autoDownload: Schema.Boolean,
   createdAt: Schema.Date,
@@ -57,6 +59,7 @@ export const libraryEntryRow = Schema.Struct({
 );
 export const libraryEntryColumns = fieldColumns(libraryEntryRow);
 
+export const trackedSeriesStateTable = "tracked_series_state";
 export const trackedSeriesStateRow = Schema.Struct({
   checkFailureCount: Schema.Int,
   createdAt: Schema.Date,

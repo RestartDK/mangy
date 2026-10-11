@@ -1,7 +1,8 @@
-import { db } from "@mangy/db";
-import { user } from "@mangy/db/schema";
+import { column, runSql, table } from "@mangy/db";
+import { userColumns } from "@mangy/db/model";
 import { serve } from "bun";
-import { eq } from "drizzle-orm";
+import { Effect } from "effect";
+import { SqlClient } from "effect/sql";
 import { request as playwrightRequest } from "playwright";
 
 import { app } from "../src/index";
@@ -189,7 +190,12 @@ if (liveSourceTestsEnabled) {
   } finally {
     await requestContext?.dispose();
     server.stop(true);
-    await db.delete(user).where(eq(user.email, email));
+    await runSql(
+      Effect.gen(function* deleteUserByEmail() {
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`DELETE FROM ${table("user")} WHERE ${column(userColumns, "email")} = ${email}`;
+      })
+    );
   }
 } else {
   console.log(
