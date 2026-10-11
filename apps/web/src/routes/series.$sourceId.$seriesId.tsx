@@ -9,6 +9,7 @@ import { enqueueDownload } from "@/atoms/downloads";
 import { reactivityKey } from "@/atoms/keys";
 import { librarySeriesState, updateLibrarySeriesState } from "@/atoms/library";
 import { seriesChapters, seriesDetail } from "@/atoms/series";
+import { settingsBootstrapQuery } from "@/atoms/settings";
 import { refreshTrackedSeries } from "@/atoms/tracking";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -36,7 +37,6 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
 import {
   asyncResultError,
   asyncResultLoading,
@@ -81,7 +81,7 @@ const SeriesDetailRouteComponent = () => {
   });
   const detailResult = useAtomValue(seriesDetail({ seriesId, sourceId }));
   const chaptersResult = useAtomValue(seriesChapters({ seriesId, sourceId }));
-  const settingsQuery = useSettingsBootstrap();
+  const settingsResult = useAtomValue(settingsBootstrapQuery);
   const libraryStateResult = useAtomValue(
     librarySeriesState({ seriesId, sourceId })
   );
@@ -110,7 +110,7 @@ const SeriesDetailRouteComponent = () => {
     asyncResultError(detailResult) ?? asyncResultError(chaptersResult);
   const isLoading =
     asyncResultLoading(detailResult) || asyncResultLoading(chaptersResult);
-  const settings = settingsQuery.data;
+  const settings = asyncResultValue(settingsResult);
 
   const enabledDestinations = useMemo(
     () =>
@@ -395,7 +395,7 @@ const SeriesDetailRouteComponent = () => {
                 )}
               </div>
 
-              {settingsQuery.isLoading ||
+              {asyncResultLoading(settingsResult) ||
               asyncResultLoading(libraryStateResult) ? (
                 <div className="space-y-3 p-4">
                   <Skeleton className="h-16 w-full" />
@@ -405,7 +405,7 @@ const SeriesDetailRouteComponent = () => {
               ) : null}
 
               <div className="space-y-5 p-4">
-                {!settingsQuery.isLoading &&
+                {!asyncResultLoading(settingsResult) &&
                 enabledDestinations.length === 0 ? (
                   <Alert>
                     <AlertTitle>No destination</AlertTitle>

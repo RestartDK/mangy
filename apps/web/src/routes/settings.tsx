@@ -1,8 +1,25 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { AsyncResult } from "effect/reactivity";
 import { Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
+import { reactivityKey } from "@/atoms/keys";
+import { updateNotificationPreferences } from "@/atoms/notifications";
+import {
+  browserPushClientState,
+  browserPushSettingsQuery,
+  createDestination,
+  deleteDestination,
+  removePushSubscription,
+  savePushSubscription,
+  sendTestPush,
+  settingsBootstrapQuery,
+  updateBrowserPushPreferences,
+} from "@/atoms/settings";
+import type { SettingsBootstrap } from "@/atoms/settings";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -35,21 +52,17 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
-  useBrowserPushClientState,
-  useConnectCurrentBrowserPush,
-  useDisconnectCurrentBrowserPush,
-} from "@/hooks/use-browser-push";
-import { useCreateDestination } from "@/hooks/use-create-destination";
-import { useDeleteDestination } from "@/hooks/use-delete-destination";
-import { usePushSettings } from "@/hooks/use-push-settings";
-import { useSendBrowserPushTest } from "@/hooks/use-send-browser-push-test";
-import { useSettingsBootstrap } from "@/hooks/use-settings-bootstrap";
-import type { SettingsBootstrap } from "@/hooks/use-settings-bootstrap";
-import { useUpdateBrowserPushPreferences } from "@/hooks/use-update-browser-push-preferences";
-import { useUpdateNotificationPreferences } from "@/hooks/use-update-notification-preferences";
+  asyncResultError,
+  asyncResultLoading,
+  asyncResultValue,
+} from "@/lib/async-result";
+import {
+  subscribeCurrentBrowserToPush,
+  unsubscribeCurrentBrowserFromPush,
+} from "@/lib/browser-push";
 import { formatDateTime, getErrorMessage } from "@/lib/format";
+import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
-import { runMutation } from "@/lib/run-mutation";
 
 const destinationFieldIds = {
   absolutePath: "destination-absolute-path",
@@ -106,17 +119,56 @@ const SettingsSkeleton = () => (
   </div>
 );
 const SettingsRouteComponent = () => {
-  const settingsQuery = useSettingsBootstrap();
-  const pushSettingsQuery = usePushSettings();
-  const browserPushClientStateQuery = useBrowserPushClientState();
-  const createDestination = useCreateDestination();
-  const deleteDestination = useDeleteDestination();
-  const updateNotificationPreferences = useUpdateNotificationPreferences();
+  const settingsResult = useAtomValue(settingsBootstrapQuery);
+  const pushSettingsResult = useAtomValue(browserPushSettingsQuery);
+  const clientStateResult = useAtomValue(browserPushClientState);
+  const createDestinationRequest = useAtomSet(createDestination, {
+    mode: "promise",
+  });
+  const deleteDestinationRequest = useAtomSet(deleteDestination, {
+    mode: "promise",
+  });
+  const saveNotificationPreferences = useAtomSet(
+    updateNotificationPreferences,
+    {
+      mode: "promise",
+    }
+  );
   const { setTheme, theme } = useTheme();
-  const updateBrowserPushPreferences = useUpdateBrowserPushPreferences();
-  const connectCurrentBrowserPush = useConnectCurrentBrowserPush();
-  const disconnectCurrentBrowserPush = useDisconnectCurrentBrowserPush();
-  const sendBrowserPushTest = useSendBrowserPushTest();
+  const saveBrowserPushPreferences = useAtomSet(updateBrowserPushPreferences, {
+    mode: "promise",
+  });
+  const connectCurrentBrowserPush = useAtomSet(savePushSubscription, {
+    mode: "promise",
+  });
+  const disconnectCurrentBrowserPush = useAtomSet(removePushSubscription, {
+    mode: "promise",
+  });
+  const sendBrowserPushTestRequest = useAtomSet(sendTestPush, {
+    mode: "promise",
+  });
+  const createDestinationResult = useAtomValue(createDestination);
+  const deleteDestinationResult = useAtomValue(deleteDestination);
+  const notificationPreferencesResult = useAtomValue(
+    updateNotificationPreferences
+  );
+  const browserPushPreferencesResult = useAtomValue(
+    updateBrowserPushPreferences
+  );
+  const connectPushResult = useAtomValue(savePushSubscription);
+  const disconnectPushResult = useAtomValue(removePushSubscription);
+  const sendPushTestResult = useAtomValue(sendTestPush);
+  const isSavingDestination = AsyncResult.isWaiting(createDestinationResult);
+  const isRemovingDestination = AsyncResult.isWaiting(deleteDestinationResult);
+  const isSavingNotificationPreferences = AsyncResult.isWaiting(
+    notificationPreferencesResult
+  );
+  const isSavingBrowserPushPreferences = AsyncResult.isWaiting(
+    browserPushPreferencesResult
+  );
+  const isConnectingPush = AsyncResult.isWaiting(connectPushResult);
+  const isDisconnectingPush = AsyncResult.isWaiting(disconnectPushResult);
+  const isSendingPushTest = AsyncResult.isWaiting(sendPushTestResult);
   const [name, setName] = useState("");
   const [absolutePath, setAbsolutePath] = useState("");
   const [komgaLibraryId, setKomgaLibraryId] = useState("");
@@ -126,6 +178,10 @@ const SettingsRouteComponent = () => {
   const [destinationPendingRemoval, setDestinationPendingRemoval] = useState<
     SettingsBootstrap["destinations"][number] | null
   >(null);
+
+  const settings = asyncResultValue(settingsResult);
+  const pushSettings = asyncResultValue(pushSettingsResult);
+  const browserPushClientStateValue = asyncResultValue(clientStateResult);
 
   useEffect(() => {
     setHasMounted(true);
@@ -138,80 +194,69 @@ const SettingsRouteComponent = () => {
   const [notifyOnSystemWarning, setNotifyOnSystemWarning] = useState(true);
 
   useEffect(() => {
-    if (!settingsQuery.data) {
+    if (!settings) {
       return;
     }
 
-    setInAppEnabled(settingsQuery.data.notifications.inAppEnabled);
-  }, [settingsQuery.data]);
+    setInAppEnabled(settings.notifications.inAppEnabled);
+  }, [settings]);
 
   useEffect(() => {
-    if (!pushSettingsQuery.data) {
+    if (!pushSettings) {
       return;
     }
 
-    setNotifyOnDownloadCompleted(
-      pushSettingsQuery.data.notifyOnDownloadCompleted
-    );
-    setNotifyOnDownloadFailed(pushSettingsQuery.data.notifyOnDownloadFailed);
-    setNotifyOnTrackedSeriesUpdate(
-      pushSettingsQuery.data.notifyOnTrackedSeriesUpdate
-    );
-    setNotifyOnSystemWarning(pushSettingsQuery.data.notifyOnSystemWarning);
-  }, [pushSettingsQuery.data]);
+    setNotifyOnDownloadCompleted(pushSettings.notifyOnDownloadCompleted);
+    setNotifyOnDownloadFailed(pushSettings.notifyOnDownloadFailed);
+    setNotifyOnTrackedSeriesUpdate(pushSettings.notifyOnTrackedSeriesUpdate);
+    setNotifyOnSystemWarning(pushSettings.notifyOnSystemWarning);
+  }, [pushSettings]);
 
   const hasBrowserPushPreferenceChanges = useMemo(() => {
-    if (!pushSettingsQuery.data) {
+    if (!pushSettings) {
       return false;
     }
 
     return (
-      notifyOnDownloadCompleted !==
-        pushSettingsQuery.data.notifyOnDownloadCompleted ||
-      notifyOnDownloadFailed !==
-        pushSettingsQuery.data.notifyOnDownloadFailed ||
+      notifyOnDownloadCompleted !== pushSettings.notifyOnDownloadCompleted ||
+      notifyOnDownloadFailed !== pushSettings.notifyOnDownloadFailed ||
       notifyOnTrackedSeriesUpdate !==
-        pushSettingsQuery.data.notifyOnTrackedSeriesUpdate ||
-      notifyOnSystemWarning !== pushSettingsQuery.data.notifyOnSystemWarning
+        pushSettings.notifyOnTrackedSeriesUpdate ||
+      notifyOnSystemWarning !== pushSettings.notifyOnSystemWarning
     );
   }, [
     notifyOnDownloadCompleted,
     notifyOnDownloadFailed,
     notifyOnTrackedSeriesUpdate,
     notifyOnSystemWarning,
-    pushSettingsQuery.data,
+    pushSettings,
   ]);
 
   const isLoading =
-    settingsQuery.isLoading ||
-    pushSettingsQuery.isLoading ||
-    browserPushClientStateQuery.isLoading;
+    asyncResultLoading(settingsResult) ||
+    asyncResultLoading(pushSettingsResult) ||
+    asyncResultLoading(clientStateResult);
 
   const pageError =
-    settingsQuery.error ??
-    pushSettingsQuery.error ??
-    browserPushClientStateQuery.error;
+    asyncResultError(settingsResult) ??
+    asyncResultError(pushSettingsResult) ??
+    asyncResultError(clientStateResult);
 
   const isCurrentBrowserPushEnabled = Boolean(
-    pushSettingsQuery.data?.isEnabled &&
-    browserPushClientStateQuery.data?.isSubscribed &&
-    browserPushClientStateQuery.data?.permission === "granted"
+    pushSettings?.isEnabled &&
+    browserPushClientStateValue?.isSubscribed &&
+    browserPushClientStateValue?.permission === "granted"
   );
 
   const browserPushPermissionLabel =
-    browserPushClientStateQuery.data?.permission === "secureContextRequired"
+    browserPushClientStateValue?.permission === "secureContextRequired"
       ? "requires HTTPS"
-      : (browserPushClientStateQuery.data?.permission ?? "unknown");
+      : (browserPushClientStateValue?.permission ?? "unknown");
 
-  const isBrowserPushTogglePending =
-    connectCurrentBrowserPush.isPending ||
-    disconnectCurrentBrowserPush.isPending;
+  const isBrowserPushTogglePending = isConnectingPush || isDisconnectingPush;
 
   const handleBrowserPushToggle = async (checked: boolean) => {
-    const pushSettings = pushSettingsQuery.data;
-    const browserPushClientState = browserPushClientStateQuery.data;
-
-    if (!(pushSettings && browserPushClientState)) {
+    if (!(pushSettings && browserPushClientStateValue)) {
       return;
     }
 
@@ -220,20 +265,107 @@ const SettingsRouteComponent = () => {
         return;
       }
 
-      await runMutation(
-        connectCurrentBrowserPush.mutateAsync({
-          vapidPublicKey: pushSettings.vapidPublicKey,
-        })
+      const subscription = await subscribeCurrentBrowserToPush(
+        pushSettings.vapidPublicKey
+      );
+
+      await notifyMutation(
+        connectCurrentBrowserPush({
+          payload: { ...subscription, userAgent: navigator.userAgent },
+          reactivityKeys: [
+            reactivityKey.browserPushClientState,
+            reactivityKey.browserPushSettings,
+          ],
+        }),
+        {
+          failure: "Unable to connect this browser for notifications",
+          success: "Browser notifications enabled on this browser",
+        }
       );
 
       return;
     }
 
-    await runMutation(disconnectCurrentBrowserPush.mutateAsync());
+    const endpoint = await unsubscribeCurrentBrowserFromPush();
+
+    if (!endpoint) {
+      return;
+    }
+
+    await notifyMutation(
+      disconnectCurrentBrowserPush({
+        payload: { endpoint },
+        reactivityKeys: [
+          reactivityKey.browserPushClientState,
+          reactivityKey.browserPushSettings,
+        ],
+      }),
+      {
+        failure: "Unable to disconnect this browser",
+        success: "Browser notifications disabled on this browser",
+      }
+    );
   };
 
-  const unreadCount = settingsQuery.data?.notifications.unreadCount ?? 0;
-  const permission = browserPushClientStateQuery.data?.permission;
+  const sendTestNotification = async (): Promise<void> => {
+    try {
+      const result = await sendBrowserPushTestRequest({
+        reactivityKeys: [reactivityKey.browserPushSettings],
+      });
+      const { deliveredCount: delivered } = result;
+
+      toast.success(
+        delivered === 1
+          ? "Test notification sent"
+          : `Test notification sent to ${delivered} browsers`
+      );
+    } catch (sendError) {
+      toast.error(
+        getErrorMessage(sendError, "Unable to send a browser test notification")
+      );
+    }
+  };
+
+  const addDestination = async (): Promise<void> => {
+    const saved = await notifyMutation(
+      createDestinationRequest({
+        payload: { absolutePath, isDefault, komgaLibraryId, name },
+        reactivityKeys: [reactivityKey.settingsBootstrap],
+      }),
+      { failure: "Unable to save destination", success: "Destination saved" }
+    );
+
+    if (saved) {
+      setAbsolutePath("");
+      setIsDefault(false);
+      setKomgaLibraryId("");
+      setName("");
+    }
+  };
+
+  const removeDestination = async (destinationId: string): Promise<void> => {
+    const removed = await notifyMutation(
+      deleteDestinationRequest({
+        params: { destinationId },
+        reactivityKeys: [
+          reactivityKey.settingsBootstrap,
+          reactivityKey.library,
+          reactivityKey.librarySeriesState,
+        ],
+      }),
+      {
+        failure: "Unable to remove destination",
+        success: "Destination removed",
+      }
+    );
+
+    if (removed) {
+      setDestinationPendingRemoval(null);
+    }
+  };
+
+  const unreadCount = settings?.notifications.unreadCount ?? 0;
+  const permission = browserPushClientStateValue?.permission;
   let permissionTone: StatusTone = "neutral";
   if (permission === "granted") {
     permissionTone = "success";
@@ -246,14 +378,14 @@ const SettingsRouteComponent = () => {
     <AppShell>
       <PageHeader title="Settings" />
 
-      {pageError ? (
+      {pageError === undefined ? null : (
         <Alert variant="destructive">
           <AlertTitle>Unable to load settings</AlertTitle>
           <AlertDescription>
             {getErrorMessage(pageError, "Try again in a moment.")}
           </AlertDescription>
         </Alert>
-      ) : null}
+      )}
 
       {isLoading ? <SettingsSkeleton /> : null}
 
@@ -268,13 +400,13 @@ const SettingsRouteComponent = () => {
                 <div className="row">
                   <dt className="meta">Name</dt>
                   <dd className="text-sm">
-                    {settingsQuery.data?.profile.name ?? "Not set"}
+                    {settings?.profile.name ?? "Not set"}
                   </dd>
                 </div>
                 <div className="row">
                   <dt className="meta">Email</dt>
                   <dd className="text-sm">
-                    {settingsQuery.data?.profile.email ?? "Not set"}
+                    {settings?.profile.email ?? "Not set"}
                   </dd>
                 </div>
               </dl>
@@ -330,20 +462,30 @@ const SettingsRouteComponent = () => {
               <div className="border-border flex justify-end border-t px-4 py-3">
                 <Button
                   disabled={
-                    updateNotificationPreferences.isPending ||
+                    isSavingNotificationPreferences ||
                     inAppEnabled ===
-                      (settingsQuery.data?.notifications.inAppEnabled ?? true)
+                      (settings?.notifications.inAppEnabled ?? true)
                   }
                   onClick={() => {
-                    updateNotificationPreferences.mutate({ inAppEnabled });
+                    void notifyMutation(
+                      saveNotificationPreferences({
+                        payload: { inAppEnabled },
+                        reactivityKeys: [
+                          reactivityKey.notificationPreferences,
+                          reactivityKey.settingsBootstrap,
+                        ],
+                      }),
+                      {
+                        failure: "Unable to update notification settings",
+                        success: "Notification settings updated",
+                      }
+                    );
                   }}
                   size="lg"
                   type="button"
                   variant="outline"
                 >
-                  {updateNotificationPreferences.isPending
-                    ? "Saving..."
-                    : "Save"}
+                  {isSavingNotificationPreferences ? "Saving..." : "Save"}
                 </Button>
               </div>
             </section>
@@ -354,12 +496,12 @@ const SettingsRouteComponent = () => {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <StatusBadge
                     tone={
-                      browserPushClientStateQuery.data?.isSupported
+                      browserPushClientStateValue?.isSupported
                         ? "success"
                         : "neutral"
                     }
                   >
-                    {browserPushClientStateQuery.data?.isSupported
+                    {browserPushClientStateValue?.isSupported
                       ? "Supported"
                       : "Not supported"}
                   </StatusBadge>
@@ -375,13 +517,13 @@ const SettingsRouteComponent = () => {
                   description="Register this browser for push delivery."
                   disabled={
                     isBrowserPushTogglePending ||
-                    !pushSettingsQuery.data?.isConfigured ||
-                    !browserPushClientStateQuery.data?.isSupported ||
-                    !browserPushClientStateQuery.data?.isSecureContext
+                    !pushSettings?.isConfigured ||
+                    !browserPushClientStateValue?.isSupported ||
+                    !browserPushClientStateValue?.isSecureContext
                   }
                   label="Enable on this browser"
                   onCheckedChange={(checked) => {
-                    void runMutation(handleBrowserPushToggle(checked));
+                    void handleBrowserPushToggle(checked);
                   }}
                 />
                 <ToggleRow
@@ -415,18 +557,18 @@ const SettingsRouteComponent = () => {
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <dt className="meta">Last delivery</dt>
                     <dd className="text-xs">
-                      {formatDateTime(pushSettingsQuery.data?.lastDeliveredAt)}
+                      {formatDateTime(pushSettings?.lastDeliveredAt)}
                     </dd>
                   </div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <dt className="meta">Last error</dt>
                     <dd className="text-xs">
-                      {pushSettingsQuery.data?.lastError ?? "None"}
+                      {pushSettings?.lastError ?? "None"}
                     </dd>
                   </div>
                 </dl>
 
-                {pushSettingsQuery.data?.isConfigured ? null : (
+                {pushSettings?.isConfigured ? null : (
                   <Alert>
                     <AlertTitle>Browser push is not configured</AlertTitle>
                     <AlertDescription>
@@ -436,7 +578,7 @@ const SettingsRouteComponent = () => {
                   </Alert>
                 )}
 
-                {browserPushClientStateQuery.data?.permission === "denied" ? (
+                {browserPushClientStateValue?.permission === "denied" ? (
                   <Alert variant="destructive">
                     <AlertTitle>Browser permission is blocked</AlertTitle>
                     <AlertDescription>
@@ -445,8 +587,8 @@ const SettingsRouteComponent = () => {
                   </Alert>
                 ) : null}
 
-                {browserPushClientStateQuery.data?.isSupported &&
-                !browserPushClientStateQuery.data.isSecureContext ? (
+                {browserPushClientStateValue?.isSupported &&
+                !browserPushClientStateValue.isSecureContext ? (
                   <Alert variant="destructive">
                     <AlertTitle>Needs HTTPS or localhost</AlertTitle>
                     <AlertDescription>
@@ -459,41 +601,47 @@ const SettingsRouteComponent = () => {
               <div className="border-border flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
                 <Button
                   disabled={
-                    updateBrowserPushPreferences.isPending ||
+                    isSavingBrowserPushPreferences ||
                     !hasBrowserPushPreferenceChanges
                   }
                   onClick={() => {
-                    updateBrowserPushPreferences.mutate({
-                      isEnabled: pushSettingsQuery.data?.isEnabled ?? false,
-                      notifyOnDownloadCompleted,
-                      notifyOnDownloadFailed,
-                      notifyOnSystemWarning,
-                      notifyOnTrackedSeriesUpdate,
-                    });
+                    void notifyMutation(
+                      saveBrowserPushPreferences({
+                        payload: {
+                          isEnabled: pushSettings?.isEnabled ?? false,
+                          notifyOnDownloadCompleted,
+                          notifyOnDownloadFailed,
+                          notifyOnSystemWarning,
+                          notifyOnTrackedSeriesUpdate,
+                        },
+                        reactivityKeys: [reactivityKey.browserPushSettings],
+                      }),
+                      {
+                        failure:
+                          "Unable to update browser notification settings",
+                        success: "Browser notification settings updated",
+                      }
+                    );
                   }}
                   size="lg"
                   type="button"
                   variant="outline"
                 >
-                  {updateBrowserPushPreferences.isPending
-                    ? "Saving..."
-                    : "Save"}
+                  {isSavingBrowserPushPreferences ? "Saving..." : "Save"}
                 </Button>
                 <Button
                   disabled={
-                    sendBrowserPushTest.isPending ||
-                    !pushSettingsQuery.data?.isConfigured ||
+                    isSendingPushTest ||
+                    !pushSettings?.isConfigured ||
                     !isCurrentBrowserPushEnabled
                   }
                   onClick={() => {
-                    sendBrowserPushTest.mutate();
+                    void sendTestNotification();
                   }}
                   size="lg"
                   type="button"
                 >
-                  {sendBrowserPushTest.isPending
-                    ? "Sending..."
-                    : "Send test notification"}
+                  {isSendingPushTest ? "Sending..." : "Send test notification"}
                 </Button>
               </div>
             </section>
@@ -503,13 +651,13 @@ const SettingsRouteComponent = () => {
             <div className="panel-header">
               <h2 className="panel-title">Destinations</h2>
               <span className="meta">
-                {settingsQuery.data?.destinations.length ?? 0} saved
+                {settings?.destinations.length ?? 0} saved
               </span>
             </div>
 
-            {settingsQuery.data?.destinations.length ? (
+            {settings?.destinations.length ? (
               <div className="rows">
-                {settingsQuery.data.destinations.map((destination) => (
+                {settings.destinations.map((destination) => (
                   <div className="row" key={destination.id}>
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -535,7 +683,7 @@ const SettingsRouteComponent = () => {
                     <Button
                       aria-label={`Remove ${destination.name}`}
                       className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
-                      disabled={deleteDestination.isPending}
+                      disabled={isRemovingDestination}
                       onClick={() => {
                         setDestinationPendingRemoval(destination);
                       }}
@@ -561,22 +709,7 @@ const SettingsRouteComponent = () => {
               onSubmit={(event) => {
                 event.preventDefault();
 
-                void runMutation(
-                  createDestination.mutateAsync({
-                    absolutePath,
-                    isDefault,
-                    komgaLibraryId,
-                    name,
-                  }),
-                  {
-                    onSuccess: () => {
-                      setAbsolutePath("");
-                      setIsDefault(false);
-                      setKomgaLibraryId("");
-                      setName("");
-                    },
-                  }
-                );
+                void addDestination();
               }}
             >
               <h3 className="panel-title">Add destination</h3>
@@ -644,14 +777,14 @@ const SettingsRouteComponent = () => {
               <Button
                 className="w-full"
                 disabled={
-                  createDestination.isPending ||
+                  isSavingDestination ||
                   name.trim().length === 0 ||
                   absolutePath.trim().length === 0
                 }
                 size="lg"
                 type="submit"
               >
-                {createDestination.isPending ? "Saving..." : "Save destination"}
+                {isSavingDestination ? "Saving..." : "Save destination"}
               </Button>
             </form>
           </section>
@@ -683,19 +816,15 @@ const SettingsRouteComponent = () => {
                   return;
                 }
 
-                void runMutation(deleteDestination.mutateAsync(destinationId), {
-                  onSuccess: () => {
-                    setDestinationPendingRemoval(null);
-                  },
-                });
+                void removeDestination(destinationId);
               }}
               type="button"
               variant="destructive"
             >
-              {deleteDestination.isPending ? "Removing..." : "Remove"}
+              {isRemovingDestination ? "Removing..." : "Remove"}
             </Button>
             <Button
-              disabled={deleteDestination.isPending}
+              disabled={isRemovingDestination}
               onClick={() => {
                 setDestinationPendingRemoval(null);
               }}
