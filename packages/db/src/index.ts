@@ -1,5 +1,4 @@
 import { PgClient, PgTypes } from "@effect/sql-pg";
-import { envConfig } from "@mangy/env";
 import { Config, ManagedRuntime, Result, Schema } from "effect";
 import type { Effect } from "effect";
 import type { SqlClient } from "effect/sql";
@@ -7,6 +6,7 @@ import { fragment, identifier } from "effect/sql/Statement";
 import type { Fragment } from "effect/sql/Statement";
 
 import { modelTables } from "./model";
+import { databaseConfig } from "./config";
 
 export type ModelName = keyof typeof modelTables;
 
@@ -20,7 +20,7 @@ const runtime = ManagedRuntime.make(
     // as UTC, so pin the session to UTC and writes and reads stay a fixed point
     // instead of shifting by the server's zone on every round trip.
     startupOptions: Config.succeed("-c TimeZone=UTC"),
-    url: envConfig.DATABASE_URL,
+    ...databaseConfig(),
   })
 );
 

@@ -3,10 +3,11 @@ import path from "node:path";
 
 import { BunRuntime } from "@effect/platform-bun";
 import { PgClient } from "@effect/sql-pg";
-import { envConfig } from "@mangy/env";
 import { Data, Effect } from "effect";
 import { Migrator, SqlClient, Statement } from "effect/sql";
 import type { SqlError } from "effect/sql";
+
+import { databaseConfig } from "./config";
 
 const migrationsDirectory = path.join(import.meta.dir, "migrations");
 const statementBreakpoint = "--> statement-breakpoint";
@@ -79,6 +80,6 @@ const program = Effect.gen(function* program() {
 
 BunRuntime.runMain(
   program.pipe(
-    Effect.provide(PgClient.layerConfig({ url: envConfig.DATABASE_URL }))
+    Effect.provide(PgClient.layerConfig(databaseConfig()))
   )
 );
