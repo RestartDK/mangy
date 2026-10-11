@@ -116,32 +116,4 @@ export const downloads = new Elysia({ prefix: "/api/downloads" })
         401: unauthorizedResponseSchema,
       },
     }
-  )
-  .post(
-    "/:jobId/prioritize",
-    async ({ params, request, set }) => {
-      const user = await getSessionUser(request);
-      if (!user) {
-        set.status = 401;
-        return { message: "Unauthorized" };
-      }
-
-      try {
-        return await DownloadsService.prioritize(user.id, params.jobId);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message:
-            error instanceof Error ? error.message : "Unable to reorder job",
-        };
-      }
-    },
-    {
-      params: downloadJobParamsSchema,
-      response: {
-        200: downloadJobSchema,
-        400: badRequestResponseSchema,
-        401: unauthorizedResponseSchema,
-      },
-    }
   );

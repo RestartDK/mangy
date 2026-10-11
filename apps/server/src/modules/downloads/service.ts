@@ -365,51 +365,6 @@ const retry = (userId: string, jobId: string) =>
     return serializeJob(updatedJob);
   });
 
-const prioritize = (userId: string, jobId: string) =>
-  Effect.gen(function* prioritizeEffect() {
-    const sql = yield* SqlClient.SqlClient;
-    const job = yield* getJob(userId, jobId);
-    if (!job) {
-      throw new Error("The requested queue job could not be found.");
-    }
-
-    if (!(job.status === "queued" || job.status === "retryableFailed")) {
-      throw new Error("Only queued jobs can be moved to the front.");
-    }
-
-    const earliestJobs = yield* decodeRows(
-      Schema.Struct({ created_at: DownloadJob.fields.createdAt }),
-      yield* sql`SELECT ${column(downloadJobColumns, "createdAt")} FROM ${table("downloadJob")}
-        WHERE ${column(downloadJobColumns, "userId")} = ${userId}
-          AND ${column(downloadJobColumns, "status")} IN ${sql.in(activeJobStatuses)}
-        ORDER BY ${column(downloadJobColumns, "createdAt")} ASC
-        LIMIT 1`
-    );
-
-    const [earliestJob] = earliestJobs;
-    const createdAt = earliestJob
-      ? new Date(earliestJob.created_at.getTime() - 1000)
-      : new Date(Date.now() - 1000);
-
-    yield* sql`UPDATE ${table("downloadJob")} SET ${updateRow(
-      sql,
-      downloadJobColumns,
-      {
-        createdAt,
-        updatedAt: new Date(),
-      }
-    )}
-      WHERE ${column(downloadJobColumns, "userId")} = ${userId}
-        AND ${column(downloadJobColumns, "id")} = ${jobId}`;
-
-    const updatedJob = yield* getJob(userId, jobId);
-    if (!updatedJob) {
-      throw new Error("The reordered queue job could not be loaded.");
-    }
-
-    return serializeJob(updatedJob);
-  });
-
 export const DownloadsService = {
   async cancel(userId: string, jobId: string) {
     return await runSql(cancel(userId, jobId));
@@ -435,10 +390,6 @@ export const DownloadsService = {
 
   async list(userId: string) {
     return await runSql(list(userId));
-  },
-
-  async prioritize(userId: string, jobId: string) {
-    return await runSql(prioritize(userId, jobId));
   },
 
   async retry(userId: string, jobId: string) {

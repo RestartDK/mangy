@@ -481,12 +481,6 @@ describe("server and worker integration", () => {
     );
     expect(queuedJob.status).toBe("queued");
 
-    const prioritizeResponse = await apiFetch(
-      `/api/downloads/${queuedJob.id}/prioritize`,
-      { method: "POST" }
-    );
-    expect(prioritizeResponse.status).toBe(200);
-
     const cancelResponse = await apiFetch(
       `/api/downloads/${queuedJob.id}/cancel`,
       {
