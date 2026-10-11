@@ -2,14 +2,19 @@ import type { CheerioAPI } from "cheerio";
 import { Effect } from "effect";
 
 import { SourceParseError } from "../errors";
+import {
+  decodeSourceChapter,
+  decodeSourceFilterDefinitions,
+  decodeSourceListResponse,
+  decodeSourcePageList,
+  decodeSourceSeries,
+} from "../schemas";
 import type {
   SourceAdapter,
   SourceChapter,
   SourceFilterDefinition,
   SourceFilterOption,
   SourceListResponse,
-  SourcePage,
-  SourcePageList,
   SourceSearchInput,
   SourceSeries,
   SourceSeriesStatus,
@@ -258,7 +263,7 @@ const attemptParse = <TResult>(
 
 const getCachedFilters = (): Effect.Effect<
   SourceFilterDefinition[],
-  HttpError
+  HttpError | SourceParseError
 > =>
   Effect.gen(function* getCachedFiltersEffect() {
     if (cachedFilters && cachedFilters.expiresAt > Date.now()) {
@@ -317,12 +322,16 @@ const getCachedFilters = (): Effect.Effect<
       },
     ];
 
+    const parsedFilters = yield* attemptParse(() =>
+      decodeSourceFilterDefinitions(filters)
+    );
+
     cachedFilters = {
       expiresAt: Date.now() + filterCacheTtlMs,
-      filters,
+      filters: [...parsedFilters],
     };
 
-    return filters;
+    return [...parsedFilters];
   });
 
 const getFilterStrings = (value: unknown): string[] => {
@@ -373,11 +382,8 @@ const applySearchFilters = (
   }
 };
 
-const cleanTitle = (
-  value: string | null | undefined,
-  fallback: string
-): string =>
-  (normalizeText(value) || fallback).replace(titleSuffixPattern, "").trim();
+const cleanTitle = (value: string | null | undefined): string =>
+  normalizeText(value).replace(titleSuffixPattern, "").trim();
 
 const getDetailValue = ($: CheerioAPI, label: string): string | null => {
   const strong = $("strong")
@@ -468,7 +474,7 @@ const parseSeriesDetail = (
   const tags = getDetailList($, "Tags(s):");
   const adultContent = getDetailValue($, "Adult Content:");
 
-  return {
+  return decodeSourceSeries({
     artistNames: [],
     authorNames: getDetailList($, "Author(s):"),
     availableTranslatedLanguages: [sourceLanguage],
@@ -494,8 +500,8 @@ const parseSeriesDetail = (
     publicationDemographic: inferPublicationDemographic(tags),
     status: mapStatus(getDetailValue($, "Status:")),
     tags,
-    title: cleanTitle($("title").text(), context.slug.replaceAll("-", " ")),
-  };
+    title: cleanTitle($("title").text()),
+  });
 };
 
 const parseChapterId = (url: string): string | null => {
@@ -534,7 +540,7 @@ const parseChapters = (html: string): SourceChapter[] => {
       const title = nullableText(chapterLabel.replace(titlePrefixPattern, ""));
       const publishedAtValue = nullableText(link.find("time").attr("datetime"));
 
-      return {
+      return decodeSourceChapter({
         chapterNumber,
         externalId: chapterId,
         externalUrl: chapterUrl,
@@ -547,7 +553,7 @@ const parseChapters = (html: string): SourceChapter[] => {
         title: hasText(title) && title !== chapterLabel ? title : null,
         translatedLanguage: sourceLanguage,
         volumeNumber: null,
-      } satisfies SourceChapter;
+      });
     })
     .filter((chapter) => chapter !== null);
 
@@ -632,8 +638,7 @@ const parseSearchResultCard = (
   );
   const title = cleanTitle(
     details.find('a[href*="/series/"]').last().text() ||
-      card.find("h2").first().text(),
-    context.slug.replaceAll("-", " ")
+      card.find("h2").first().text()
   );
   const tags = uniqueStrings(
     details
@@ -671,7 +676,7 @@ const parseSearchResultCard = (
       .text()
   );
 
-  return {
+  return decodeSourceSeries({
     artistNames: [],
     authorNames,
     availableTranslatedLanguages: [sourceLanguage],
@@ -686,7 +691,7 @@ const parseSearchResultCard = (
     status,
     tags,
     title,
-  };
+  });
 };
 
 const searchSeriesList = (
@@ -719,12 +724,19 @@ const searchSeriesList = (
         .filter((item): item is SourceSeries => item !== null);
     });
 
+    const response = yield* attemptParse(() =>
+      decodeSourceListResponse({
+        hasNextPage: items.length === pageSize,
+        items: [...items],
+        page,
+        pageSize,
+        total: null,
+      })
+    );
+
     return {
-      hasNextPage: items.length === pageSize,
-      items,
-      page,
-      pageSize,
-      total: null,
+      ...response,
+      items: [...response.items],
     };
   });
 
@@ -742,7 +754,7 @@ export const createWeebCentralSourceAdapter = (
         );
         const { html } = yield* fetchHtmlPage(url);
 
-        return parseChapters(html);
+        return yield* attemptParse(() => parseChapters(html));
       }),
     getFilters: getCachedFilters(),
     getLatest: (page, pageSize) =>
@@ -769,18 +781,16 @@ export const createWeebCentralSourceAdapter = (
           imageUrls = parsePageImageUrls(html);
         }
 
-        const pages: SourcePage[] = imageUrls.map((imageUrl, index) => ({
-          headers: { ...imageRequestHeaders },
-          imageUrl,
-          index,
-          referer: chapterUrl,
-        }));
-
-        const pageList: SourcePageList = {
-          pages,
-        };
-
-        return pageList;
+        return yield* attemptParse(() =>
+          decodeSourcePageList({
+            pages: imageUrls.map((imageUrl, index) => ({
+              headers: { ...imageRequestHeaders },
+              imageUrl,
+              index,
+              referer: chapterUrl,
+            })),
+          })
+        );
       }),
     getPopular: (page, pageSize) =>
       searchSeriesList({ page, pageSize }, "Popularity"),
@@ -788,7 +798,7 @@ export const createWeebCentralSourceAdapter = (
       Effect.gen(function* getSeriesEffect() {
         const { context, html } = yield* fetchSeriesDetail(seriesId);
 
-        return parseSeriesDetail(html, context);
+        return yield* attemptParse(() => parseSeriesDetail(html, context));
       }),
     metadata: {
       capabilities: {

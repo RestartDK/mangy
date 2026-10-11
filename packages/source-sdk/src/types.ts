@@ -1,6 +1,15 @@
 import type { Effect } from "effect";
 
 import type { SourceAdapterError } from "./errors";
+import type {
+  sourceChapterSchema,
+  sourceFilterOptionSchema,
+  sourceFilterSchema,
+  sourcePageListSchema,
+  sourcePageSchema,
+  sourceSeriesSchema,
+  sourceSeriesStatusSchema,
+} from "./schemas";
 
 export interface SourceCapabilities {
   supportsPopular: boolean;
@@ -13,38 +22,24 @@ export interface SourceCapabilities {
   supportsPageFetch: boolean;
 }
 
-export interface SourceFilterOption {
-  label: string;
-  value: string;
-}
+export type SourceFilterOption = typeof sourceFilterOptionSchema.Type;
 
-export interface SourceSelectFilter {
-  type: "select";
-  key: string;
-  label: string;
-  options: SourceFilterOption[];
-  defaultValue?: string;
-}
+export type SourceFilterDefinition = typeof sourceFilterSchema.Type;
 
-export interface SourceMultiSelectFilter {
-  type: "multiSelect";
-  key: string;
-  label: string;
-  options: SourceFilterOption[];
-  defaultValue?: string[];
-}
+export type SourceSelectFilter = Extract<
+  SourceFilterDefinition,
+  { type: "select" }
+>;
 
-export interface SourceToggleFilter {
-  type: "toggle";
-  key: string;
-  label: string;
-  defaultValue?: boolean;
-}
+export type SourceMultiSelectFilter = Extract<
+  SourceFilterDefinition,
+  { type: "multiSelect" }
+>;
 
-export type SourceFilterDefinition =
-  | SourceSelectFilter
-  | SourceMultiSelectFilter
-  | SourceToggleFilter;
+export type SourceToggleFilter = Extract<
+  SourceFilterDefinition,
+  { type: "toggle" }
+>;
 
 export interface SourceMetadata {
   id: string;
@@ -57,53 +52,15 @@ export interface SourceMetadata {
   capabilities: SourceCapabilities;
 }
 
-export type SourceSeriesStatus =
-  | "ongoing"
-  | "completed"
-  | "hiatus"
-  | "cancelled"
-  | "unknown";
+export type SourceSeriesStatus = typeof sourceSeriesStatusSchema.Type;
 
-export interface SourceSeries {
-  externalId: string;
-  title: string;
-  description: string | null;
-  canonicalUrl: string | null;
-  coverImageUrl: string | null;
-  status: SourceSeriesStatus;
-  originalLanguage: string | null;
-  latestChapter: string | null;
-  contentRating: string | null;
-  publicationDemographic: string | null;
-  authorNames: string[];
-  artistNames: string[];
-  tags: string[];
-  availableTranslatedLanguages: string[];
-}
+export type SourceSeries = typeof sourceSeriesSchema.Type;
 
-export interface SourceChapter {
-  externalId: string;
-  title: string | null;
-  chapterNumber: string | null;
-  volumeNumber: string | null;
-  translatedLanguage: string | null;
-  externalUrl: string | null;
-  sourceOrder: string | null;
-  pageCount: number | null;
-  publishedAt: Date | null;
-  isUnavailable: boolean;
-}
+export type SourceChapter = typeof sourceChapterSchema.Type;
 
-export interface SourcePage {
-  index: number;
-  imageUrl: string;
-  headers?: Record<string, string>;
-  referer?: string;
-}
+export type SourcePage = typeof sourcePageSchema.Type;
 
-export interface SourcePageList {
-  pages: SourcePage[];
-}
+export type SourcePageList = typeof sourcePageListSchema.Type;
 
 export interface SourceListResponse<TItem> {
   items: TItem[];
