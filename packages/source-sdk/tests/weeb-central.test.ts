@@ -95,6 +95,20 @@ describe("WeebCentral adapter", () => {
     expect(searchResult.total).toBeNull();
   });
 
+  test("stops paging once the source window is exhausted", async () => {
+    const adapter = createWeebCentralSourceAdapter();
+    const searchResult = await Effect.runPromise(
+      adapter.searchSeries({
+        page: 1,
+        pageSize: 3,
+        query: "one piece",
+      })
+    );
+
+    expect(searchResult.items).toHaveLength(3);
+    expect(searchResult.hasNextPage).toBe(false);
+  });
+
   test("parses series details, chapters, and browser-backed page extraction", async () => {
     const adapter = createWeebCentralSourceAdapter({
       renderChapterPageImages() {

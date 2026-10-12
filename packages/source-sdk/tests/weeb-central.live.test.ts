@@ -39,6 +39,24 @@ if (liveSourceTestsEnabled) {
     expect(pages.pages[0]?.referer).toBeString();
   });
 
+  test("WeebCentral live search pages past the first window", async () => {
+    const adapter = createWeebCentralSourceAdapter();
+    const first = await Effect.runPromise(
+      adapter.searchSeries({ page: 1, pageSize: 12, query: "one" })
+    );
+    const second = await Effect.runPromise(
+      adapter.searchSeries({ page: 2, pageSize: 12, query: "one" })
+    );
+    const firstIds = new Set(first.items.map((item) => item.externalId));
+
+    expect(first.items).toHaveLength(12);
+    expect(first.hasNextPage).toBe(true);
+    expect(second.items).toHaveLength(12);
+    expect(second.items.some((item) => firstIds.has(item.externalId))).toBe(
+      false
+    );
+  });
+
   test("browser helper renders WeebCentral chapter pages with page images", async () => {
     const adapter = createWeebCentralSourceAdapter();
     const popular = await Effect.runPromise(adapter.getPopular(1, 1));
