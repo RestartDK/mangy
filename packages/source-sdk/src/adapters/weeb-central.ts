@@ -33,8 +33,10 @@ import type { HttpError } from "./shared/http";
 const sourceBaseUrl = "https://weebcentral.com/";
 const searchPageUrl = new URL("search", sourceBaseUrl);
 const sourceLanguage = "en";
+// search/data answers with a fixed window and ignores the limit it is sent.
+const sourceWindowSize = 32;
 const defaultPageSize = 12;
-const maxPageSize = 24;
+const maxPageSize = Math.min(24, sourceWindowSize);
 const filterCacheTtlMs = 1000 * 60 * 60;
 const pageImageSelector = 'img[alt^="Page"]';
 const searchDisplayMode = "Full Display";
@@ -715,7 +717,7 @@ const searchSeriesList = (
     const { html } = yield* fetchHtmlPage(
       new URL(`search/data?${searchParams.toString()}`, sourceBaseUrl)
     );
-    const items = yield* attemptParse(() => {
+    const fetchedItems = yield* attemptParse(() => {
       const $ = loadDocument(html);
 
       return $("article")
@@ -723,10 +725,11 @@ const searchSeriesList = (
         .map((element) => parseSearchResultCard($, element))
         .filter((item): item is SourceSeries => item !== null);
     });
+    const items = fetchedItems.slice(0, pageSize);
 
     const response = yield* attemptParse(() =>
       decodeSourceListResponse({
-        hasNextPage: items.length === pageSize,
+        hasNextPage: fetchedItems.length > items.length,
         items: [...items],
         page,
         pageSize,
