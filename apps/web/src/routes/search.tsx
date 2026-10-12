@@ -4,11 +4,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { ArrowDown, ArrowUp, Filter, Loader2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   searchIdle,
   searchPagesWithHistory,
+  searchQuery,
+  searchQueryInput,
   sourceFilters,
   sourceFiltersIdle,
   sourcesQuery,
@@ -55,7 +57,6 @@ import {
   withoutFilter,
 } from "@/lib/search-filters";
 
-const SEARCH_DEBOUNCE_MS = 350;
 const ASCENDING_VALUE_PATTERN = /^asc/iu;
 const DESCENDING_VALUE_PATTERN = /^desc/iu;
 
@@ -213,9 +214,11 @@ const SearchRouteComponent = () => {
   const sourcesResult = useAtomValue(sourcesQuery);
   const sources = Option.getOrElse(AsyncResult.value(sourcesResult), () => []);
   const sourceId = sources.find((source) => source.isEnabled)?.id ?? "";
+  const queryInput = useAtomValue(searchQueryInput);
+  const query = useAtomValue(searchQuery);
+  const setQueryInput = useAtomSet(searchQueryInput);
+  const setQuery = useAtomSet(searchQuery);
 
-  const [queryInput, setQueryInput] = useState("");
-  const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Record<string, unknown>>({});
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
@@ -223,16 +226,6 @@ const SearchRouteComponent = () => {
     hasText(sourceId) ? sourceFilters({ sourceId }) : sourceFiltersIdle
   );
   const definitionsValue = AsyncResult.value(filtersResult);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setQuery(queryInput.trim());
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [queryInput]);
 
   const definitions = useMemo(
     () => Option.getOrElse(definitionsValue, () => []),
