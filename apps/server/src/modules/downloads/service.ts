@@ -17,6 +17,14 @@ import {
   libraryEntryColumns,
   seriesColumns,
 } from "@mangy/db/model";
+import type {
+  DownloadDestinationId,
+  DownloadJobId,
+  SourceChapterId,
+  SourceId,
+  SourceSeriesId,
+  UserId,
+} from "@mangy/db/model";
 import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { Fragment } from "effect/sql/Statement";
@@ -84,7 +92,7 @@ const baseQuery = (
   LEFT JOIN ${table("downloadDestination")} ON ${table("downloadJob")}.${column(downloadJobColumns, "downloadDestinationId")} = ${table("downloadDestination")}.${column(downloadDestinationColumns, "id")}
   WHERE ${sql.and(extra)}`;
 
-const list = (userId: string) =>
+const list = (userId: UserId) =>
   Effect.gen(function* listEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -98,7 +106,7 @@ const list = (userId: string) =>
     return rows.map(serializeJob);
   });
 
-const getJob = (userId: string, jobId: string) =>
+const getJob = (userId: UserId, jobId: DownloadJobId) =>
   Effect.gen(function* getJobEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -115,8 +123,8 @@ const getJob = (userId: string, jobId: string) =>
   });
 
 const resolveDestination = (
-  userId: string,
-  requestedDestinationId: string | undefined
+  userId: UserId,
+  requestedDestinationId: DownloadDestinationId | undefined
 ) =>
   Effect.gen(function* resolveDestinationEffect() {
     const sql = yield* SqlClient.SqlClient;
@@ -170,12 +178,12 @@ const resolveDestination = (
   });
 
 const enqueue = (
-  userId: string,
+  userId: UserId,
   input: {
-    sourceId: string;
-    seriesId: string;
-    chapterId: string;
-    downloadDestinationId?: string;
+    sourceId: SourceId;
+    seriesId: SourceSeriesId;
+    chapterId: SourceChapterId;
+    downloadDestinationId?: DownloadDestinationId;
   }
 ) =>
   Effect.gen(function* enqueueEffect() {
@@ -284,7 +292,7 @@ const enqueue = (
     return serializeJob(job);
   });
 
-const cancel = (userId: string, jobId: string) =>
+const cancel = (userId: UserId, jobId: DownloadJobId) =>
   Effect.gen(function* cancelEffect() {
     const sql = yield* SqlClient.SqlClient;
     const job = yield* getJob(userId, jobId);
@@ -324,7 +332,7 @@ const cancel = (userId: string, jobId: string) =>
     return serializeJob(updatedJob);
   });
 
-const retry = (userId: string, jobId: string) =>
+const retry = (userId: UserId, jobId: DownloadJobId) =>
   Effect.gen(function* retryEffect() {
     const sql = yield* SqlClient.SqlClient;
     const job = yield* getJob(userId, jobId);
@@ -367,33 +375,33 @@ const retry = (userId: string, jobId: string) =>
   });
 
 export const DownloadsService = {
-  async cancel(userId: string, jobId: string) {
+  async cancel(userId: UserId, jobId: DownloadJobId) {
     return await runSql(cancel(userId, jobId));
   },
 
   async enqueue(
-    userId: string,
+    userId: UserId,
     input: {
-      sourceId: string;
-      seriesId: string;
-      chapterId: string;
-      downloadDestinationId?: string;
+      sourceId: SourceId;
+      seriesId: SourceSeriesId;
+      chapterId: SourceChapterId;
+      downloadDestinationId?: DownloadDestinationId;
     }
   ) {
     return await runSql(enqueue(userId, input));
   },
 
-  async getJob(userId: string, jobId: string) {
+  async getJob(userId: UserId, jobId: DownloadJobId) {
     const job = await runSql(getJob(userId, jobId));
 
     return job ?? null;
   },
 
-  async list(userId: string) {
+  async list(userId: UserId) {
     return await runSql(list(userId));
   },
 
-  async retry(userId: string, jobId: string) {
+  async retry(userId: UserId, jobId: DownloadJobId) {
     return await runSql(retry(userId, jobId));
   },
 };

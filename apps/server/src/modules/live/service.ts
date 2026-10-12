@@ -9,12 +9,13 @@ import {
   notificationColumns,
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
+import type { UserId } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { SqlError } from "effect/sql";
 
 const getSnapshot = (
-  userId: string
+  userId: UserId
 ): Effect.Effect<
   LiveSnapshot,
   Schema.SchemaError | SqlError.SqlError,
@@ -88,7 +89,7 @@ const getSnapshot = (
   });
 
 export const LiveService = {
-  async loadSnapshot(userId: string) {
+  async loadSnapshot(userId: UserId) {
     return await runSql(getSnapshot(userId));
   },
 };

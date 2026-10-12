@@ -1,5 +1,10 @@
 import { column, decodeRows, runSql, table } from "@mangy/db";
-import { sourceColumns, sourceRow } from "@mangy/db/model";
+import {
+  decodeSourceSeriesId,
+  sourceColumns,
+  sourceRow,
+} from "@mangy/db/model";
+import type { SourceId } from "@mangy/db/model";
 import type {
   SourceFilterDefinition,
   SourceListResponse,
@@ -19,7 +24,7 @@ interface DiscoverSection {
   items: SourceSeries[];
 }
 
-const mapSeriesResponse = (sourceId: string, item: SourceSeries) => ({
+const mapSeriesResponse = (sourceId: SourceId, item: SourceSeries) => ({
   artistNames: item.artistNames,
   authorNames: item.authorNames,
   availableTranslatedLanguages: item.availableTranslatedLanguages,
@@ -30,7 +35,7 @@ const mapSeriesResponse = (sourceId: string, item: SourceSeries) => ({
   latestChapter: item.latestChapter,
   originalLanguage: item.originalLanguage,
   publicationDemographic: item.publicationDemographic,
-  seriesId: item.externalId,
+  seriesId: decodeSourceSeriesId(item.externalId),
   sourceId,
   status: item.status,
   tags: item.tags,
@@ -38,7 +43,7 @@ const mapSeriesResponse = (sourceId: string, item: SourceSeries) => ({
 });
 
 const mapListResponse = (
-  sourceId: string,
+  sourceId: SourceId,
   response: SourceListResponse<SourceSeries>
 ) => ({
   hasNextPage: response.hasNextPage,
@@ -86,7 +91,7 @@ const list = Effect.gen(function* listEffect() {
 });
 
 export const SourcesService = {
-  async getDiscover(sourceId: string, limit?: number) {
+  async getDiscover(sourceId: SourceId, limit?: number) {
     return await runSql(
       Effect.gen(function* getDiscoverEffect() {
         const adapter = SourcesService.getSourceOrThrow(sourceId);
@@ -145,12 +150,12 @@ export const SourcesService = {
     );
   },
 
-  async getFilters(sourceId: string): Promise<SourceFilterDefinition[]> {
+  async getFilters(sourceId: SourceId): Promise<SourceFilterDefinition[]> {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
     return await runSql(adapter.getFilters);
   },
 
-  getSourceOrThrow(sourceId: string) {
+  getSourceOrThrow(sourceId: SourceId) {
     const adapter = sourceRegistry.get(sourceId);
     if (!adapter) {
       throw new Error(`Unknown source: ${sourceId}`);
@@ -165,7 +170,7 @@ export const SourcesService = {
     return await runSql(list);
   },
 
-  async search(sourceId: string, input: SourceSearchInput) {
+  async search(sourceId: SourceId, input: SourceSearchInput) {
     return await runSql(
       Effect.gen(function* searchEffect() {
         const adapter = SourcesService.getSourceOrThrow(sourceId);

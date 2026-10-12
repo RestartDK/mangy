@@ -1,5 +1,6 @@
 import { Api } from "@mangy/contract";
 import type { LiveEvent, LiveSnapshot } from "@mangy/contract";
+import type { UserId } from "@mangy/db/model";
 import { Duration, Effect, Schedule, Stream } from "effect";
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
 
@@ -23,7 +24,7 @@ const stateEvent = (previous: LiveSnapshot, next: LiveSnapshot): LiveEvent => ({
   event: "state",
 });
 
-const snapshotPoll = (userId: string, initial: LiveSnapshot) =>
+const snapshotPoll = (userId: UserId, initial: LiveSnapshot) =>
   Stream.fromSchedule(Schedule.spaced(pollInterval)).pipe(
     Stream.mapAccumEffect(
       () => initial,
@@ -47,7 +48,7 @@ const heartbeat = Stream.fromSchedule(Schedule.spaced(heartbeatInterval)).pipe(
   }))
 );
 
-const liveEvents = (userId: string, initial: LiveSnapshot) =>
+const liveEvents = (userId: UserId, initial: LiveSnapshot) =>
   Stream.concat(
     Stream.make({
       data: { snapshot: initial },

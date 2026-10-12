@@ -9,9 +9,13 @@ import {
 import {
   Series,
   chapterColumns,
+  decodeSourceChapterId,
+  decodeSourceId,
+  decodeSourceSeriesId,
   seriesColumns,
   sourceColumns,
 } from "@mangy/db/model";
+import type { SeriesId, SourceId, SourceSeriesId } from "@mangy/db/model";
 import type {
   SourceAdapter,
   SourceChapter,
@@ -20,7 +24,7 @@ import type {
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
-const mapSeriesValues = (sourceId: string, item: SourceSeries) => ({
+const mapSeriesValues = (sourceId: SourceId, item: SourceSeries) => ({
   artistNames: item.artistNames,
   authorNames: item.authorNames,
   availableTranslatedLanguages: item.availableTranslatedLanguages,
@@ -28,7 +32,7 @@ const mapSeriesValues = (sourceId: string, item: SourceSeries) => ({
   contentRating: item.contentRating,
   coverImageUrl: item.coverImageUrl,
   description: item.description,
-  externalId: item.externalId,
+  externalId: decodeSourceSeriesId(item.externalId),
   lastFetchedAt: new Date(),
   latestChapter: item.latestChapter,
   originalLanguage: item.originalLanguage,
@@ -39,9 +43,9 @@ const mapSeriesValues = (sourceId: string, item: SourceSeries) => ({
   title: item.title,
 });
 
-const mapChapterValues = (seriesId: string, item: SourceChapter) => ({
+const mapChapterValues = (seriesId: SeriesId, item: SourceChapter) => ({
   chapterNumber: item.chapterNumber,
-  externalId: item.externalId,
+  externalId: decodeSourceChapterId(item.externalId),
   externalUrl: item.externalUrl,
   isUnavailable: item.isUnavailable,
   pageCount: item.pageCount,
@@ -56,7 +60,7 @@ const mapChapterValues = (seriesId: string, item: SourceChapter) => ({
 const mapSourceValues = (adapter: SourceAdapter) => ({
   description: adapter.metadata.description,
   iconUrl: adapter.metadata.iconUrl ?? null,
-  id: adapter.metadata.id,
+  id: decodeSourceId(adapter.metadata.id),
   isEnabled: true,
   languageCode: adapter.metadata.languageCode,
   name: adapter.metadata.name,
@@ -101,7 +105,7 @@ const syncSource = (adapter: SourceAdapter) =>
       )}`;
   });
 
-const upsertSeriesItem = (sourceId: string, item: SourceSeries) =>
+const upsertSeriesItem = (sourceId: SourceId, item: SourceSeries) =>
   Effect.gen(function* upsertSeriesItemEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -154,7 +158,7 @@ const upsertSeriesItem = (sourceId: string, item: SourceSeries) =>
     };
   });
 
-const upsertChapters = (seriesId: string, items: SourceChapter[]) =>
+const upsertChapters = (seriesId: SeriesId, items: SourceChapter[]) =>
   Effect.gen(function* upsertChaptersEffect() {
     const sql = yield* SqlClient.SqlClient;
 
@@ -186,7 +190,7 @@ const upsertChapters = (seriesId: string, items: SourceChapter[]) =>
     }
   });
 
-const findSeriesRecord = (sourceId: string, externalId: string) =>
+const findSeriesRecord = (sourceId: SourceId, externalId: SourceSeriesId) =>
   Effect.gen(function* findSeriesRecordEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -201,9 +205,9 @@ const findSeriesRecord = (sourceId: string, externalId: string) =>
 
 export const SourcesStorage = {
   async findSeriesRecord(
-    sourceId: string,
-    externalId: string
-  ): Promise<{ id: string } | null> {
+    sourceId: SourceId,
+    externalId: SourceSeriesId
+  ): Promise<{ id: SeriesId } | null> {
     return await runSql(findSeriesRecord(sourceId, externalId));
   },
 
@@ -214,22 +218,22 @@ export const SourcesStorage = {
   },
 
   async upsertChapters(
-    seriesId: string,
+    seriesId: SeriesId,
     items: SourceChapter[]
   ): Promise<void> {
     await runSql(upsertChapters(seriesId, items));
   },
 
-  async upsertSeries(sourceId: string, items: SourceSeries[]): Promise<void> {
+  async upsertSeries(sourceId: SourceId, items: SourceSeries[]): Promise<void> {
     for (const item of items) {
       await SourcesStorage.upsertSeriesItem(sourceId, item);
     }
   },
 
   async upsertSeriesItem(
-    sourceId: string,
+    sourceId: SourceId,
     item: SourceSeries
-  ): Promise<{ id: string; sourceId: string; externalId: string }> {
+  ): Promise<{ id: SeriesId; sourceId: SourceId; externalId: SourceSeriesId }> {
     return await runSql(upsertSeriesItem(sourceId, item));
   },
 };

@@ -1,4 +1,10 @@
 import { runSql } from "@mangy/db";
+import { decodeSourceChapterId, decodeSourceSeriesId } from "@mangy/db/model";
+import type {
+  SourceChapterId,
+  SourceId,
+  SourceSeriesId,
+} from "@mangy/db/model";
 import type { SourceChapter, SourcePage } from "@mangy/source-sdk";
 import { Effect } from "effect";
 
@@ -6,9 +12,9 @@ import { SourcesService } from "../sources/service";
 import { SourcesStorage } from "../sources/storage";
 
 const proxiedPagePath = (
-  sourceId: string,
-  seriesId: string,
-  chapterId: string,
+  sourceId: SourceId,
+  seriesId: SourceSeriesId,
+  chapterId: SourceChapterId,
   pageIndex: number
 ) =>
   `/api/series/${encodeURIComponent(seriesId)}/chapters/${encodeURIComponent(chapterId)}/pages/${pageIndex}/image?sourceId=${encodeURIComponent(sourceId)}`;
@@ -51,7 +57,7 @@ export class SeriesServiceError extends Error {
 }
 
 const toSeriesResponse = (
-  sourceId: string,
+  sourceId: SourceId,
   item: {
     externalId: string;
     title: string;
@@ -79,7 +85,7 @@ const toSeriesResponse = (
   latestChapter: item.latestChapter,
   originalLanguage: item.originalLanguage,
   publicationDemographic: item.publicationDemographic,
-  seriesId: item.externalId,
+  seriesId: decodeSourceSeriesId(item.externalId),
   sourceId,
   status: item.status,
   tags: item.tags,
@@ -87,7 +93,7 @@ const toSeriesResponse = (
 });
 
 const toChapterResponse = (item: SourceChapter) => ({
-  chapterId: item.externalId,
+  chapterId: decodeSourceChapterId(item.externalId),
   chapterNumber: item.chapterNumber,
   externalUrl: item.externalUrl,
   isUnavailable: item.isUnavailable,
@@ -101,9 +107,9 @@ const toChapterResponse = (item: SourceChapter) => ({
 
 const toPageResponse = (
   requestUrl: string,
-  sourceId: string,
-  seriesId: string,
-  chapterId: string,
+  sourceId: SourceId,
+  seriesId: SourceSeriesId,
+  chapterId: SourceChapterId,
   item: SourcePage
 ) => ({
   imageUrl: new URL(
@@ -114,7 +120,7 @@ const toPageResponse = (
 });
 
 export const SeriesService = {
-  async getChapters(sourceId: string, seriesId: string) {
+  async getChapters(sourceId: SourceId, seriesId: SourceSeriesId) {
     return await runSql(
       Effect.gen(function* getChaptersEffect() {
         const adapter = SourcesService.getSourceOrThrow(sourceId);
@@ -133,9 +139,9 @@ export const SeriesService = {
   },
 
   async getPages(
-    sourceId: string,
-    seriesId: string,
-    chapterId: string,
+    sourceId: SourceId,
+    seriesId: SourceSeriesId,
+    chapterId: SourceChapterId,
     requestUrl: string
   ) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
@@ -165,7 +171,7 @@ export const SeriesService = {
     );
   },
 
-  async getSeries(sourceId: string, seriesId: string) {
+  async getSeries(sourceId: SourceId, seriesId: SourceSeriesId) {
     return await runSql(
       Effect.gen(function* getSeriesEffect() {
         const adapter = SourcesService.getSourceOrThrow(sourceId);
@@ -179,7 +185,11 @@ export const SeriesService = {
     );
   },
 
-  async proxyPageImage(sourceId: string, chapterId: string, pageIndex: number) {
+  async proxyPageImage(
+    sourceId: SourceId,
+    chapterId: SourceChapterId,
+    pageIndex: number
+  ) {
     const adapter = SourcesService.getSourceOrThrow(sourceId);
 
     if (!adapter.metadata.capabilities.supportsPageFetch) {

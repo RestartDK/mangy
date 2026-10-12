@@ -1,4 +1,5 @@
 import { Api, SeriesPageNotFound, SeriesRequestFailed } from "@mangy/contract";
+import { decodeSourceChapterId, decodeSourceId } from "@mangy/db/model";
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
@@ -106,7 +107,11 @@ export const SeriesPageImageRoute = HttpRouter.add(
     const proxied = yield* Effect.tryPromise({
       catch: seriesErrorResponse,
       try: async () =>
-        await SeriesService.proxyPageImage(sourceId, chapterId, pageIndex),
+        await SeriesService.proxyPageImage(
+          decodeSourceId(sourceId),
+          decodeSourceChapterId(chapterId),
+          pageIndex
+        ),
     });
 
     return HttpServerResponse.fromWeb(proxied);
