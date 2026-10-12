@@ -1,10 +1,11 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import type { UpdateBrowserPushPreferences } from "@mangy/contract";
 import { createFileRoute } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { reactivityKey } from "@/atoms/keys";
@@ -78,6 +79,14 @@ interface ToggleRowProps {
   label: string;
   onCheckedChange: (checked: boolean) => void;
 }
+
+type PushPreferences = Pick<
+  UpdateBrowserPushPreferences,
+  | "notifyOnDownloadCompleted"
+  | "notifyOnDownloadFailed"
+  | "notifyOnSystemWarning"
+  | "notifyOnTrackedSeriesUpdate"
+>;
 
 const ToggleRow = ({
   checked,
@@ -174,8 +183,10 @@ const SettingsRouteComponent = () => {
   const [absolutePath, setAbsolutePath] = useState("");
   const [komgaLibraryId, setKomgaLibraryId] = useState("");
   const [isDefault, setIsDefault] = useState(false);
-  const [inAppEnabled, setInAppEnabled] = useState(true);
-  const [hasMounted, setHasMounted] = useState(false);
+  const [inAppOverride, setInAppOverride] = useState<boolean | null>(null);
+  const [pushPreferenceOverrides, setPushPreferenceOverrides] = useState<
+    Partial<PushPreferences>
+  >({});
   const [destinationPendingRemoval, setDestinationPendingRemoval] = useState<
     SettingsBootstrap["destinations"][number] | null
   >(null);
@@ -188,54 +199,44 @@ const SettingsRouteComponent = () => {
     AsyncResult.value(clientStateResult)
   );
 
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
-  const [notifyOnDownloadCompleted, setNotifyOnDownloadCompleted] =
-    useState(true);
-  const [notifyOnDownloadFailed, setNotifyOnDownloadFailed] = useState(true);
-  const [notifyOnTrackedSeriesUpdate, setNotifyOnTrackedSeriesUpdate] =
-    useState(true);
-  const [notifyOnSystemWarning, setNotifyOnSystemWarning] = useState(true);
+  const inAppEnabled =
+    inAppOverride ?? settings?.notifications.inAppEnabled ?? true;
+  const pushPreferences: PushPreferences = {
+    notifyOnDownloadCompleted:
+      pushPreferenceOverrides.notifyOnDownloadCompleted ??
+      pushSettings?.notifyOnDownloadCompleted ??
+      true,
+    notifyOnDownloadFailed:
+      pushPreferenceOverrides.notifyOnDownloadFailed ??
+      pushSettings?.notifyOnDownloadFailed ??
+      true,
+    notifyOnSystemWarning:
+      pushPreferenceOverrides.notifyOnSystemWarning ??
+      pushSettings?.notifyOnSystemWarning ??
+      true,
+    notifyOnTrackedSeriesUpdate:
+      pushPreferenceOverrides.notifyOnTrackedSeriesUpdate ??
+      pushSettings?.notifyOnTrackedSeriesUpdate ??
+      true,
+  };
 
-  useEffect(() => {
-    if (!settings) {
-      return;
-    }
+  const setPushPreference = (
+    key: keyof PushPreferences,
+    value: boolean
+  ): void => {
+    setPushPreferenceOverrides((current) => ({ ...current, [key]: value }));
+  };
 
-    setInAppEnabled(settings.notifications.inAppEnabled);
-  }, [settings]);
-
-  useEffect(() => {
-    if (!pushSettings) {
-      return;
-    }
-
-    setNotifyOnDownloadCompleted(pushSettings.notifyOnDownloadCompleted);
-    setNotifyOnDownloadFailed(pushSettings.notifyOnDownloadFailed);
-    setNotifyOnTrackedSeriesUpdate(pushSettings.notifyOnTrackedSeriesUpdate);
-    setNotifyOnSystemWarning(pushSettings.notifyOnSystemWarning);
-  }, [pushSettings]);
-
-  const hasBrowserPushPreferenceChanges = useMemo(() => {
-    if (!pushSettings) {
-      return false;
-    }
-
-    return (
-      notifyOnDownloadCompleted !== pushSettings.notifyOnDownloadCompleted ||
-      notifyOnDownloadFailed !== pushSettings.notifyOnDownloadFailed ||
-      notifyOnTrackedSeriesUpdate !==
-        pushSettings.notifyOnTrackedSeriesUpdate ||
-      notifyOnSystemWarning !== pushSettings.notifyOnSystemWarning
-    );
-  }, [
-    notifyOnDownloadCompleted,
-    notifyOnDownloadFailed,
-    notifyOnTrackedSeriesUpdate,
-    notifyOnSystemWarning,
-    pushSettings,
-  ]);
+  const hasBrowserPushPreferenceChanges =
+    pushSettings !== undefined &&
+    (pushPreferences.notifyOnDownloadCompleted !==
+      pushSettings.notifyOnDownloadCompleted ||
+      pushPreferences.notifyOnDownloadFailed !==
+        pushSettings.notifyOnDownloadFailed ||
+      pushPreferences.notifyOnSystemWarning !==
+        pushSettings.notifyOnSystemWarning ||
+      pushPreferences.notifyOnTrackedSeriesUpdate !==
+        pushSettings.notifyOnTrackedSeriesUpdate);
 
   const isLoading =
     AsyncResult.isInitial(settingsResult) ||
@@ -430,10 +431,7 @@ const SettingsRouteComponent = () => {
                 <FieldGroup>
                   <Field>
                     <FieldLabel htmlFor="theme-preference">Theme</FieldLabel>
-                    <Select
-                      onValueChange={setTheme}
-                      value={hasMounted ? (theme ?? "system") : "system"}
-                    >
+                    <Select onValueChange={setTheme} value={theme ?? "system"}>
                       <SelectTrigger
                         className="h-8 w-full sm:w-52"
                         id="theme-preference"
@@ -466,7 +464,7 @@ const SettingsRouteComponent = () => {
                   checked={inAppEnabled}
                   description="Completed downloads, failures, tracked-series changes."
                   label="In-app notifications"
-                  onCheckedChange={setInAppEnabled}
+                  onCheckedChange={setInAppOverride}
                 />
               </div>
               <div className="border-border flex justify-end border-t px-4 py-3">
@@ -532,28 +530,36 @@ const SettingsRouteComponent = () => {
                   }}
                 />
                 <ToggleRow
-                  checked={notifyOnDownloadCompleted}
+                  checked={pushPreferences.notifyOnDownloadCompleted}
                   description="A chapter finishes downloading."
                   label="Download completed"
-                  onCheckedChange={setNotifyOnDownloadCompleted}
+                  onCheckedChange={(checked) => {
+                    setPushPreference("notifyOnDownloadCompleted", checked);
+                  }}
                 />
                 <ToggleRow
-                  checked={notifyOnDownloadFailed}
+                  checked={pushPreferences.notifyOnDownloadFailed}
                   description="Retries are exhausted and action is needed."
                   label="Download failed"
-                  onCheckedChange={setNotifyOnDownloadFailed}
+                  onCheckedChange={(checked) => {
+                    setPushPreference("notifyOnDownloadFailed", checked);
+                  }}
                 />
                 <ToggleRow
-                  checked={notifyOnTrackedSeriesUpdate}
+                  checked={pushPreferences.notifyOnTrackedSeriesUpdate}
                   description="Tracked series queue new chapters."
                   label="Tracked series updates"
-                  onCheckedChange={setNotifyOnTrackedSeriesUpdate}
+                  onCheckedChange={(checked) => {
+                    setPushPreference("notifyOnTrackedSeriesUpdate", checked);
+                  }}
                 />
                 <ToggleRow
-                  checked={notifyOnSystemWarning}
+                  checked={pushPreferences.notifyOnSystemWarning}
                   description="Tracking or import issues need attention."
                   label="System warnings"
-                  onCheckedChange={setNotifyOnSystemWarning}
+                  onCheckedChange={(checked) => {
+                    setPushPreference("notifyOnSystemWarning", checked);
+                  }}
                 />
               </div>
 
@@ -621,10 +627,7 @@ const SettingsRouteComponent = () => {
                       saveBrowserPushPreferences({
                         payload: {
                           isEnabled: pushSettings?.isEnabled ?? false,
-                          notifyOnDownloadCompleted,
-                          notifyOnDownloadFailed,
-                          notifyOnSystemWarning,
-                          notifyOnTrackedSeriesUpdate,
+                          ...pushPreferences,
                         },
                         reactivityKeys: [reactivityKey.browserPushSettings],
                       }),
