@@ -4,7 +4,7 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { BookOpen, ExternalLink, RefreshCcw, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { enqueueDownload } from "@/atoms/downloads";
 import { reactivityKey } from "@/atoms/keys";
@@ -72,6 +72,12 @@ const SeriesDetailSkeleton = () => (
     </div>
   </div>
 );
+interface TrackingOverrides {
+  autoDownload?: boolean;
+  destinationId?: string;
+  isTracked?: boolean;
+}
+
 const SeriesDetailRouteComponent = () => {
   const { sourceId, seriesId } = useParams({
     from: "/series/$sourceId/$seriesId",
@@ -95,10 +101,10 @@ const SeriesDetailRouteComponent = () => {
   const isQueueing = AsyncResult.isWaiting(enqueueResult);
   const isSavingTracking = AsyncResult.isWaiting(updateResult);
   const isRefreshingTracking = AsyncResult.isWaiting(refreshResult);
-  const [selectedDestinationId, setSelectedDestinationId] = useState("");
   const [pendingChapterId, setPendingChapterId] = useState<string | null>(null);
-  const [isTracked, setIsTracked] = useState(false);
-  const [autoDownload, setAutoDownload] = useState(false);
+  const [trackingOverrides, setTrackingOverrides] = useState<TrackingOverrides>(
+    {}
+  );
 
   const series = Option.getOrUndefined(AsyncResult.value(detailResult));
   const chapters = Option.getOrElse(
@@ -138,39 +144,16 @@ const SeriesDetailRouteComponent = () => {
           libraryState.downloadDestinationId,
           () => defaultDestinationId
         );
+  const isTracked =
+    trackingOverrides.isTracked ?? libraryState?.isTracked ?? false;
+  const autoDownload =
+    trackingOverrides.autoDownload ?? libraryState?.autoDownload ?? false;
+  const selectedDestinationId =
+    trackingOverrides.destinationId ?? baselineDestinationId;
   const isTrackingDirty =
     isTracked !== (libraryState?.isTracked ?? false) ||
     autoDownload !== (libraryState?.autoDownload ?? false) ||
     selectedDestinationId !== baselineDestinationId;
-
-  useEffect(() => {
-    if (!libraryState) {
-      return;
-    }
-
-    setIsTracked(libraryState.isTracked);
-    setAutoDownload(libraryState.autoDownload);
-    setSelectedDestinationId(
-      Option.getOrElse(
-        libraryState.downloadDestinationId,
-        () => defaultDestinationId
-      )
-    );
-  }, [defaultDestinationId, libraryState]);
-
-  useEffect(() => {
-    if (selectedDestinationId || enabledDestinations.length === 0) {
-      return;
-    }
-
-    const destination =
-      enabledDestinations.find((item) => item.isDefault) ??
-      enabledDestinations[0];
-
-    if (destination !== undefined) {
-      setSelectedDestinationId(destination.id);
-    }
-  }, [enabledDestinations, selectedDestinationId]);
 
   const canQueue = Boolean(selectedDestinationId);
   const canSaveTracking =
@@ -443,7 +426,12 @@ const SeriesDetailRouteComponent = () => {
                     Destination
                   </FieldLabel>
                   <Select
-                    onValueChange={setSelectedDestinationId}
+                    onValueChange={(value) => {
+                      setTrackingOverrides((current) => ({
+                        ...current,
+                        destinationId: value,
+                      }));
+                    }}
                     value={selectedDestinationId || undefined}
                   >
                     <SelectTrigger
@@ -471,10 +459,15 @@ const SeriesDetailRouteComponent = () => {
                     <Switch
                       checked={isTracked}
                       onCheckedChange={(checked) => {
-                        setIsTracked(checked);
-                        if (!checked) {
-                          setAutoDownload(false);
-                        }
+                        setTrackingOverrides((current) =>
+                          checked
+                            ? { ...current, isTracked: true }
+                            : {
+                                ...current,
+                                autoDownload: false,
+                                isTracked: false,
+                              }
+                        );
                       }}
                     />
                     <div className="space-y-0.5">
@@ -489,7 +482,12 @@ const SeriesDetailRouteComponent = () => {
                     <Switch
                       checked={autoDownload}
                       disabled={!(isTracked && selectedDestinationId)}
-                      onCheckedChange={setAutoDownload}
+                      onCheckedChange={(checked) => {
+                        setTrackingOverrides((current) => ({
+                          ...current,
+                          autoDownload: checked,
+                        }));
+                      }}
                     />
                     <div className="space-y-0.5">
                       <FieldLabel>Auto-queue releases</FieldLabel>
@@ -599,4 +597,5 @@ const SeriesDetailRouteComponent = () => {
 export const Route = createFileRoute("/series/$sourceId/$seriesId")({
   beforeLoad: requireAuth,
   component: SeriesDetailRouteComponent,
+  remountDeps: ({ params }) => params,
 });
