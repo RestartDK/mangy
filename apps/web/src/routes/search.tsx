@@ -3,14 +3,7 @@ import type { SourceFilterDefinition } from "@mangy/contract";
 import { createFileRoute } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
-import {
-  ArrowDown,
-  ArrowUp,
-  Filter,
-  Loader2,
-  Search as SearchIcon,
-  X,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Filter, Loader2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -34,6 +27,7 @@ import {
   FieldLabel,
   FieldTitle,
 } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -374,12 +368,11 @@ const SearchRouteComponent = () => {
         </Alert>
       ) : null}
 
-      <div className="panel focus-within:ring-ring/25 flex items-center gap-1 p-1.5 pl-3 focus-within:ring-2">
-        <SearchIcon className="text-muted-foreground size-4 shrink-0" />
-        <input
+      <div className="flex items-center gap-2">
+        <Input
           aria-label="Search titles"
           autoComplete="off"
-          className="placeholder:text-muted-foreground h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
+          className="h-9 flex-1"
           onChange={(event) => {
             setQueryInput(event.target.value);
           }}
@@ -393,7 +386,7 @@ const SearchRouteComponent = () => {
               setQueryInput("");
               setQuery("");
             }}
-            size="icon-sm"
+            size="icon-lg"
             type="button"
             variant="ghost"
           >
@@ -401,7 +394,7 @@ const SearchRouteComponent = () => {
           </Button>
         ) : null}
         <Button
-          className="h-8"
+          className="h-9"
           onClick={() => {
             setIsFiltersOpen(true);
           }}
