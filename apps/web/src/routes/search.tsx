@@ -50,7 +50,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePreferredSource } from "@/hooks/use-preferred-source";
 import { formatCause, hasText, pluralize } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 import {
@@ -219,12 +218,7 @@ const ResultGridSkeleton = () => (
 const SearchRouteComponent = () => {
   const sourcesResult = useAtomValue(sourcesQuery);
   const sources = Option.getOrElse(AsyncResult.value(sourcesResult), () => []);
-  const enabledSources = useMemo(
-    () => sources.filter((source) => source.isEnabled),
-    [sources]
-  );
-  const { selectedSourceId: sourceId, setSelectedSourceId: setSourceId } =
-    usePreferredSource(enabledSources);
+  const sourceId = sources.find((source) => source.isEnabled)?.id ?? "";
 
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
@@ -232,9 +226,7 @@ const SearchRouteComponent = () => {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const filtersResult = useAtomValue(
-    sourceId === undefined || sourceId === ""
-      ? sourceFiltersIdle
-      : sourceFilters({ sourceId })
+    hasText(sourceId) ? sourceFilters({ sourceId }) : sourceFiltersIdle
   );
   const definitionsValue = AsyncResult.value(filtersResult);
 
@@ -258,9 +250,6 @@ const SearchRouteComponent = () => {
   const sortDefinition = findSelectFilter(definitions, "sort");
   const orderDefinition = findSelectFilter(definitions, "order");
   const activeFilters = getActiveFilters(filters, definitions);
-  const sourceName =
-    enabledSources.find((source) => source.id === sourceId)?.name ??
-    "this source";
   const orderAscendingValue =
     orderDefinition?.options.find(
       (option) =>
@@ -292,9 +281,7 @@ const SearchRouteComponent = () => {
     [filters, toolbarDefaults]
   );
   const isSearchEnabled =
-    sourceId !== undefined &&
-    sourceId !== "" &&
-    !AsyncResult.isInitial(filtersResult);
+    hasText(sourceId) && !AsyncResult.isInitial(filtersResult);
   const searchAtom = isSearchEnabled
     ? searchPagesWithHistory({
         filters: effectiveFilters,
@@ -366,10 +353,7 @@ const SearchRouteComponent = () => {
         <Alert variant="destructive">
           <AlertTitle>Unable to load filters</AlertTitle>
           <AlertDescription>
-            {formatCause(
-              filtersResult.cause,
-              "Try another source or reload the page."
-            )}
+            {formatCause(filtersResult.cause, "Reload the page to try again.")}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -383,7 +367,7 @@ const SearchRouteComponent = () => {
           onChange={(event) => {
             setQueryInput(event.target.value);
           }}
-          placeholder={`Search ${sourceName}`}
+          placeholder="Search titles"
           value={queryInput}
         />
         {queryInput ? (
@@ -419,28 +403,6 @@ const SearchRouteComponent = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select
-          onValueChange={(value) => {
-            setSourceId(value);
-            setFilters({});
-          }}
-          value={sourceId ?? ""}
-        >
-          <SelectTrigger
-            aria-label="Source"
-            className="h-8 w-auto min-w-32 border-0 bg-transparent px-2 text-xs dark:bg-transparent"
-          >
-            <SelectValue placeholder="Choose a source" />
-          </SelectTrigger>
-          <SelectContent>
-            {enabledSources.map((source) => (
-              <SelectItem key={source.id} value={source.id}>
-                {source.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         {sortDefinition ? (
           <Select
             onValueChange={(value) => {
@@ -545,7 +507,7 @@ const SearchRouteComponent = () => {
       AsyncResult.isInitial(sourcesResult) ||
       hasText(sourceId) ? null : (
         <EmptyState
-          description="No enabled sources are connected yet."
+          description="No source is connected yet."
           icon="search"
           title="No source available"
         />
@@ -571,8 +533,8 @@ const SearchRouteComponent = () => {
           }
           description={
             query
-              ? "Try a shorter title, a different spelling, or another source."
-              : "This source returned nothing for the current filters."
+              ? "Try a shorter title or a different spelling."
+              : "Nothing matched the current filters."
           }
           icon="search"
           title={query ? `No matches for “${query}”` : "No series found"}

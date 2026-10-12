@@ -2,7 +2,6 @@ import { useAtomValue } from "@effect/atom-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
-import { useMemo } from "react";
 
 import { discoverIdle, sourceDiscover, sourcesQuery } from "@/atoms/sources";
 import { AppShell } from "@/components/app-shell";
@@ -11,15 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { SectionShelf } from "@/components/section-shelf";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePreferredSource } from "@/hooks/use-preferred-source";
 import { formatCause } from "@/lib/format";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -44,15 +35,7 @@ const DiscoverSkeleton = () => (
 const DiscoverRouteComponent = () => {
   const sourcesResult = useAtomValue(sourcesQuery);
   const sources = Option.getOrElse(AsyncResult.value(sourcesResult), () => []);
-  const enabledSources = useMemo(
-    () => sources.filter((source) => source.isEnabled),
-    [sources]
-  );
-  const { selectedSourceId, setSelectedSourceId } =
-    usePreferredSource(enabledSources);
-
-  const activeSource =
-    enabledSources.find((source) => source.id === selectedSourceId) ?? null;
+  const activeSource = sources.find((source) => source.isEnabled) ?? null;
   const discoverResult = useAtomValue(
     activeSource === null
       ? discoverIdle
@@ -72,26 +55,7 @@ const DiscoverRouteComponent = () => {
 
   return (
     <AppShell>
-      <PageHeader
-        action={
-          <Select
-            onValueChange={setSelectedSourceId}
-            value={activeSource?.id ?? undefined}
-          >
-            <SelectTrigger aria-label="Source" className="h-8 w-full sm:w-48">
-              <SelectValue placeholder="Choose a source" />
-            </SelectTrigger>
-            <SelectContent>
-              {enabledSources.map((source) => (
-                <SelectItem key={source.id} value={source.id}>
-                  {source.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        }
-        title="Discover"
-      />
+      <PageHeader title="Discover" />
 
       {Option.isSome(hasError) ? (
         <Alert variant="destructive">
@@ -106,9 +70,9 @@ const DiscoverRouteComponent = () => {
 
       {isLoading || activeSource ? null : (
         <EmptyState
-          description="No source is enabled right now."
+          description="No source is connected yet."
           icon="library"
-          title="No sources available"
+          title="No source available"
         />
       )}
 
@@ -122,10 +86,10 @@ const DiscoverRouteComponent = () => {
             <EmptyState
               action={
                 <Button asChild variant="outline">
-                  <Link to="/search">Search this source</Link>
+                  <Link to="/search">Search titles</Link>
                 </Button>
               }
-              description="This source is connected but returned no browse sections."
+              description="The source returned no browse sections."
               icon="search"
               title="Nothing to browse"
             />
