@@ -101,3 +101,21 @@ export const searchIdle: ReturnType<typeof searchPages> = Atom.writable(
   () => AsyncResult.success({ done: true, items: [emptyPage] }),
   constVoid
 );
+
+const SEARCH_DEBOUNCE_MS = 350;
+
+export const searchQueryInput = Atom.make("");
+
+const debouncedSearchQuery = Atom.debounce(
+  searchQueryInput.pipe(Atom.map((value) => value.trim())),
+  SEARCH_DEBOUNCE_MS
+);
+
+// Clearing the field is a reset rather than a refinement, so it commits without
+// waiting out the debounce.
+export const searchQuery = Atom.writable<string, string>(
+  (get) => get(debouncedSearchQuery),
+  (ctx, value) => {
+    ctx.setSelf(value);
+  }
+);
