@@ -3,6 +3,7 @@ import {
   prepareChapterOutputFile,
   removePath,
 } from "@mangy/downloader";
+import { scanKomgaLibrary } from "@mangy/komga";
 import type { SourceAdapterError } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
 import { Data, Effect, Option } from "effect";
@@ -10,7 +11,6 @@ import { Data, Effect, Option } from "effect";
 import { DownloadJobError } from "./download-job-error";
 import { completeDownloadJob, updateDownloadJobProgress } from "./jobs";
 import type { ClaimedDownloadJob } from "./jobs";
-import { scanKomgaLibrary } from "./komga";
 
 export class CancelledError extends Data.TaggedError("CancelledError") {}
 

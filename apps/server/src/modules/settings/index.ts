@@ -32,6 +32,16 @@ export const SettingsApiLive = HttpApiBuilder.group(
             await SettingsService.createDestination(userId, payload),
         });
       }),
+      createKomgaDestination: Effect.fn(
+        function* createKomgaDestinationHandler({ payload }) {
+          const userId = yield* currentUser;
+          return yield* Effect.tryPromise({
+            catch: badRequest("Unable to save destination"),
+            try: async () =>
+              await SettingsService.createKomgaDestination(userId, payload),
+          });
+        }
+      ),
       deleteDestination: Effect.fn(function* deleteDestinationHandler({
         params,
       }) {
@@ -43,6 +53,13 @@ export const SettingsApiLive = HttpApiBuilder.group(
               userId,
               params.destinationId
             ),
+        });
+      }),
+      getKomgaLibraries: Effect.fn(function* getKomgaLibrariesHandler() {
+        yield* currentUser;
+        return yield* Effect.tryPromise({
+          catch: badRequest("Unable to list Komga libraries"),
+          try: async () => await SettingsService.getKomgaLibraries(),
         });
       }),
       getPush: Effect.fn(function* getPushHandler() {

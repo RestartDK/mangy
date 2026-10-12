@@ -25,6 +25,7 @@
         "@mangy/contract": "workspace:*",
         "@mangy/db": "workspace:*",
         "@mangy/env": "workspace:*",
+        "@mangy/komga": "workspace:*",
         "@mangy/push": "workspace:*",
         "@mangy/source-sdk": "workspace:*",
         "better-auth": "catalog:",
@@ -86,6 +87,7 @@
         "@mangy/db": "workspace:*",
         "@mangy/downloader": "workspace:*",
         "@mangy/env": "workspace:*",
+        "@mangy/komga": "workspace:*",
         "@mangy/push": "workspace:*",
         "@mangy/source-sdk": "workspace:*",
         "effect": "catalog:",
@@ -157,6 +159,18 @@
       },
       "devDependencies": {
         "@mangy/config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/komga": {
+      "name": "@mangy/komga",
+      "dependencies": {
+        "@mangy/env": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@mangy/config": "workspace:*",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
       },
     },
@@ -403,6 +417,8 @@
     "@mangy/downloader": ["@mangy/downloader@workspace:packages/downloader"],
 
     "@mangy/env": ["@mangy/env@workspace:packages/env"],
+
+    "@mangy/komga": ["@mangy/komga@workspace:packages/komga"],
 
     "@mangy/push": ["@mangy/push@workspace:packages/push"],
 

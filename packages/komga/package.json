@@ -1,0 +1,22 @@
+{
+  "name": "@mangy/komga",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc -b",
+    "test": "bun test src/*.test.ts"
+  },
+  "dependencies": {
+    "@mangy/env": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@mangy/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

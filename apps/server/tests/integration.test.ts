@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import assert from "node:assert";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 
@@ -18,6 +18,7 @@ import {
   sourceColumns,
   userColumns,
 } from "@mangy/db/model";
+import { setKomgaConfigForTests } from "@mangy/komga";
 import { setBrowserPushSenderForTests } from "@mangy/push";
 import type {
   SourceAdapter,
@@ -32,7 +33,6 @@ import { SqlClient } from "effect/sql";
 import type { SqlError } from "effect/sql";
 import { unzipSync } from "fflate";
 
-import { setKomgaConfigForTests } from "../../worker/src/komga";
 import {
   claimNextPushDelivery,
   processPushDelivery,
@@ -655,6 +655,171 @@ describe("server and worker integration", () => {
     ).toBe(true);
   });
 
+  test("settings destinations come from the Komga library list", async () => {
+    const libraryRoot = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-komga-root-")
+    );
+    const komgaLibraryId = `komga-library-${crypto.randomUUID()}`;
+    const komgaLibraries = [
+      { id: komgaLibraryId, name: "Manga", root: libraryRoot },
+    ];
+
+    cleanupState.tempPaths.add(libraryRoot);
+
+    const komgaServer = serve({
+      fetch(request) {
+        const url = new URL(request.url);
+        if (url.pathname === "/api/v1/libraries") {
+          return Response.json(komgaLibraries);
+        }
+
+        return new Response(null, { status: 202 });
+      },
+      hostname: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const email = `komga-list-${crypto.randomUUID()}@example.com`;
+      const { apiFetch, userId } = await createApiClient(
+        email,
+        "reader-password-123",
+        "Komga List Reader"
+      );
+      cleanupState.userIds.add(userId);
+
+      setKomgaConfigForTests({
+        apiKey: undefined,
+        baseUrl: undefined,
+        password: undefined,
+        username: undefined,
+      });
+
+      const unconfiguredResponse = await apiFetch(
+        "/api/settings/komga-libraries"
+      );
+      expect(unconfiguredResponse.status).toBe(200);
+      expect(
+        await readJson<{ isConfigured: boolean; libraries: unknown[] }>(
+          unconfiguredResponse
+        )
+      ).toEqual({ isConfigured: false, libraries: [] });
+
+      setKomgaConfigForTests({
+        apiKey: "komga-list-key",
+        baseUrl: `http://127.0.0.1:${komgaServer.port}`,
+        password: undefined,
+        username: undefined,
+      });
+
+      const librariesResponse = await apiFetch("/api/settings/komga-libraries");
+      expect(librariesResponse.status).toBe(200);
+      expect(
+        await readJson<{ isConfigured: boolean; libraries: unknown[] }>(
+          librariesResponse
+        )
+      ).toEqual({
+        isConfigured: true,
+        libraries: komgaLibraries,
+      });
+
+      const createdResponse = await apiFetch(
+        "/api/settings/destinations/komga-library",
+        jsonRequest({ komgaLibraryId, name: "Manga" }, { method: "POST" })
+      );
+      expect(createdResponse.status).toBe(200);
+      const created = await readJson<{
+        absolutePath: string;
+        isDefault: boolean;
+        komgaLibraryId: string | null;
+      }>(createdResponse);
+      expect(created.absolutePath).toBe(libraryRoot);
+      expect(created.komgaLibraryId).toBe(komgaLibraryId);
+      expect(created.isDefault).toBe(true);
+
+      const missingResponse = await apiFetch(
+        "/api/settings/destinations/komga-library",
+        jsonRequest(
+          { komgaLibraryId: "komga-library-missing", name: "Missing" },
+          { method: "POST" }
+        )
+      );
+      expect(missingResponse.status).toBe(400);
+    } finally {
+      void komgaServer.stop(true);
+    }
+  });
+
+  test.skipIf(process.getuid?.() === 0)(
+    "rejects a destination the service cannot write to",
+    async () => {
+      const lockedLibraryRoot = await mkdtemp(
+        nodePath.join(tmpdir(), "mangy-komga-locked-")
+      );
+      const lockedFolderRoot = await mkdtemp(
+        nodePath.join(tmpdir(), "mangy-folder-locked-")
+      );
+      const komgaLibraryId = `komga-library-${crypto.randomUUID()}`;
+
+      cleanupState.tempPaths.add(lockedLibraryRoot);
+      cleanupState.tempPaths.add(lockedFolderRoot);
+      await chmod(lockedLibraryRoot, 0o500);
+      await chmod(lockedFolderRoot, 0o500);
+
+      const komgaServer = serve({
+        fetch(request) {
+          const url = new URL(request.url);
+          if (url.pathname === "/api/v1/libraries") {
+            return Response.json([
+              { id: komgaLibraryId, name: "Locked", root: lockedLibraryRoot },
+            ]);
+          }
+
+          return new Response(null, { status: 202 });
+        },
+        hostname: "127.0.0.1",
+        port: 0,
+      });
+
+      try {
+        const email = `komga-locked-${crypto.randomUUID()}@example.com`;
+        const { apiFetch, userId } = await createApiClient(
+          email,
+          "reader-password-123",
+          "Komga Locked Reader"
+        );
+        cleanupState.userIds.add(userId);
+
+        setKomgaConfigForTests({
+          apiKey: "komga-locked-key",
+          baseUrl: `http://127.0.0.1:${komgaServer.port}`,
+          password: undefined,
+          username: undefined,
+        });
+
+        const libraryResponse = await apiFetch(
+          "/api/settings/destinations/komga-library",
+          jsonRequest(
+            { komgaLibraryId, name: "Locked library" },
+            { method: "POST" }
+          )
+        );
+        expect(libraryResponse.status).toBe(400);
+
+        const folderResponse = await apiFetch(
+          "/api/settings/destinations",
+          jsonRequest(
+            { absolutePath: lockedFolderRoot, name: "Locked folder" },
+            { method: "POST" }
+          )
+        );
+        expect(folderResponse.status).toBe(400);
+      } finally {
+        void komgaServer.stop(true);
+      }
+    }
+  );
+
   test("worker triggers a Komga library scan after a destination download", async () => {
     const adapterId = `test-source-${crypto.randomUUID()}`;
     const seriesExternalId = `series-${crypto.randomUUID()}`;
@@ -675,6 +840,12 @@ describe("server and worker integration", () => {
     const komgaServer = serve({
       fetch(request) {
         const url = new URL(request.url);
+        if (url.pathname === "/api/v1/libraries") {
+          return Response.json([
+            { id: komgaLibraryId, name: "Komga Library", root: tempDirectory },
+          ]);
+        }
+
         scanRequests.push({
           apiKey: request.headers.get("x-api-key"),
           method: request.method,
@@ -746,19 +917,20 @@ describe("server and worker integration", () => {
       cleanupState.userIds.add(userId);
 
       const destinationResponse = await apiFetch(
-        "/api/settings/destinations",
+        "/api/settings/destinations/komga-library",
         jsonRequest(
-          {
-            absolutePath: tempDirectory,
-            isDefault: true,
-            komgaLibraryId,
-            name: "Komga Library",
-          },
+          { isDefault: true, komgaLibraryId, name: "Komga Library" },
           { method: "POST" }
         )
       );
       expect(destinationResponse.status).toBe(200);
-      const destination = await readJson<{ id: string }>(destinationResponse);
+      const destination = await readJson<{
+        absolutePath: string;
+        id: string;
+        komgaLibraryId: string | null;
+      }>(destinationResponse);
+      expect(destination.absolutePath).toBe(tempDirectory);
+      expect(destination.komgaLibraryId).toBe(komgaLibraryId);
 
       const queueResponse = await apiFetch(
         "/api/downloads",
