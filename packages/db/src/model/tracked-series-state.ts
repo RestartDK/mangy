@@ -1,7 +1,11 @@
 import { Schema } from "effect";
 import { Model } from "effect/schema";
 
-import { LibraryEntryIdSchema, TrackedSeriesStateIdSchema } from "./ids";
+import {
+  LibraryEntryIdSchema,
+  SourceChapterIdSchema,
+  TrackedSeriesStateIdSchema,
+} from "./ids";
 
 export const trackedSeriesStateTable = "tracked_series_state";
 
@@ -12,7 +16,7 @@ export class TrackedSeriesState extends Model.Class<TrackedSeriesState>(
   createdAt: Schema.Date,
   id: TrackedSeriesStateIdSchema,
   lastCheckedAt: Schema.OptionFromNullOr(Schema.Date),
-  lastSeenChapterExternalId: Schema.OptionFromNullOr(Schema.String),
+  lastSeenChapterExternalId: Schema.OptionFromNullOr(SourceChapterIdSchema),
   libraryEntryId: LibraryEntryIdSchema,
   nextCheckAt: Schema.OptionFromNullOr(Schema.Date),
   updatedAt: Schema.Date,

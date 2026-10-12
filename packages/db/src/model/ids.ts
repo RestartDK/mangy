@@ -41,6 +41,11 @@ export const NotificationIdSchema = Schema.String.pipe(
 );
 export type NotificationId = typeof NotificationIdSchema.Type;
 
+export const KomgaLibraryIdSchema = Schema.String.pipe(
+  Schema.brand("KomgaLibraryId")
+);
+export type KomgaLibraryId = typeof KomgaLibraryIdSchema.Type;
+
 export const PushSubscriptionIdSchema = Schema.String.pipe(
   Schema.brand("PushSubscriptionId")
 );
@@ -48,6 +53,16 @@ export type PushSubscriptionId = typeof PushSubscriptionIdSchema.Type;
 
 export const SeriesIdSchema = Schema.String.pipe(Schema.brand("SeriesId"));
 export type SeriesId = typeof SeriesIdSchema.Type;
+
+export const SourceSeriesIdSchema = Schema.String.pipe(
+  Schema.brand("SourceSeriesId")
+);
+export type SourceSeriesId = typeof SourceSeriesIdSchema.Type;
+
+export const SourceChapterIdSchema = Schema.String.pipe(
+  Schema.brand("SourceChapterId")
+);
+export type SourceChapterId = typeof SourceChapterIdSchema.Type;
 
 export const SessionIdSchema = Schema.String.pipe(Schema.brand("SessionId"));
 export type SessionId = typeof SessionIdSchema.Type;
@@ -67,3 +82,14 @@ export const VerificationIdSchema = Schema.String.pipe(
   Schema.brand("VerificationId")
 );
 export type VerificationId = typeof VerificationIdSchema.Type;
+
+const decoder =
+  <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
+  (value: unknown): S["Type"] =>
+    Schema.decodeUnknownSync(schema)(value);
+
+export const decodeDownloadDestinationId = decoder(DownloadDestinationIdSchema);
+export const decodeKomgaLibraryId = decoder(KomgaLibraryIdSchema);
+export const decodeSourceChapterId = decoder(SourceChapterIdSchema);
+export const decodeSourceId = decoder(SourceIdSchema);
+export const decodeSourceSeriesId = decoder(SourceSeriesIdSchema);
