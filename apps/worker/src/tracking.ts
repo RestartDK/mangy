@@ -19,8 +19,9 @@ import {
   libraryEntryColumns,
   seriesColumns,
   trackedSeriesStateColumns,
+  decodeSourceChapterId,
 } from "@mangy/db/model";
-import type { ChapterId, DownloadDestinationId } from "@mangy/db/model";
+import type { ChapterId, SeriesId, SourceChapterId } from "@mangy/db/model";
 import { env } from "@mangy/env";
 import type { SourceChapter } from "@mangy/source-sdk";
 import { sourceRegistry } from "@mangy/source-sdk/registry";
@@ -48,7 +49,7 @@ const getTrackingPollIntervalMs = (): number => {
 const getNextCheckAt = (multiplier = 1): Date =>
   new Date(Date.now() + getTrackingPollIntervalMs() * multiplier);
 
-const mapChapterValues = (seriesId: string, item: SourceChapter) => ({
+const mapChapterValues = (seriesId: SeriesId, item: SourceChapter) => ({
   chapterNumber: item.chapterNumber,
   externalId: item.externalId,
   externalUrl: item.externalUrl,
@@ -68,20 +69,9 @@ const pluralize = (count: number, singular: string, plural: string): string =>
 const buildTrackedSeriesTitle = (seriesTitle: string): string =>
   `Tracking update: ${seriesTitle}`;
 
-export interface ClaimedTrackedSeries {
-  autoDownload: boolean;
-  checkFailureCount: number;
-  downloadDestinationId: Option.Option<DownloadDestinationId>;
-  downloadDestinationName: Option.Option<string>;
-  id: string;
-  lastSeenChapterExternalId: Option.Option<string>;
-  libraryEntryId: string;
-  seriesExternalId: string;
-  seriesRecordId: string;
-  seriesSourceId: string;
-  seriesTitle: string;
-  userId: string;
-}
+export type ClaimedTrackedSeries = Schema.Schema.Type<
+  typeof claimedTrackedSeriesProjection
+>;
 
 const claimedTrackedSeriesProjection = Schema.Struct({
   autoDownload: LibraryEntry.fields.autoDownload,
@@ -101,7 +91,7 @@ const claimedTrackedSeriesProjection = Schema.Struct({
   userId: LibraryEntry.fields.userId,
 });
 
-const upsertTrackedChapters = (seriesId: string, items: SourceChapter[]) =>
+const upsertTrackedChapters = (seriesId: SeriesId, items: SourceChapter[]) =>
   Effect.gen(function* upsertTrackedChaptersEffect() {
     const sql = yield* SqlClient.SqlClient;
 
@@ -212,13 +202,15 @@ const queueTrackedChapters = (
 
     const queueableChapters = [...newChapters]
       .toReversed()
-      .map((item) => chaptersByExternalId.get(item.externalId))
+      .map((item) =>
+        chaptersByExternalId.get(decodeSourceChapterId(item.externalId))
+      )
       .filter(
         (
           item
         ): item is {
           id: ChapterId;
-          external_id: string;
+          external_id: SourceChapterId;
           is_downloaded: boolean;
         } => {
           if (!item) {

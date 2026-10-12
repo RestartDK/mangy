@@ -6,7 +6,7 @@ import {
   table,
   updateRow,
 } from "@mangy/db";
-import type { ChapterId } from "@mangy/db/model";
+import type { DownloadJobId } from "@mangy/db/model";
 import {
   Chapter,
   DownloadDestination,
@@ -23,23 +23,9 @@ import { SqlClient } from "effect/sql";
 
 import { queueNotification } from "./notifications";
 
-export interface ClaimedDownloadJob {
-  attempts: number;
-  chapterExternalId: Option.Option<string>;
-  chapterNumber: Option.Option<string>;
-  chapterRecordId: Option.Option<ChapterId>;
-  chapterTitle: Option.Option<string>;
-  destinationKomgaLibraryId: Option.Option<string>;
-  destinationName: Option.Option<string>;
-  destinationPath: Option.Option<string>;
-  id: string;
-  maxAttempts: number;
-  queueId: Option.Option<string>;
-  seriesSourceId: Option.Option<string>;
-  seriesTitle: Option.Option<string>;
-  status: Schema.Schema.Type<typeof DownloadJob.fields.status>;
-  userId: string;
-}
+export type ClaimedDownloadJob = Schema.Schema.Type<
+  typeof claimedJobProjection
+>;
 
 type ArtifactPackageFormat = "cbz" | "folder";
 
@@ -88,7 +74,7 @@ const buildChapterLabel = (job: ClaimedDownloadJob): string => {
 const buildDownloadTitle = (job: ClaimedDownloadJob): string =>
   Option.getOrElse(job.seriesTitle, () => "Queued chapter");
 
-export const loadClaimedDownloadJob = (jobId: string) =>
+export const loadClaimedDownloadJob = (jobId: DownloadJobId) =>
   Effect.gen(function* loadClaimedDownloadJobEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -120,7 +106,7 @@ export const loadClaimedDownloadJob = (jobId: string) =>
   });
 
 export const updateDownloadJobProgress = async (
-  jobId: string,
+  jobId: DownloadJobId,
   progressPercent: number
 ): Promise<void> => {
   await runSql(
@@ -139,7 +125,7 @@ export const updateDownloadJobProgress = async (
   );
 };
 
-export const isDownloadJobCancelled = (jobId: string) =>
+export const isDownloadJobCancelled = (jobId: DownloadJobId) =>
   Effect.gen(function* checkJobCancelledEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(

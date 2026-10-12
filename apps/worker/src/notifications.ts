@@ -16,6 +16,7 @@ import {
   notificationEndpointColumns,
   pushSubscriptionColumns,
 } from "@mangy/db/model";
+import type { UserId } from "@mangy/db/model";
 import { BrowserPushError, sendBrowserPush } from "@mangy/push";
 import type { BrowserPushPayload } from "@mangy/push";
 import { Effect, Option, Schema } from "effect";
@@ -32,20 +33,9 @@ interface BrowserPushEndpointRecord {
   notifyOnSystemWarning: boolean;
 }
 
-export interface ClaimedPushDelivery {
-  attempts: number;
-  id: string;
-  maxAttempts: number;
-  notificationBody: string;
-  notificationEndpointId: Option.Option<string>;
-  notificationId: string;
-  notificationTitle: string;
-  notificationType: NotificationType;
-  pushSubscriptionAuth: Option.Option<string>;
-  pushSubscriptionEndpoint: Option.Option<string>;
-  pushSubscriptionId: Option.Option<string>;
-  pushSubscriptionP256dh: Option.Option<string>;
-}
+export type ClaimedPushDelivery = Schema.Schema.Type<
+  typeof claimedPushDeliveryProjection
+>;
 
 const claimedPushDeliveryProjection = Schema.Struct({
   attempts: NotificationDelivery.fields.attempts,
@@ -115,7 +105,7 @@ export const queueNotification = (input: {
   body: string;
   title: string;
   type: NotificationType;
-  userId: string;
+  userId: UserId;
 }) =>
   Effect.gen(function* createNotificationRecordEffect() {
     const sql = yield* SqlClient.SqlClient;
