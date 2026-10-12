@@ -1,4 +1,16 @@
 import { env } from "@mangy/env";
+import { Schema } from "effect";
+
+const komgaLibrarySchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  root: Schema.String,
+});
+
+const komgaLibrariesSchema = Schema.Array(komgaLibrarySchema);
+
+export type KomgaLibrary = typeof komgaLibrarySchema.Type;
+export type KomgaLibraries = typeof komgaLibrariesSchema.Type;
 
 interface KomgaScanInput {
   libraryId: string | null;
@@ -12,10 +24,28 @@ interface KomgaConfig {
 }
 
 let configOverride: KomgaConfig | null = null;
+const requestTimeoutMs = 5000;
 const trailingSlashesPattern = /\/+$/u;
 
 const trimTrailingSlashes = (value: string): string =>
   value.replace(trailingSlashesPattern, "");
+
+const fetchKomga = async (
+  url: string,
+  init: RequestInit
+): Promise<Response> => {
+  const signal = AbortSignal.timeout(requestTimeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal });
+  } catch (error) {
+    const reason = signal.aborted
+      ? `Komga did not respond within ${requestTimeoutMs} ms.`
+      : `Komga request failed: ${error instanceof Error ? error.message : "unknown error"}.`;
+
+    throw new Error(reason, { cause: error });
+  }
+};
 
 const getKomgaConfig = (): KomgaConfig =>
   configOverride ?? {
@@ -24,6 +54,11 @@ const getKomgaConfig = (): KomgaConfig =>
     password: env.KOMGA_PASSWORD,
     username: env.KOMGA_USERNAME,
   };
+
+const hasBaseUrl = (
+  config: KomgaConfig
+): config is KomgaConfig & { baseUrl: string } =>
+  typeof config.baseUrl === "string" && config.baseUrl.length > 0;
 
 const createBasicAuthHeader = (
   username: string | undefined,
@@ -60,8 +95,40 @@ const createKomgaHeaders = (config: KomgaConfig): Headers => {
   return headers;
 };
 
+const parseKomgaLibraries = (payload: unknown): KomgaLibraries => {
+  const decoded = Schema.decodeUnknownResult(komgaLibrariesSchema)(payload);
+
+  if (decoded._tag === "Failure") {
+    throw new Error("Komga returned a library list this app cannot read.");
+  }
+
+  return decoded.success;
+};
+
 export const setKomgaConfigForTests = (config: KomgaConfig | null): void => {
   configOverride = config;
+};
+
+export const hasKomgaConfig = (): boolean => hasBaseUrl(getKomgaConfig());
+
+export const listKomgaLibraries = async (): Promise<KomgaLibraries> => {
+  const config = getKomgaConfig();
+  if (!hasBaseUrl(config)) {
+    throw new Error("KOMGA_BASE_URL is not configured.");
+  }
+
+  const response = await fetchKomga(
+    `${trimTrailingSlashes(config.baseUrl)}/api/v1/libraries`,
+    { headers: createKomgaHeaders(config) }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Komga library list failed with status ${response.status}.`
+    );
+  }
+
+  return parseKomgaLibraries(await response.json());
 };
 
 export const scanKomgaLibrary = async ({
@@ -72,14 +139,14 @@ export const scanKomgaLibrary = async ({
   }
 
   const config = getKomgaConfig();
-  if (config.baseUrl === undefined || config.baseUrl.length === 0) {
+  if (!hasBaseUrl(config)) {
     throw new Error(
       "This destination has a Komga library ID, but KOMGA_BASE_URL is not configured."
     );
   }
 
   const scanUrl = `${trimTrailingSlashes(config.baseUrl)}/api/v1/libraries/${encodeURIComponent(libraryId)}/scan`;
-  const response = await fetch(scanUrl, {
+  const response = await fetchKomga(scanUrl, {
     headers: createKomgaHeaders(config),
     method: "POST",
   });

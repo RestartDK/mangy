@@ -16,6 +16,7 @@
     "@mangy/contract": "workspace:*",
     "@mangy/db": "workspace:*",
     "@mangy/env": "workspace:*",
+    "@mangy/komga": "workspace:*",
     "@mangy/push": "workspace:*",
     "@mangy/source-sdk": "workspace:*",
     "better-auth": "catalog:",

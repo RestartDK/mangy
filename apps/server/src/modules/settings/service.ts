@@ -1,6 +1,11 @@
-import { mkdir } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 
+import type {
+  CreateDestination,
+  CreateKomgaDestination,
+} from "@mangy/contract";
 import {
   column,
   decodeRows,
@@ -14,13 +19,19 @@ import {
   DownloadJob,
   NotificationEndpoint,
   PushSubscription,
+  decodeKomgaLibraryId,
   downloadDestinationColumns,
   downloadJobColumns,
   libraryEntryColumns,
   notificationEndpointColumns,
   pushSubscriptionColumns,
 } from "@mangy/db/model";
-import type { DownloadDestinationId, UserId } from "@mangy/db/model";
+import type {
+  DownloadDestinationId,
+  KomgaLibraryId,
+  UserId,
+} from "@mangy/db/model";
+import { hasKomgaConfig, listKomgaLibraries } from "@mangy/komga";
 import {
   BrowserPushError,
   getBrowserPushPublicKey,
@@ -583,25 +594,37 @@ const sendTestBrowserPush = (userId: UserId) =>
     throw lastError ?? new Error("Unable to send a browser test notification.");
   });
 
-const createDestination = (
-  userId: UserId,
-  input: {
-    name: string;
-    absolutePath: string;
-    komgaLibraryId?: string;
-    isDefault?: boolean;
+const assertDestinationFolder = async (directory: string): Promise<void> => {
+  if (!path.isAbsolute(directory)) {
+    throw new Error("Destination folders must be absolute paths.");
   }
-) =>
-  Effect.gen(function* createDestinationEffect() {
-    const sql = yield* SqlClient.SqlClient;
-    const absolutePath = input.absolutePath.trim();
-    if (!path.isAbsolute(absolutePath)) {
-      throw new Error("Destination paths must be absolute.");
-    }
 
-    yield* Effect.promise(
-      async () => await mkdir(absolutePath, { recursive: true })
-    );
+  const isFolder = await stat(directory).then(
+    (stats) => stats.isDirectory(),
+    () => false
+  );
+  if (!isFolder) {
+    throw new Error(`${directory} is not an existing folder.`);
+  }
+
+  try {
+    await access(directory, constants.X_OK);
+    await access(directory, constants.W_OK);
+  } catch {
+    throw new Error(`Cannot write downloads to ${directory}.`);
+  }
+};
+
+interface DestinationRowInput {
+  absolutePath: string;
+  isDefault: boolean | undefined;
+  komgaLibraryId: KomgaLibraryId | null;
+  name: string;
+}
+
+const insertDestination = (userId: UserId, input: DestinationRowInput) =>
+  Effect.gen(function* insertDestinationEffect() {
+    const sql = yield* SqlClient.SqlClient;
 
     return yield* sql.withTransaction(
       Effect.gen(function* createDestinationRow() {
@@ -636,11 +659,11 @@ const createDestination = (
             sql,
             downloadDestinationColumns,
             {
-              absolutePath,
+              absolutePath: input.absolutePath,
               id: crypto.randomUUID(),
               isDefault: shouldBeDefault,
-              komgaLibraryId: input.komgaLibraryId?.trim() ?? null,
-              name: input.name.trim(),
+              komgaLibraryId: input.komgaLibraryId,
+              name: input.name,
               userId,
             }
           )}
@@ -667,6 +690,53 @@ const createDestination = (
         };
       })
     );
+  });
+
+const createManualDestination = (userId: UserId, input: CreateDestination) =>
+  Effect.gen(function* createManualDestinationEffect() {
+    if (!path.isAbsolute(input.absolutePath)) {
+      throw new Error("Destination folders must be absolute paths.");
+    }
+
+    yield* Effect.promise(async () => {
+      await mkdir(input.absolutePath, { recursive: true });
+      await assertDestinationFolder(input.absolutePath);
+    });
+
+    return yield* insertDestination(userId, {
+      absolutePath: input.absolutePath,
+      isDefault: input.isDefault,
+      komgaLibraryId: null,
+      name: input.name,
+    });
+  });
+
+const createKomgaDestination = (
+  userId: UserId,
+  input: CreateKomgaDestination
+) =>
+  Effect.gen(function* createKomgaDestinationEffect() {
+    const libraries = yield* Effect.promise(
+      async () => await listKomgaLibraries()
+    );
+    const library = libraries.find(
+      (candidate) => candidate.id === input.komgaLibraryId
+    );
+
+    if (library === undefined) {
+      throw new Error(`Komga has no library ${input.komgaLibraryId}.`);
+    }
+
+    yield* Effect.promise(async () => {
+      await assertDestinationFolder(library.root);
+    });
+
+    return yield* insertDestination(userId, {
+      absolutePath: library.root,
+      isDefault: input.isDefault,
+      komgaLibraryId: decodeKomgaLibraryId(library.id),
+      name: input.name,
+    });
   });
 
 const deleteDestination = (
@@ -758,16 +828,15 @@ const deleteDestination = (
   });
 
 export const SettingsService = {
-  async createDestination(
+  async createDestination(userId: UserId, input: CreateDestination) {
+    return await runSql(createManualDestination(userId, input));
+  },
+
+  async createKomgaDestination(
     userId: UserId,
-    input: {
-      name: string;
-      absolutePath: string;
-      komgaLibraryId?: string;
-      isDefault?: boolean;
-    }
+    input: CreateKomgaDestination
   ) {
-    return await runSql(createDestination(userId, input));
+    return await runSql(createKomgaDestination(userId, input));
   },
 
   async deleteDestination(
@@ -783,6 +852,16 @@ export const SettingsService = {
 
   async getBrowserPushSettings(userId: UserId) {
     return await runSql(getBrowserPushSettings(userId));
+  },
+
+  async getKomgaLibraries() {
+    if (!hasKomgaConfig()) {
+      return { isConfigured: false, libraries: [] };
+    }
+
+    const libraries = await listKomgaLibraries();
+
+    return { isConfigured: true, libraries };
   },
 
   async removePushSubscription(userId: UserId, input: { endpoint: string }) {
