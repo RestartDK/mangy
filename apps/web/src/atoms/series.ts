@@ -1,10 +1,15 @@
+import type {
+  SourceChapterId,
+  SourceId,
+  SourceSeriesId,
+} from "@mangy/contract";
 import { Atom } from "effect/reactivity";
 
 import { ApiAtoms } from "@/atoms/client";
 
 interface SeriesInput {
-  seriesId: string;
-  sourceId: string;
+  seriesId: SourceSeriesId;
+  sourceId: SourceId;
 }
 
 const seriesQueries = Atom.family((input: SeriesInput) => ({
@@ -24,7 +29,7 @@ export const seriesChapters = (input: SeriesInput) =>
 export const seriesDetail = (input: SeriesInput) => seriesQueries(input).detail;
 
 interface ChapterInput extends SeriesInput {
-  chapterId: string;
+  chapterId: SourceChapterId;
 }
 
 export const chapterPages = Atom.family((input: ChapterInput) =>

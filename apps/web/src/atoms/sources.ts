@@ -1,6 +1,7 @@
 import type {
   DiscoverSection,
   SourceFilterDefinition,
+  SourceId,
   SourceSeriesList,
 } from "@mangy/contract";
 import { Effect, Option, Stream } from "effect";
@@ -22,7 +23,7 @@ export const sourceFiltersIdle = Atom.make(
 );
 
 interface SourceInput {
-  sourceId: string;
+  sourceId: SourceId;
 }
 
 export const sourceFilters = Atom.family(({ sourceId }: SourceInput) =>

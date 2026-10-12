@@ -213,7 +213,7 @@ const ResultGridSkeleton = () => (
 const SearchRouteComponent = () => {
   const sourcesResult = useAtomValue(sourcesQuery);
   const sources = Option.getOrElse(AsyncResult.value(sourcesResult), () => []);
-  const sourceId = sources.find((source) => source.isEnabled)?.id ?? "";
+  const sourceId = sources.find((source) => source.isEnabled)?.id;
   const queryInput = useAtomValue(searchQueryInput);
   const query = useAtomValue(searchQuery);
   const setQueryInput = useAtomSet(searchQueryInput);
@@ -223,7 +223,7 @@ const SearchRouteComponent = () => {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const filtersResult = useAtomValue(
-    hasText(sourceId) ? sourceFilters({ sourceId }) : sourceFiltersIdle
+    sourceId === undefined ? sourceFiltersIdle : sourceFilters({ sourceId })
   );
   const definitionsValue = AsyncResult.value(filtersResult);
 
@@ -268,7 +268,7 @@ const SearchRouteComponent = () => {
     [filters, toolbarDefaults]
   );
   const isSearchEnabled =
-    hasText(sourceId) && !AsyncResult.isInitial(filtersResult);
+    sourceId !== undefined && !AsyncResult.isInitial(filtersResult);
   const searchAtom = isSearchEnabled
     ? searchPagesWithHistory({
         filters: effectiveFilters,
@@ -316,7 +316,8 @@ const SearchRouteComponent = () => {
     resultsLabel = `${pluralize(total ?? results.length, "result")} for “${query}”`;
   }
 
-  const showSkeleton = Boolean(sourceId) && AsyncResult.isInitial(searchResult);
+  const showSkeleton =
+    sourceId !== undefined && AsyncResult.isInitial(searchResult);
   const showError = Option.isSome(searchError);
 
   if (!showSkeleton && isSearching) {
@@ -491,7 +492,7 @@ const SearchRouteComponent = () => {
       {showSkeleton ||
       showError ||
       AsyncResult.isInitial(sourcesResult) ||
-      hasText(sourceId) ? null : (
+      sourceId !== undefined ? null : (
         <EmptyState
           description="No source is connected yet."
           icon="search"
@@ -499,7 +500,7 @@ const SearchRouteComponent = () => {
         />
       )}
 
-      {hasText(sourceId) &&
+      {sourceId !== undefined &&
       !(showSkeleton || showError || isSearching) &&
       results.length === 0 ? (
         <EmptyState

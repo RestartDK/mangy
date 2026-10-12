@@ -1,5 +1,9 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import type { UpdateBrowserPushPreferences } from "@mangy/contract";
+import { decodeKomgaLibraryId } from "@mangy/contract";
+import type {
+  DownloadDestinationId,
+  UpdateBrowserPushPreferences,
+} from "@mangy/contract";
 import { createFileRoute } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
@@ -340,7 +344,12 @@ const SettingsRouteComponent = () => {
   const addDestination = async (): Promise<void> => {
     const saved = await notifyMutation(
       createDestinationRequest({
-        payload: { absolutePath, isDefault, komgaLibraryId, name },
+        payload: {
+          absolutePath,
+          isDefault,
+          komgaLibraryId: decodeKomgaLibraryId(komgaLibraryId),
+          name,
+        },
         reactivityKeys: [reactivityKey.settingsBootstrap],
       }),
       { failure: "Unable to save destination", success: "Destination saved" }
@@ -354,7 +363,9 @@ const SettingsRouteComponent = () => {
     }
   };
 
-  const removeDestination = async (destinationId: string): Promise<void> => {
+  const removeDestination = async (
+    destinationId: DownloadDestinationId
+  ): Promise<void> => {
     const removed = await notifyMutation(
       deleteDestinationRequest({
         params: { destinationId },

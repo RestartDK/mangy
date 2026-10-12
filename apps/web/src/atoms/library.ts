@@ -1,3 +1,4 @@
+import type { SourceId, SourceSeriesId } from "@mangy/contract";
 import { Atom } from "effect/reactivity";
 
 import { ApiAtoms } from "@/atoms/client";
@@ -10,8 +11,8 @@ export const libraryQuery = ApiAtoms.query("library", "list", {
 });
 
 interface LibrarySeriesInput {
-  seriesId: string;
-  sourceId: string;
+  seriesId: SourceSeriesId;
+  sourceId: SourceId;
 }
 
 export const librarySeriesState = Atom.family((input: LibrarySeriesInput) =>

@@ -1,5 +1,10 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import { decodeRefreshTrackedSeries } from "@mangy/contract";
+import {
+  decodeDownloadDestinationId,
+  decodeSourceId,
+  decodeSourceSeriesId,
+} from "@mangy/contract";
+import type { DownloadDestinationId, SourceChapterId } from "@mangy/contract";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
@@ -74,14 +79,16 @@ const SeriesDetailSkeleton = () => (
 );
 interface TrackingOverrides {
   autoDownload?: boolean;
-  destinationId?: string;
+  destinationId?: DownloadDestinationId;
   isTracked?: boolean;
 }
 
 const SeriesDetailRouteComponent = () => {
-  const { sourceId, seriesId } = useParams({
+  const { sourceId: sourceIdParam, seriesId: seriesIdParam } = useParams({
     from: "/series/$sourceId/$seriesId",
   });
+  const sourceId = decodeSourceId(sourceIdParam);
+  const seriesId = decodeSourceSeriesId(seriesIdParam);
   const detailResult = useAtomValue(seriesDetail({ seriesId, sourceId }));
   const chaptersResult = useAtomValue(seriesChapters({ seriesId, sourceId }));
   const settingsResult = useAtomValue(settingsBootstrapQuery);
@@ -134,8 +141,7 @@ const SeriesDetailRouteComponent = () => {
   const trackingState = libraryState?.trackingState ?? Option.none();
   const defaultDestinationId =
     enabledDestinations.find((destination) => destination.isDefault)?.id ??
-    enabledDestinations[0]?.id ??
-    "";
+    enabledDestinations[0]?.id;
 
   const baselineDestinationId =
     libraryState === undefined
@@ -150,19 +156,20 @@ const SeriesDetailRouteComponent = () => {
     trackingOverrides.autoDownload ?? libraryState?.autoDownload ?? false;
   const selectedDestinationId =
     trackingOverrides.destinationId ?? baselineDestinationId;
+  const hasDestination = selectedDestinationId !== undefined;
   const isTrackingDirty =
     isTracked !== (libraryState?.isTracked ?? false) ||
     autoDownload !== (libraryState?.autoDownload ?? false) ||
     selectedDestinationId !== baselineDestinationId;
 
-  const canQueue = Boolean(selectedDestinationId);
+  const canQueue = hasDestination;
   const canSaveTracking =
     Boolean(libraryState) &&
     isTrackingDirty &&
-    !(autoDownload && !selectedDestinationId) &&
+    !(autoDownload && !hasDestination) &&
     !isSavingTracking;
 
-  const queueChapter = async (chapterId: string): Promise<void> => {
+  const queueChapter = async (chapterId: SourceChapterId): Promise<void> => {
     setPendingChapterId(chapterId);
     await notifyMutation(
       enqueueChapter({
@@ -429,10 +436,10 @@ const SeriesDetailRouteComponent = () => {
                     onValueChange={(value) => {
                       setTrackingOverrides((current) => ({
                         ...current,
-                        destinationId: value,
+                        destinationId: decodeDownloadDestinationId(value),
                       }));
                     }}
-                    value={selectedDestinationId || undefined}
+                    value={selectedDestinationId}
                   >
                     <SelectTrigger
                       className="h-8 w-full"
@@ -481,7 +488,7 @@ const SeriesDetailRouteComponent = () => {
                   >
                     <Switch
                       checked={autoDownload}
-                      disabled={!(isTracked && selectedDestinationId)}
+                      disabled={!(isTracked && hasDestination)}
                       onCheckedChange={(checked) => {
                         setTrackingOverrides((current) => ({
                           ...current,
@@ -526,7 +533,7 @@ const SeriesDetailRouteComponent = () => {
                           payload: {
                             autoDownload,
                             downloadDestinationId:
-                              selectedDestinationId || null,
+                              selectedDestinationId ?? null,
                             isTracked,
                             seriesId,
                             sourceId,
@@ -555,10 +562,7 @@ const SeriesDetailRouteComponent = () => {
                     onClick={() => {
                       void notifyMutation(
                         requestTrackingRefresh({
-                          payload: decodeRefreshTrackedSeries({
-                            seriesId,
-                            sourceId,
-                          }),
+                          payload: { seriesId, sourceId },
                           reactivityKeys: [
                             reactivityKey.tracking,
                             reactivityKey.notifications,
