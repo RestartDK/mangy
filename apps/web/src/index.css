@@ -158,6 +158,10 @@
     @apply mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8;
   }
 
+  .app-page > * {
+    @apply shrink-0;
+  }
+
   .page-section {
     @apply flex flex-col gap-4;
   }
