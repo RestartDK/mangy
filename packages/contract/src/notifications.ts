@@ -3,12 +3,13 @@ import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { Unauthorized } from "./auth";
 import { BadRequest } from "./errors";
+import { NotificationIdSchema } from "./ids";
 import { isoDateTimeString } from "./timestamps";
 
 export const notificationSchema = Schema.Struct({
   body: Schema.String,
   createdAt: isoDateTimeString,
-  id: Schema.String,
+  id: NotificationIdSchema,
   isRead: Schema.Boolean,
   title: Schema.String,
   type: Schema.Literals([
@@ -27,7 +28,7 @@ export const notificationPreferencesSchema = Schema.Struct({
 export type NotificationPreferences = typeof notificationPreferencesSchema.Type;
 
 export const notificationParamsSchema = Schema.Struct({
-  notificationId: Schema.String,
+  notificationId: NotificationIdSchema,
 });
 
 export type NotificationParams = typeof notificationParamsSchema.Type;

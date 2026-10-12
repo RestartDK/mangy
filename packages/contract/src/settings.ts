@@ -3,32 +3,35 @@ import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { Unauthorized } from "./auth";
 import { BadRequest } from "./errors";
+import { DownloadDestinationIdSchema, KomgaLibraryIdSchema } from "./ids";
 import { isoDateTimeString } from "./timestamps";
 
 const trimmed = Schema.Trim;
 
+const trimmedKomgaLibraryId = Schema.Trim.pipe(Schema.brand("KomgaLibraryId"));
+
 export const destinationSchema = Schema.Struct({
   absolutePath: Schema.String,
-  id: Schema.String,
+  id: DownloadDestinationIdSchema,
   isDefault: Schema.Boolean,
   isEnabled: Schema.Boolean,
-  komgaLibraryId: Schema.OptionFromNullOr(Schema.String),
+  komgaLibraryId: Schema.OptionFromNullOr(KomgaLibraryIdSchema),
   name: Schema.String,
 });
 export type Destination = typeof destinationSchema.Type;
 
 export const destinationParamsSchema = Schema.Struct({
-  destinationId: Schema.String,
+  destinationId: DownloadDestinationIdSchema,
 });
 
 export const deleteDestinationResponseSchema = Schema.Struct({
-  id: Schema.String,
+  id: DownloadDestinationIdSchema,
 });
 
 export const createDestinationBody = Schema.Struct({
   absolutePath: trimmed.check(Schema.isMinLength(1)),
   isDefault: Schema.optional(Schema.Boolean),
-  komgaLibraryId: Schema.optional(trimmed),
+  komgaLibraryId: Schema.optional(trimmedKomgaLibraryId),
   name: trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
 });
 export type CreateDestination = typeof createDestinationBody.Type;

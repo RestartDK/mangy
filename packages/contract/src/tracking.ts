@@ -1,33 +1,33 @@
-import { SeriesIdSchema, SourceIdSchema } from "@mangy/db/model/ids";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { Unauthorized } from "./auth";
+import {
+  SourceChapterIdSchema,
+  SourceIdSchema,
+  SourceSeriesIdSchema,
+  TrackedSeriesStateIdSchema,
+} from "./ids";
 import { ErrorWithoutTag } from "./schema";
 import { isoDateTimeString } from "./timestamps";
 
 export const trackedSeriesSchema = Schema.Struct({
   checkFailureCount: Schema.Int,
-  id: Schema.String,
+  id: TrackedSeriesStateIdSchema,
   lastCheckedAt: Schema.OptionFromNullOr(isoDateTimeString),
-  lastSeenChapterExternalId: Schema.OptionFromNullOr(Schema.String),
+  lastSeenChapterExternalId: Schema.OptionFromNullOr(SourceChapterIdSchema),
   nextCheckAt: Schema.OptionFromNullOr(isoDateTimeString),
-  seriesId: SeriesIdSchema,
+  seriesId: SourceSeriesIdSchema,
   sourceId: SourceIdSchema,
   title: Schema.String,
 });
 export type TrackedSeries = typeof trackedSeriesSchema.Type;
 
 export const refreshTrackedSeriesSchema = Schema.Struct({
-  seriesId: SeriesIdSchema,
+  seriesId: SourceSeriesIdSchema,
   sourceId: SourceIdSchema,
 });
 export type RefreshTrackedSeries = typeof refreshTrackedSeriesSchema.Type;
-
-export const decodeRefreshTrackedSeries = (
-  input: unknown
-): RefreshTrackedSeries =>
-  Schema.decodeUnknownSync(refreshTrackedSeriesSchema)(input);
 
 export class RefreshFailed extends ErrorWithoutTag<RefreshFailed>(
   "RefreshFailed"

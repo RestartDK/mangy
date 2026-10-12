@@ -2,35 +2,40 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { Unauthorized } from "./auth";
+import {
+  SourceChapterIdSchema,
+  SourceIdSchema,
+  SourceSeriesIdSchema,
+} from "./ids";
 import { SeriesPageNotFound } from "./series-page-not-found";
 import { SeriesRequestFailed } from "./series-request-failed";
 import { sourceSeriesSchema } from "./sources";
 import { isoDateTimeString } from "./timestamps";
 
 export const seriesParamsSchema = Schema.Struct({
-  seriesId: Schema.String,
+  seriesId: SourceSeriesIdSchema,
 });
 
 export const seriesSourceQuerySchema = Schema.Struct({
-  sourceId: Schema.String,
+  sourceId: SourceIdSchema,
 });
 
 export const seriesChapterParamsSchema = Schema.Struct({
-  chapterId: Schema.String,
-  seriesId: Schema.String,
+  chapterId: SourceChapterIdSchema,
+  seriesId: SourceSeriesIdSchema,
 });
 
 export const seriesPageParamsSchema = Schema.Struct({
-  chapterId: Schema.String,
+  chapterId: SourceChapterIdSchema,
   pageIndex: Schema.Number.check(
     Schema.isInt(),
     Schema.isGreaterThanOrEqualTo(0)
   ),
-  seriesId: Schema.String,
+  seriesId: SourceSeriesIdSchema,
 });
 
 export const chapterSchema = Schema.Struct({
-  chapterId: Schema.String,
+  chapterId: SourceChapterIdSchema,
   chapterNumber: Schema.NullOr(Schema.String),
   externalUrl: Schema.NullOr(Schema.String),
   isUnavailable: Schema.Boolean,
