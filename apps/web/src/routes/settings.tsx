@@ -14,7 +14,9 @@ import {
   browserPushClientState,
   browserPushSettingsQuery,
   createDestination,
+  createKomgaDestination,
   deleteDestination,
+  komgaLibrariesQuery,
   removePushSubscription,
   savePushSubscription,
   sendTestPush,
@@ -130,9 +132,13 @@ const SettingsSkeleton = () => (
 );
 const SettingsRouteComponent = () => {
   const settingsResult = useAtomValue(settingsBootstrapQuery);
+  const komgaLibrariesResult = useAtomValue(komgaLibrariesQuery);
   const pushSettingsResult = useAtomValue(browserPushSettingsQuery);
   const clientStateResult = useAtomValue(browserPushClientState);
   const createDestinationRequest = useAtomSet(createDestination, {
+    mode: "promise",
+  });
+  const createKomgaDestinationRequest = useAtomSet(createKomgaDestination, {
     mode: "promise",
   });
   const deleteDestinationRequest = useAtomSet(deleteDestination, {
@@ -158,6 +164,7 @@ const SettingsRouteComponent = () => {
     mode: "promise",
   });
   const createDestinationResult = useAtomValue(createDestination);
+  const createKomgaDestinationResult = useAtomValue(createKomgaDestination);
   const deleteDestinationResult = useAtomValue(deleteDestination);
   const notificationPreferencesResult = useAtomValue(
     updateNotificationPreferences
@@ -168,7 +175,9 @@ const SettingsRouteComponent = () => {
   const connectPushResult = useAtomValue(savePushSubscription);
   const disconnectPushResult = useAtomValue(removePushSubscription);
   const sendPushTestResult = useAtomValue(sendTestPush);
-  const isSavingDestination = AsyncResult.isWaiting(createDestinationResult);
+  const isSavingDestination =
+    AsyncResult.isWaiting(createDestinationResult) ||
+    AsyncResult.isWaiting(createKomgaDestinationResult);
   const isRemovingDestination = AsyncResult.isWaiting(deleteDestinationResult);
   const isSavingNotificationPreferences = AsyncResult.isWaiting(
     notificationPreferencesResult
@@ -181,7 +190,8 @@ const SettingsRouteComponent = () => {
   const isSendingPushTest = AsyncResult.isWaiting(sendPushTestResult);
   const [name, setName] = useState("");
   const [absolutePath, setAbsolutePath] = useState("");
-  const [komgaLibraryId, setKomgaLibraryId] = useState("");
+  const [selectedKomgaLibraryId, setSelectedKomgaLibraryId] = useState("");
+  const [isManualFolder, setIsManualFolder] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
   const [inAppOverride, setInAppOverride] = useState<boolean | null>(null);
   const [pushPreferenceOverrides, setPushPreferenceOverrides] = useState<
@@ -198,6 +208,40 @@ const SettingsRouteComponent = () => {
   const browserPushClientStateValue = Option.getOrUndefined(
     AsyncResult.value(clientStateResult)
   );
+  const komgaLibrariesState = Option.getOrUndefined(
+    AsyncResult.value(komgaLibrariesResult)
+  );
+  const komgaLibraries = komgaLibrariesState?.libraries ?? [];
+  const komgaCause = AsyncResult.cause(komgaLibrariesResult);
+  const isLoadingKomgaLibraries =
+    AsyncResult.isInitial(komgaLibrariesResult) ||
+    AsyncResult.isWaiting(komgaLibrariesResult);
+  const canUseKomgaLibraries = komgaLibraries.length > 0;
+  const usesManualFolder =
+    isManualFolder || (!isLoadingKomgaLibraries && !canUseKomgaLibraries);
+  const selectedKomgaLibrary = komgaLibraries.find(
+    (library) => library.id === selectedKomgaLibraryId
+  );
+  const komgaUnavailableNote = (): string => {
+    if (isLoadingKomgaLibraries) {
+      return "Checking Komga libraries.";
+    }
+
+    if (Option.isSome(komgaCause)) {
+      return formatCause(
+        komgaCause.value,
+        "Komga libraries are unavailable, so destinations are folders."
+      );
+    }
+
+    return komgaLibrariesState?.isConfigured === true
+      ? "This Komga has no libraries yet, so destinations are folders."
+      : "Komga is not configured on this server, so destinations are folders.";
+  };
+
+  const komgaLibraryName = (libraryId: string): string =>
+    komgaLibraries.find((library) => library.id === libraryId)?.name ??
+    libraryId;
 
   const inAppEnabled =
     inAppOverride ?? settings?.notifications.inAppEnabled ?? true;
@@ -338,19 +382,29 @@ const SettingsRouteComponent = () => {
   };
 
   const addDestination = async (): Promise<void> => {
+    const reactivityKeys = [reactivityKey.settingsBootstrap];
     const saved = await notifyMutation(
-      createDestinationRequest({
-        payload: { absolutePath, isDefault, komgaLibraryId, name },
-        reactivityKeys: [reactivityKey.settingsBootstrap],
-      }),
+      usesManualFolder
+        ? createDestinationRequest({
+            payload: { absolutePath, isDefault, name },
+            reactivityKeys,
+          })
+        : createKomgaDestinationRequest({
+            payload: {
+              isDefault,
+              komgaLibraryId: selectedKomgaLibraryId,
+              name,
+            },
+            reactivityKeys,
+          }),
       { failure: "Unable to save destination", success: "Destination saved" }
     );
 
     if (saved) {
       setAbsolutePath("");
       setIsDefault(false);
-      setKomgaLibraryId("");
       setName("");
+      setSelectedKomgaLibraryId("");
     }
   };
 
@@ -691,7 +745,8 @@ const SettingsRouteComponent = () => {
                       </p>
                       {Option.isSome(destination.komgaLibraryId) ? (
                         <p className="meta break-all">
-                          Komga library {destination.komgaLibraryId.value}
+                          Komga library{" "}
+                          {komgaLibraryName(destination.komgaLibraryId.value)}
                         </p>
                       ) : null}
                     </div>
@@ -745,41 +800,66 @@ const SettingsRouteComponent = () => {
                   />
                 </Field>
 
-                <Field>
-                  <FieldLabel htmlFor={destinationFieldIds.absolutePath}>
-                    Absolute path
-                  </FieldLabel>
-                  <Input
-                    className="h-8"
-                    id={destinationFieldIds.absolutePath}
-                    onChange={(event) => {
-                      setAbsolutePath(event.target.value);
-                    }}
-                    placeholder="/srv/media/manga"
-                    value={absolutePath}
-                  />
-                  <FieldDescription className="text-xs">
-                    Folder where downloads are written.
-                  </FieldDescription>
-                </Field>
+                <ToggleRow
+                  checked={usesManualFolder}
+                  description={
+                    canUseKomgaLibraries
+                      ? "Write to a folder Komga does not watch."
+                      : komgaUnavailableNote()
+                  }
+                  disabled={!canUseKomgaLibraries && !isLoadingKomgaLibraries}
+                  label="Manual folder"
+                  onCheckedChange={setIsManualFolder}
+                />
 
-                <Field>
-                  <FieldLabel htmlFor={destinationFieldIds.komgaLibraryId}>
-                    Komga library ID
-                  </FieldLabel>
-                  <Input
-                    className="h-8"
-                    id={destinationFieldIds.komgaLibraryId}
-                    onChange={(event) => {
-                      setKomgaLibraryId(event.target.value);
-                    }}
-                    placeholder="Optional"
-                    value={komgaLibraryId}
-                  />
-                  <FieldDescription className="text-xs">
-                    Only needed to tie this folder to a Komga library.
-                  </FieldDescription>
-                </Field>
+                {usesManualFolder ? (
+                  <Field>
+                    <FieldLabel htmlFor={destinationFieldIds.absolutePath}>
+                      Absolute path
+                    </FieldLabel>
+                    <Input
+                      className="h-8"
+                      id={destinationFieldIds.absolutePath}
+                      onChange={(event) => {
+                        setAbsolutePath(event.target.value);
+                      }}
+                      placeholder="/srv/media/manga"
+                      value={absolutePath}
+                    />
+                    <FieldDescription className="text-xs">
+                      Folder where downloads are written.
+                    </FieldDescription>
+                  </Field>
+                ) : (
+                  <Field>
+                    <FieldLabel htmlFor={destinationFieldIds.komgaLibraryId}>
+                      Komga library
+                    </FieldLabel>
+                    <Select
+                      disabled={isLoadingKomgaLibraries}
+                      onValueChange={setSelectedKomgaLibraryId}
+                      value={selectedKomgaLibraryId}
+                    >
+                      <SelectTrigger
+                        className="h-8 w-full"
+                        id={destinationFieldIds.komgaLibraryId}
+                      >
+                        <SelectValue placeholder="Choose a library" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {komgaLibraries.map((library) => (
+                          <SelectItem key={library.id} value={library.id}>
+                            {library.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription className="text-xs">
+                      {selectedKomgaLibrary?.root ??
+                        "Downloads land in the root folder of the library you pick."}
+                    </FieldDescription>
+                  </Field>
+                )}
               </FieldGroup>
 
               <ToggleRow
@@ -794,7 +874,9 @@ const SettingsRouteComponent = () => {
                 disabled={
                   isSavingDestination ||
                   name.trim().length === 0 ||
-                  absolutePath.trim().length === 0
+                  (usesManualFolder
+                    ? absolutePath.trim().length === 0
+                    : selectedKomgaLibrary === undefined)
                 }
                 size="lg"
                 type="submit"

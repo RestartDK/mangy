@@ -659,6 +659,7 @@
   "@mangy/db" = copyPathToStore ./packages/db;
   "@mangy/downloader" = copyPathToStore ./packages/downloader;
   "@mangy/env" = copyPathToStore ./packages/env;
+  "@mangy/komga" = copyPathToStore ./packages/komga;
   "@mangy/push" = copyPathToStore ./packages/push;
   "@mangy/source-sdk" = copyPathToStore ./packages/source-sdk;
   "@modelcontextprotocol/sdk@1.28.0" = fetchurl {

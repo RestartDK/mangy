@@ -21,17 +21,41 @@ export const destinationParamsSchema = Schema.Struct({
   destinationId: Schema.String,
 });
 
+export const komgaLibrarySchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  root: Schema.String,
+});
+export type KomgaLibrary = typeof komgaLibrarySchema.Type;
+
+export const komgaLibrariesSchema = Schema.Struct({
+  isConfigured: Schema.Boolean,
+  libraries: Schema.Array(komgaLibrarySchema),
+});
+export type KomgaLibraries = typeof komgaLibrariesSchema.Type;
+
 export const deleteDestinationResponseSchema = Schema.Struct({
   id: Schema.String,
 });
 
+const destinationName = trimmed.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(120)
+);
+
 export const createDestinationBody = Schema.Struct({
   absolutePath: trimmed.check(Schema.isMinLength(1)),
   isDefault: Schema.optional(Schema.Boolean),
-  komgaLibraryId: Schema.optional(trimmed),
-  name: trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  name: destinationName,
 });
 export type CreateDestination = typeof createDestinationBody.Type;
+
+export const createKomgaDestinationBody = Schema.Struct({
+  isDefault: Schema.optional(Schema.Boolean),
+  komgaLibraryId: trimmed.check(Schema.isMinLength(1)),
+  name: destinationName,
+});
+export type CreateKomgaDestination = typeof createKomgaDestinationBody.Type;
 
 export const profileSchema = Schema.Struct({
   email: Schema.String,
@@ -126,11 +150,24 @@ export const SettingsApi = HttpApiGroup.make("settings")
       error: [Unauthorized, BadRequest],
       success: browserPushTestResponseSchema,
     }),
+    HttpApiEndpoint.get("getKomgaLibraries", "/komga-libraries", {
+      error: [Unauthorized, BadRequest],
+      success: komgaLibrariesSchema,
+    }),
     HttpApiEndpoint.post("createDestination", "/destinations", {
       error: [Unauthorized, BadRequest],
       payload: createDestinationBody,
       success: destinationSchema,
     }),
+    HttpApiEndpoint.post(
+      "createKomgaDestination",
+      "/destinations/komga-library",
+      {
+        error: [Unauthorized, BadRequest],
+        payload: createKomgaDestinationBody,
+        success: destinationSchema,
+      }
+    ),
     HttpApiEndpoint.delete(
       "deleteDestination",
       "/destinations/:destinationId",
