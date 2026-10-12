@@ -27,6 +27,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
+import { isActiveRoute } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 const navigationGroups = [
@@ -56,14 +57,6 @@ const navigationGroups = [
 interface AppShellProps extends PropsWithChildren {
   contentClassName?: string;
 }
-
-const isActiveRoute = (pathname: string, to: string): boolean => {
-  if (to === "/") {
-    return pathname === "/";
-  }
-
-  return pathname === to || pathname.startsWith(`${to}/`);
-};
 
 export const AppShell = ({ children, contentClassName }: AppShellProps) => {
   const pathname = useRouterState({
