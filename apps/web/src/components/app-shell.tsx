@@ -17,7 +17,6 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -29,28 +28,13 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
-const navigationGroups = [
-  {
-    items: [
-      { icon: Compass, label: "Discover", to: "/" },
-      { icon: Search, label: "Search", to: "/search" },
-    ],
-    label: "Browse",
-  },
-  {
-    items: [
-      { icon: BookMarked, label: "Library", to: "/library" },
-      { icon: Download, label: "Queue", to: "/queue" },
-    ],
-    label: "Manage",
-  },
-  {
-    items: [
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: Settings, label: "Settings", to: "/settings" },
-    ],
-    label: "Account",
-  },
+const navigationItems = [
+  { icon: Compass, label: "Discover", to: "/" },
+  { icon: Search, label: "Search", to: "/search" },
+  { icon: BookMarked, label: "Library", to: "/library" },
+  { icon: Download, label: "Queue", to: "/queue" },
+  { icon: Bell, label: "Notifications", to: "/notifications" },
+  { icon: Settings, label: "Settings", to: "/settings" },
 ] as const;
 
 interface AppShellProps extends PropsWithChildren {
@@ -90,35 +74,30 @@ export const AppShell = ({ children, contentClassName }: AppShellProps) => {
             </span>
           </Link>
         </SidebarHeader>
-        <SidebarContent className="gap-4">
-          {navigationGroups.map((group) => (
-            <SidebarGroup className="gap-1 py-0" key={group.label}>
-              <SidebarGroupLabel className="text-muted-foreground px-2 text-xs font-normal">
-                {group.label}
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-0.5">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <SidebarMenuItem key={item.to}>
-                        <SidebarMenuButton
-                          asChild
-                          className="h-8 px-2 data-[active=true]:font-medium"
-                          isActive={isActiveRoute(pathname, item.to)}
-                        >
-                          <Link to={item.to}>
-                            <Icon className="size-4" />
-                            <span>{item.label}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
+        <SidebarContent>
+          <SidebarGroup className="gap-1 py-0">
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+                {navigationItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton
+                        asChild
+                        className="h-8 px-2 data-[active=true]:font-medium"
+                        isActive={isActiveRoute(pathname, item.to)}
+                      >
+                        <Link to={item.to}>
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="min-h-0 overflow-hidden">
