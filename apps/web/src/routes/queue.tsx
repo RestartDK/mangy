@@ -1,4 +1,5 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import type { DownloadJobId } from "@mangy/contract";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
@@ -66,8 +67,8 @@ interface QueueListProps {
   isCancelling: boolean;
   isRetrying: boolean;
   jobs: DownloadItem[];
-  onCancel: (jobId: string) => void;
-  onRetry: (jobId: string) => void;
+  onCancel: (jobId: DownloadJobId) => void;
+  onRetry: (jobId: DownloadJobId) => void;
 }
 
 const QueueList = ({
@@ -192,7 +193,7 @@ const QueueRouteComponent = () => {
   const isCancelling = AsyncResult.isWaiting(cancelResult);
   const isRetrying = AsyncResult.isWaiting(retryResult);
 
-  const onCancel = (jobId: string): void => {
+  const onCancel = (jobId: DownloadJobId): void => {
     void notifyMutation(
       cancelDownload({
         params: { jobId },
@@ -202,7 +203,7 @@ const QueueRouteComponent = () => {
     );
   };
 
-  const onRetry = (jobId: string): void => {
+  const onRetry = (jobId: DownloadJobId): void => {
     void notifyMutation(
       retryDownload({
         params: { jobId },

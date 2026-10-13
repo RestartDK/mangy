@@ -1,13 +1,13 @@
 import { column, decodeRows, runSql, table, updateRow } from "@mangy/db";
 import {
   Series,
-  SeriesIdSchema,
+  SourceSeriesIdSchema,
   TrackedSeriesState,
   libraryEntryColumns,
   seriesColumns,
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
-import type { SeriesId, SourceId, UserId } from "@mangy/db/model";
+import type { SourceId, SourceSeriesId, UserId } from "@mangy/db/model";
 import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import type { Fragment } from "effect/sql/Statement";
@@ -19,7 +19,7 @@ const trackedSeriesProjection = Schema.Struct({
   lastSeenChapterExternalId:
     TrackedSeriesState.fields.lastSeenChapterExternalId,
   nextCheckAt: TrackedSeriesState.fields.nextCheckAt,
-  seriesId: SeriesIdSchema,
+  seriesId: SourceSeriesIdSchema,
   sourceId: Series.fields.sourceId,
   title: Series.fields.title,
 });
@@ -73,7 +73,7 @@ const list = (userId: UserId) =>
 const requestRefresh = (
   userId: UserId,
   sourceId: SourceId,
-  seriesId: SeriesId
+  seriesId: SourceSeriesId
 ) =>
   Effect.gen(function* requestRefreshEffect() {
     const sql = yield* SqlClient.SqlClient;
@@ -117,7 +117,11 @@ export const TrackingService = {
     return await runSql(list(userId));
   },
 
-  async requestRefresh(userId: UserId, sourceId: SourceId, seriesId: SeriesId) {
+  async requestRefresh(
+    userId: UserId,
+    sourceId: SourceId,
+    seriesId: SourceSeriesId
+  ) {
     return await runSql(requestRefresh(userId, sourceId, seriesId));
   },
 };

@@ -1,14 +1,14 @@
 import { Schema } from "effect";
 import { Model } from "effect/schema";
 
-import { ChapterIdSchema, SeriesIdSchema } from "./ids";
+import { ChapterIdSchema, SeriesIdSchema, SourceChapterIdSchema } from "./ids";
 
 export const chapterTable = "chapter";
 
 export class Chapter extends Model.Class<Chapter>("Chapter")({
   chapterNumber: Schema.OptionFromNullOr(Schema.String),
   createdAt: Schema.Date,
-  externalId: Schema.String,
+  externalId: SourceChapterIdSchema,
   externalUrl: Schema.OptionFromNullOr(Schema.String),
   id: ChapterIdSchema,
   isDownloaded: Schema.Boolean,

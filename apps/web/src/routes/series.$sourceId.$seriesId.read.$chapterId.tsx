@@ -1,4 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
+import {
+  decodeSourceChapterId,
+  decodeSourceId,
+  decodeSourceSeriesId,
+} from "@mangy/contract";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
@@ -29,9 +34,16 @@ const ReaderSkeleton = () => (
   </div>
 );
 const ReaderRouteComponent = () => {
-  const { chapterId, seriesId, sourceId } = useParams({
+  const {
+    chapterId: chapterIdParam,
+    seriesId: seriesIdParam,
+    sourceId: sourceIdParam,
+  } = useParams({
     from: "/series/$sourceId/$seriesId/read/$chapterId",
   });
+  const sourceId = decodeSourceId(sourceIdParam);
+  const seriesId = decodeSourceSeriesId(seriesIdParam);
+  const chapterId = decodeSourceChapterId(chapterIdParam);
   const detailResult = useAtomValue(seriesDetail({ seriesId, sourceId }));
   const chaptersResult = useAtomValue(seriesChapters({ seriesId, sourceId }));
   const pagesResult = useAtomValue(

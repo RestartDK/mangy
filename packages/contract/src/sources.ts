@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { Unauthorized } from "./auth";
+import { SourceIdSchema, SourceSeriesIdSchema } from "./ids";
 
 export const sourceCapabilitiesSchema = Schema.Struct({
   supportsChapterFeed: Schema.Boolean,
@@ -18,7 +19,7 @@ export const sourceSchema = Schema.Struct({
   capabilities: sourceCapabilitiesSchema,
   description: Schema.String,
   iconUrl: Schema.OptionFromNullOr(Schema.String),
-  id: Schema.String,
+  id: SourceIdSchema,
   isEnabled: Schema.Boolean,
   languageCode: Schema.String,
   name: Schema.String,
@@ -67,8 +68,8 @@ export const sourceSeriesSchema = Schema.Struct({
   latestChapter: Schema.NullOr(Schema.String),
   originalLanguage: Schema.NullOr(Schema.String),
   publicationDemographic: Schema.NullOr(Schema.String),
-  seriesId: Schema.String,
-  sourceId: Schema.String,
+  seriesId: SourceSeriesIdSchema,
+  sourceId: SourceIdSchema,
   status: Schema.Literals([
     "ongoing",
     "completed",
@@ -91,7 +92,7 @@ export const sourceSeriesListSchema = Schema.Struct({
 export type SourceSeriesList = typeof sourceSeriesListSchema.Type;
 
 export const sourceDiscoverSectionSchema = Schema.Struct({
-  id: Schema.String,
+  id: Schema.Literals(["popular", "latest", "trending"]),
   items: Schema.Array(sourceSeriesSchema),
   title: Schema.String,
   type: Schema.Literals(["popular", "latest", "trending"]),
@@ -115,7 +116,7 @@ export const sourceDiscoverQuery = Schema.Struct({
 });
 
 export const sourceParamsSchema = Schema.Struct({
-  sourceId: Schema.String,
+  sourceId: SourceIdSchema,
 });
 
 export const SourcesApi = HttpApiGroup.make("sources")

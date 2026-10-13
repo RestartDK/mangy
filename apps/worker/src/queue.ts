@@ -1,5 +1,10 @@
 import { column, decodeRows, runSql, table } from "@mangy/db";
-import { DownloadJob, downloadJobColumns } from "@mangy/db/model";
+import {
+  DownloadJob,
+  downloadJobColumns,
+  DownloadJobIdSchema,
+} from "@mangy/db/model";
+import type { DownloadJobId } from "@mangy/db/model";
 import {
   Data,
   Duration,
@@ -20,7 +25,7 @@ import {
 import type { ClaimedDownloadJob } from "./jobs";
 import { runDownloadJob } from "./runner";
 
-const downloadQueueElement = Schema.Struct({ jobId: Schema.String });
+const downloadQueueElement = Schema.Struct({ jobId: DownloadJobIdSchema });
 type DownloadQueueElement = Schema.Schema.Type<typeof downloadQueueElement>;
 type DownloadQueue = PersistedQueue.PersistedQueue<DownloadQueueElement>;
 
@@ -47,7 +52,7 @@ export const makeDownloadQueue = PersistedQueue.make({
   schema: downloadQueueElement,
 });
 
-const markDownloadJobRunning = (jobId: string, attempts: number) =>
+const markDownloadJobRunning = (jobId: DownloadJobId, attempts: number) =>
   Effect.gen(function* markDownloadJobRunningEffect() {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`UPDATE ${table("downloadJob")} SET
@@ -59,7 +64,10 @@ const markDownloadJobRunning = (jobId: string, attempts: number) =>
       WHERE ${column(downloadJobColumns, "id")} = ${jobId}`;
   });
 
-const watchForCancellation = (jobId: string, cancelled: { value: boolean }) =>
+const watchForCancellation = (
+  jobId: DownloadJobId,
+  cancelled: { value: boolean }
+) =>
   isDownloadJobCancelled(jobId).pipe(
     Effect.repeat({
       schedule: Schedule.spaced(cancellationPollInterval),

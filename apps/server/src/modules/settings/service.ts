@@ -20,6 +20,7 @@ import {
   notificationEndpointColumns,
   pushSubscriptionColumns,
 } from "@mangy/db/model";
+import type { DownloadDestinationId, UserId } from "@mangy/db/model";
 import {
   BrowserPushError,
   getBrowserPushPublicKey,
@@ -101,7 +102,7 @@ const toBrowserPushEndpoint = (row: BrowserPushEndpoint) => ({
   notifyOnTrackedSeriesUpdate: row.notify_on_tracked_series_update,
 });
 
-const getBrowserPushEndpointRecord = (userId: string) =>
+const getBrowserPushEndpointRecord = (userId: UserId) =>
   Effect.gen(function* getBrowserPushEndpointRecordEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -126,7 +127,7 @@ const getBrowserPushEndpointRecord = (userId: string) =>
     return record ? toBrowserPushEndpoint(record) : null;
   });
 
-const countActivePushSubscriptions = (userId: string) =>
+const countActivePushSubscriptions = (userId: UserId) =>
   Effect.gen(function* countActivePushSubscriptionsEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -140,7 +141,7 @@ const countActivePushSubscriptions = (userId: string) =>
   });
 
 const upsertBrowserPushEndpoint = (
-  userId: string,
+  userId: UserId,
   input: Partial<BrowserPushPreferencesInput>
 ) =>
   Effect.gen(function* upsertBrowserPushEndpointEffect() {
@@ -247,7 +248,7 @@ const assertValidPushEndpoint = (value: string): void => {
 };
 
 const updateBrowserPushObservability = (
-  userId: string,
+  userId: UserId,
   input: {
     lastDeliveredAt?: Date | null;
     lastError?: string | null;
@@ -284,7 +285,7 @@ const updateBrowserPushObservability = (
       WHERE ${column(notificationEndpointColumns, "id")} = ${endpoint.id}`;
   });
 
-const getBootstrap = (userId: string, profile: UserProfile) =>
+const getBootstrap = (userId: UserId, profile: UserProfile) =>
   Effect.gen(function* getBootstrapEffect() {
     const sql = yield* SqlClient.SqlClient;
     const [destinations, notifications] = yield* Effect.all(
@@ -329,7 +330,7 @@ const getBootstrap = (userId: string, profile: UserProfile) =>
     };
   });
 
-const getBrowserPushSettings = (userId: string) =>
+const getBrowserPushSettings = (userId: UserId) =>
   Effect.gen(function* getBrowserPushSettingsEffect() {
     const [endpoint, activeSubscriptionCount] = yield* Effect.all(
       [
@@ -367,7 +368,7 @@ const getBrowserPushSettings = (userId: string) =>
   });
 
 const updateBrowserPushPreferences = (
-  userId: string,
+  userId: UserId,
   input: BrowserPushPreferencesInput
 ) =>
   Effect.gen(function* updateBrowserPushPreferencesEffect() {
@@ -378,7 +379,7 @@ const updateBrowserPushPreferences = (
   });
 
 const savePushSubscription = (
-  userId: string,
+  userId: UserId,
   input: BrowserPushSubscriptionInput
 ) =>
   Effect.gen(function* savePushSubscriptionEffect() {
@@ -430,7 +431,7 @@ const savePushSubscription = (
     return yield* getBrowserPushSettings(userId);
   });
 
-const removePushSubscription = (userId: string, input: { endpoint: string }) =>
+const removePushSubscription = (userId: UserId, input: { endpoint: string }) =>
   Effect.gen(function* removePushSubscriptionEffect() {
     const sql = yield* SqlClient.SqlClient;
     assertValidPushEndpoint(input.endpoint);
@@ -466,7 +467,7 @@ const removePushSubscription = (userId: string, input: { endpoint: string }) =>
     return yield* getBrowserPushSettings(userId);
   });
 
-const sendTestBrowserPush = (userId: string) =>
+const sendTestBrowserPush = (userId: UserId) =>
   Effect.gen(function* sendTestBrowserPushEffect() {
     const sql = yield* SqlClient.SqlClient;
     const subscriptions = yield* decodeRows(
@@ -583,7 +584,7 @@ const sendTestBrowserPush = (userId: string) =>
   });
 
 const createDestination = (
-  userId: string,
+  userId: UserId,
   input: {
     name: string;
     absolutePath: string;
@@ -668,7 +669,10 @@ const createDestination = (
     );
   });
 
-const deleteDestination = (userId: string, destinationId: string) =>
+const deleteDestination = (
+  userId: UserId,
+  destinationId: DownloadDestinationId
+) =>
   Effect.gen(function* deleteDestinationEffect() {
     const sql = yield* SqlClient.SqlClient;
 
@@ -755,7 +759,7 @@ const deleteDestination = (userId: string, destinationId: string) =>
 
 export const SettingsService = {
   async createDestination(
-    userId: string,
+    userId: UserId,
     input: {
       name: string;
       absolutePath: string;
@@ -766,35 +770,38 @@ export const SettingsService = {
     return await runSql(createDestination(userId, input));
   },
 
-  async deleteDestination(userId: string, destinationId: string) {
+  async deleteDestination(
+    userId: UserId,
+    destinationId: DownloadDestinationId
+  ) {
     return await runSql(deleteDestination(userId, destinationId));
   },
 
-  async getBootstrap(userId: string, profile: UserProfile) {
+  async getBootstrap(userId: UserId, profile: UserProfile) {
     return await runSql(getBootstrap(userId, profile));
   },
 
-  async getBrowserPushSettings(userId: string) {
+  async getBrowserPushSettings(userId: UserId) {
     return await runSql(getBrowserPushSettings(userId));
   },
 
-  async removePushSubscription(userId: string, input: { endpoint: string }) {
+  async removePushSubscription(userId: UserId, input: { endpoint: string }) {
     return await runSql(removePushSubscription(userId, input));
   },
 
   async savePushSubscription(
-    userId: string,
+    userId: UserId,
     input: BrowserPushSubscriptionInput
   ) {
     return await runSql(savePushSubscription(userId, input));
   },
 
-  async sendTestBrowserPush(userId: string) {
+  async sendTestBrowserPush(userId: UserId) {
     return await runSql(sendTestBrowserPush(userId));
   },
 
   async updateBrowserPushPreferences(
-    userId: string,
+    userId: UserId,
     input: BrowserPushPreferencesInput
   ) {
     return await runSql(updateBrowserPushPreferences(userId, input));

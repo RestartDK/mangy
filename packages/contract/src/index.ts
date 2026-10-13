@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./client";
 export * from "./downloads";
 export * from "./errors";
+export * from "./ids";
 export * from "./library";
 export * from "./live";
 export * from "./notifications";

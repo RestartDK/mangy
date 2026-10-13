@@ -16,6 +16,14 @@ import {
   seriesColumns,
   trackedSeriesStateColumns,
 } from "@mangy/db/model";
+import type {
+  DownloadDestinationId,
+  LibraryEntryId,
+  SeriesId,
+  SourceId,
+  SourceSeriesId,
+  UserId,
+} from "@mangy/db/model";
 import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -32,12 +40,15 @@ const getTrackingPollIntervalMs = (rawIntervalMs: string): number => {
   return intervalMs;
 };
 
-const createEmptySeriesState = (sourceId: string, seriesId: string) => ({
+const createEmptySeriesState = (
+  sourceId: SourceId,
+  seriesId: SourceSeriesId
+) => ({
   autoDownload: false,
-  downloadDestinationId: Option.none<string>(),
+  downloadDestinationId: Option.none<DownloadDestinationId>(),
   downloadDestinationName: Option.none<string>(),
   isTracked: false,
-  libraryEntryId: Option.none<string>(),
+  libraryEntryId: Option.none<LibraryEntryId>(),
   seriesId,
   sourceId,
   trackingState: Option.none(),
@@ -89,9 +100,9 @@ const serializeSeriesState = (row: SeriesStateRow) => ({
 });
 
 const getSeriesStateRow = (
-  userId: string,
-  sourceId: string,
-  seriesId: string
+  userId: UserId,
+  sourceId: SourceId,
+  seriesId: SourceSeriesId
 ) =>
   Effect.gen(function* getSeriesStateRowEffect() {
     const sql = yield* SqlClient.SqlClient;
@@ -122,7 +133,11 @@ const getSeriesStateRow = (
     return rows[0] ?? null;
   });
 
-const getSeriesState = (userId: string, sourceId: string, seriesId: string) =>
+const getSeriesState = (
+  userId: UserId,
+  sourceId: SourceId,
+  seriesId: SourceSeriesId
+) =>
   Effect.gen(function* getSeriesStateEffect() {
     const row = yield* getSeriesStateRow(userId, sourceId, seriesId);
 
@@ -133,7 +148,7 @@ const getSeriesState = (userId: string, sourceId: string, seriesId: string) =>
     return serializeSeriesState(row);
   });
 
-const list = (userId: string) =>
+const list = (userId: UserId) =>
   Effect.gen(function* listEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -179,7 +194,7 @@ const list = (userId: string) =>
     }));
   });
 
-const resolveSeriesRecord = (sourceId: string, seriesId: string) =>
+const resolveSeriesRecord = (sourceId: SourceId, seriesId: SourceSeriesId) =>
   Effect.gen(function* resolveSeriesRecordEffect() {
     const existingRecord = yield* Effect.promise(
       async () => await SourcesStorage.findSeriesRecord(sourceId, seriesId)
@@ -197,9 +212,9 @@ const resolveSeriesRecord = (sourceId: string, seriesId: string) =>
   });
 
 const resolveDestinationId = (
-  userId: string,
-  requestedDestinationId: string | null | undefined,
-  existingDestinationId: Option.Option<string>
+  userId: UserId,
+  requestedDestinationId: DownloadDestinationId | null | undefined,
+  existingDestinationId: Option.Option<DownloadDestinationId>
 ) =>
   Effect.gen(function* resolveDestinationIdEffect() {
     const sql = yield* SqlClient.SqlClient;
@@ -212,7 +227,7 @@ const resolveDestinationId = (
           );
 
     if (Option.isNone(destinationId)) {
-      return Option.none<string>();
+      return Option.none<DownloadDestinationId>();
     }
 
     const destinationIdValue = Option.getOrThrow(destinationId);
@@ -240,10 +255,10 @@ const resolveDestinationId = (
 const upsertTrackedState = (input: {
   hadTrackingState: boolean;
   isAlreadyTracked: boolean;
-  libraryEntryId: string;
-  seriesExternalId: string;
-  seriesRecordId: string;
-  sourceId: string;
+  libraryEntryId: LibraryEntryId;
+  seriesExternalId: SourceSeriesId;
+  seriesRecordId: SeriesId;
+  sourceId: SourceId;
   trackingPollIntervalMs: string;
 }) =>
   Effect.gen(function* upsertTrackedStateEffect() {
@@ -316,13 +331,13 @@ const upsertTrackedState = (input: {
   });
 
 const updateSeriesState = (
-  userId: string,
+  userId: UserId,
   input: {
-    sourceId: string;
-    seriesId: string;
+    sourceId: SourceId;
+    seriesId: SourceSeriesId;
     isTracked: boolean;
     autoDownload: boolean;
-    downloadDestinationId?: string | null;
+    downloadDestinationId?: DownloadDestinationId | null;
   },
   trackingPollIntervalMs: string
 ) =>
@@ -399,7 +414,11 @@ const updateSeriesState = (
     return yield* getSeriesState(userId, input.sourceId, input.seriesId);
   });
 
-const removeSeries = (userId: string, sourceId: string, seriesId: string) =>
+const removeSeries = (
+  userId: UserId,
+  sourceId: SourceId,
+  seriesId: SourceSeriesId
+) =>
   Effect.gen(function* removeSeriesEffect() {
     const sql = yield* SqlClient.SqlClient;
     const row = yield* getSeriesStateRow(userId, sourceId, seriesId);
@@ -419,26 +438,34 @@ const removeSeries = (userId: string, sourceId: string, seriesId: string) =>
   });
 
 export const LibraryService = {
-  async getSeriesState(userId: string, sourceId: string, seriesId: string) {
+  async getSeriesState(
+    userId: UserId,
+    sourceId: SourceId,
+    seriesId: SourceSeriesId
+  ) {
     return await runSql(getSeriesState(userId, sourceId, seriesId));
   },
 
-  async list(userId: string) {
+  async list(userId: UserId) {
     return await runSql(list(userId));
   },
 
-  async removeSeries(userId: string, sourceId: string, seriesId: string) {
+  async removeSeries(
+    userId: UserId,
+    sourceId: SourceId,
+    seriesId: SourceSeriesId
+  ) {
     return await runSql(removeSeries(userId, sourceId, seriesId));
   },
 
   async updateSeriesState(
-    userId: string,
+    userId: UserId,
     input: {
-      sourceId: string;
-      seriesId: string;
+      sourceId: SourceId;
+      seriesId: SourceSeriesId;
       isTracked: boolean;
       autoDownload: boolean;
-      downloadDestinationId?: string | null;
+      downloadDestinationId?: DownloadDestinationId | null;
     },
     trackingPollIntervalMs: string
   ) {

@@ -13,10 +13,11 @@ import {
   notificationEndpointColumns,
   notificationRow,
 } from "@mangy/db/model";
+import type { NotificationId, UserId } from "@mangy/db/model";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
-const list = (userId: string) =>
+const list = (userId: UserId) =>
   Effect.gen(function* listEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -36,7 +37,7 @@ const list = (userId: string) =>
     }));
   });
 
-const markRead = (userId: string, notificationId: string) =>
+const markRead = (userId: UserId, notificationId: NotificationId) =>
   Effect.gen(function* markReadEffect() {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* decodeRows(
@@ -78,7 +79,7 @@ const markRead = (userId: string, notificationId: string) =>
     };
   });
 
-const markAllRead = (userId: string) =>
+const markAllRead = (userId: UserId) =>
   Effect.gen(function* markAllReadEffect() {
     const sql = yield* SqlClient.SqlClient;
     const records = yield* decodeRows(
@@ -96,7 +97,7 @@ const markAllRead = (userId: string) =>
     return { updatedCount: records.length };
   });
 
-const getPreferences = (userId: string) =>
+const getPreferences = (userId: UserId) =>
   Effect.gen(function* getPreferencesEffect() {
     const sql = yield* SqlClient.SqlClient;
     const [endpoint, unreadRecord] = yield* Effect.all(
@@ -134,7 +135,7 @@ const getPreferences = (userId: string) =>
     };
   });
 
-const updatePreferences = (userId: string, input: { inAppEnabled: boolean }) =>
+const updatePreferences = (userId: UserId, input: { inAppEnabled: boolean }) =>
   Effect.gen(function* updatePreferencesEffect() {
     const sql = yield* SqlClient.SqlClient;
     const existing = yield* decodeRows(
@@ -172,23 +173,23 @@ const updatePreferences = (userId: string, input: { inAppEnabled: boolean }) =>
 export { getPreferences as getPreferencesEffect };
 
 export const NotificationsService = {
-  async getPreferences(userId: string) {
+  async getPreferences(userId: UserId) {
     return await runSql(getPreferences(userId));
   },
 
-  async list(userId: string) {
+  async list(userId: UserId) {
     return await runSql(list(userId));
   },
 
-  async markAllRead(userId: string) {
+  async markAllRead(userId: UserId) {
     return await runSql(markAllRead(userId));
   },
 
-  async markRead(userId: string, notificationId: string) {
+  async markRead(userId: UserId, notificationId: NotificationId) {
     return await runSql(markRead(userId, notificationId));
   },
 
-  async updatePreferences(userId: string, input: { inAppEnabled: boolean }) {
+  async updatePreferences(userId: UserId, input: { inAppEnabled: boolean }) {
     return await runSql(updatePreferences(userId, input));
   },
 };

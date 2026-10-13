@@ -1,4 +1,5 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import type { LibraryItem, TrackedSeries } from "@mangy/contract";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
@@ -28,19 +29,17 @@ import { formatCause, formatDateTime } from "@/lib/format";
 import { notifyMutation } from "@/lib/notify-mutation";
 import { requireAuth } from "@/lib/require-auth";
 
-interface LibraryRouteItem {
-  id: string;
-  sourceId: string;
-  seriesId: string;
-  title: string;
-  destinationName: Option.Option<string>;
-  isTracked: boolean;
-  autoDownload: boolean;
-  trackingState: {
-    nextCheckAt: Option.Option<string>;
-    lastCheckedAt: Option.Option<string>;
-  } | null;
-}
+type LibraryRouteItem = Pick<
+  LibraryItem,
+  | "autoDownload"
+  | "destinationName"
+  | "isTracked"
+  | "seriesId"
+  | "sourceId"
+  | "title"
+> & {
+  trackingState: TrackedSeries | null;
+};
 
 interface LibraryListProps {
   items: LibraryRouteItem[];
@@ -69,7 +68,7 @@ const LibraryList = ({ items, onRemove }: LibraryListProps) => {
         ].join(" · ");
 
         return (
-          <div className="row" key={item.id}>
+          <div className="row" key={`${item.sourceId}:${item.seriesId}`}>
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Link
@@ -190,7 +189,6 @@ const LibraryRouteComponent = () => {
       autoDownload: false,
       coverImageUrl: Option.none<string>(),
       destinationName: Option.none<string>(),
-      id: item.id,
       isTracked: true,
       seriesId: item.seriesId,
       sourceId: item.sourceId,

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { Model } from "effect/schema";
 
-import { SeriesIdSchema, SourceIdSchema } from "./ids";
+import { SeriesIdSchema, SourceIdSchema, SourceSeriesIdSchema } from "./ids";
 
 export const seriesTable = "series";
 
@@ -14,7 +14,7 @@ export class Series extends Model.Class<Series>("Series")({
   coverImageUrl: Schema.OptionFromNullOr(Schema.String),
   createdAt: Schema.Date,
   description: Schema.OptionFromNullOr(Schema.String),
-  externalId: Schema.String,
+  externalId: SourceSeriesIdSchema,
   id: SeriesIdSchema,
   lastFetchedAt: Schema.Date,
   latestChapter: Schema.OptionFromNullOr(Schema.String),

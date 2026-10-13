@@ -1,7 +1,11 @@
 import { Schema } from "effect";
 import { Model } from "effect/schema";
 
-import { DownloadDestinationIdSchema, UserIdSchema } from "./ids";
+import {
+  DownloadDestinationIdSchema,
+  KomgaLibraryIdSchema,
+  UserIdSchema,
+} from "./ids";
 
 export const downloadDestinationTable = "download_destination";
 
@@ -13,7 +17,7 @@ export class DownloadDestination extends Model.Class<DownloadDestination>(
   id: DownloadDestinationIdSchema,
   isDefault: Schema.Boolean,
   isEnabled: Schema.Boolean,
-  komgaLibraryId: Schema.OptionFromNullOr(Schema.String),
+  komgaLibraryId: Schema.OptionFromNullOr(KomgaLibraryIdSchema),
   name: Schema.String,
   updatedAt: Schema.Date,
   userId: UserIdSchema,
