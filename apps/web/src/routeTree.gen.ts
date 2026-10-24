@@ -16,6 +16,12 @@ import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as QueueRouteImport } from './routes/queue'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsAccountRouteImport } from './routes/settings.account'
+import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
+import { Route as SettingsBrowserNotificationsRouteImport } from './routes/settings.browser-notifications'
+import { Route as SettingsDestinationsRouteImport } from './routes/settings.destinations'
+import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
 import { Route as SeriesSourceIdSeriesIdRouteImport } from './routes/series.$sourceId.$seriesId'
 import { Route as SeriesSourceIdSeriesIdReadChapterIdRouteImport } from './routes/series.$sourceId.$seriesId.read.$chapterId'
 
@@ -54,6 +60,37 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAccountRoute = SettingsAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
+  id: '/appearance',
+  path: '/appearance',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsBrowserNotificationsRoute =
+  SettingsBrowserNotificationsRouteImport.update({
+    id: '/browser-notifications',
+    path: '/browser-notifications',
+    getParentRoute: () => SettingsRoute,
+  } as any)
+const SettingsDestinationsRoute = SettingsDestinationsRouteImport.update({
+  id: '/destinations',
+  path: '/destinations',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsNotificationsRoute = SettingsNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SeriesSourceIdSeriesIdRoute = SeriesSourceIdSeriesIdRouteImport.update({
   id: '/series/$sourceId/$seriesId',
   path: '/series/$sourceId/$seriesId',
@@ -73,7 +110,13 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/queue': typeof QueueRoute
   '/search': typeof SearchRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/account': typeof SettingsAccountRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/browser-notifications': typeof SettingsBrowserNotificationsRoute
+  '/settings/destinations': typeof SettingsDestinationsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
+  '/settings/': typeof SettingsIndexRoute
   '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRouteWithChildren
   '/series/$sourceId/$seriesId/read/$chapterId': typeof SeriesSourceIdSeriesIdReadChapterIdRoute
 }
@@ -84,7 +127,12 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/queue': typeof QueueRoute
   '/search': typeof SearchRoute
-  '/settings': typeof SettingsRoute
+  '/settings/account': typeof SettingsAccountRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/browser-notifications': typeof SettingsBrowserNotificationsRoute
+  '/settings/destinations': typeof SettingsDestinationsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
+  '/settings': typeof SettingsIndexRoute
   '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRouteWithChildren
   '/series/$sourceId/$seriesId/read/$chapterId': typeof SeriesSourceIdSeriesIdReadChapterIdRoute
 }
@@ -96,7 +144,13 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/queue': typeof QueueRoute
   '/search': typeof SearchRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/account': typeof SettingsAccountRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/browser-notifications': typeof SettingsBrowserNotificationsRoute
+  '/settings/destinations': typeof SettingsDestinationsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
+  '/settings/': typeof SettingsIndexRoute
   '/series/$sourceId/$seriesId': typeof SeriesSourceIdSeriesIdRouteWithChildren
   '/series/$sourceId/$seriesId/read/$chapterId': typeof SeriesSourceIdSeriesIdReadChapterIdRoute
 }
@@ -110,6 +164,12 @@ export interface FileRouteTypes {
     | '/queue'
     | '/search'
     | '/settings'
+    | '/settings/account'
+    | '/settings/appearance'
+    | '/settings/browser-notifications'
+    | '/settings/destinations'
+    | '/settings/notifications'
+    | '/settings/'
     | '/series/$sourceId/$seriesId'
     | '/series/$sourceId/$seriesId/read/$chapterId'
   fileRoutesByTo: FileRoutesByTo
@@ -120,6 +180,11 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/queue'
     | '/search'
+    | '/settings/account'
+    | '/settings/appearance'
+    | '/settings/browser-notifications'
+    | '/settings/destinations'
+    | '/settings/notifications'
     | '/settings'
     | '/series/$sourceId/$seriesId'
     | '/series/$sourceId/$seriesId/read/$chapterId'
@@ -132,6 +197,12 @@ export interface FileRouteTypes {
     | '/queue'
     | '/search'
     | '/settings'
+    | '/settings/account'
+    | '/settings/appearance'
+    | '/settings/browser-notifications'
+    | '/settings/destinations'
+    | '/settings/notifications'
+    | '/settings/'
     | '/series/$sourceId/$seriesId'
     | '/series/$sourceId/$seriesId/read/$chapterId'
   fileRoutesById: FileRoutesById
@@ -143,7 +214,7 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   QueueRoute: typeof QueueRoute
   SearchRoute: typeof SearchRoute
-  SettingsRoute: typeof SettingsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   SeriesSourceIdSeriesIdRoute: typeof SeriesSourceIdSeriesIdRouteWithChildren
 }
 
@@ -198,6 +269,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/account': {
+      id: '/settings/account'
+      path: '/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof SettingsAccountRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/appearance': {
+      id: '/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof SettingsAppearanceRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/browser-notifications': {
+      id: '/settings/browser-notifications'
+      path: '/browser-notifications'
+      fullPath: '/settings/browser-notifications'
+      preLoaderRoute: typeof SettingsBrowserNotificationsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/destinations': {
+      id: '/settings/destinations'
+      path: '/destinations'
+      fullPath: '/settings/destinations'
+      preLoaderRoute: typeof SettingsDestinationsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/notifications': {
+      id: '/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof SettingsNotificationsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/series/$sourceId/$seriesId': {
       id: '/series/$sourceId/$seriesId'
       path: '/series/$sourceId/$seriesId'
@@ -214,6 +327,28 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface SettingsRouteChildren {
+  SettingsAccountRoute: typeof SettingsAccountRoute
+  SettingsAppearanceRoute: typeof SettingsAppearanceRoute
+  SettingsBrowserNotificationsRoute: typeof SettingsBrowserNotificationsRoute
+  SettingsDestinationsRoute: typeof SettingsDestinationsRoute
+  SettingsNotificationsRoute: typeof SettingsNotificationsRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsAccountRoute: SettingsAccountRoute,
+  SettingsAppearanceRoute: SettingsAppearanceRoute,
+  SettingsBrowserNotificationsRoute: SettingsBrowserNotificationsRoute,
+  SettingsDestinationsRoute: SettingsDestinationsRoute,
+  SettingsNotificationsRoute: SettingsNotificationsRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
 
 interface SeriesSourceIdSeriesIdRouteChildren {
   SeriesSourceIdSeriesIdReadChapterIdRoute: typeof SeriesSourceIdSeriesIdReadChapterIdRoute
@@ -237,7 +372,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   QueueRoute: QueueRoute,
   SearchRoute: SearchRoute,
-  SettingsRoute: SettingsRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   SeriesSourceIdSeriesIdRoute: SeriesSourceIdSeriesIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
