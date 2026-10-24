@@ -12,6 +12,8 @@ import {
 import { HttpApiBuilder } from "effect/http-api";
 
 import type { AppConfig } from "./config";
+import { CurrentUserMiddlewareLayer } from "./lib/auth";
+import { ApiKeysApiLive } from "./modules/api-keys";
 import { DownloadsApiLive } from "./modules/downloads";
 import { makeLibraryApiLive } from "./modules/library";
 import { heartbeatIntervalSeconds, LiveApiLive } from "./modules/live";
@@ -73,21 +75,20 @@ export const makeServer = (config: AppConfig) => {
     { global: true }
   );
 
+  const ApiHandlers = Layer.mergeAll(
+    TrackingApiLive,
+    NotificationsApiLive,
+    DownloadsApiLive,
+    makeLibraryApiLive(config.trackingPollIntervalMs),
+    SourcesApiLive,
+    SeriesApiLive,
+    SettingsApiLive,
+    ApiKeysApiLive,
+    LiveApiLive
+  ).pipe(Layer.provide(CurrentUserMiddlewareLayer));
+
   const routes = Layer.mergeAll(
-    HttpApiBuilder.layer(Api).pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          TrackingApiLive,
-          NotificationsApiLive,
-          DownloadsApiLive,
-          makeLibraryApiLive(config.trackingPollIntervalMs),
-          SourcesApiLive,
-          SeriesApiLive,
-          SettingsApiLive,
-          LiveApiLive
-        )
-      )
-    ),
+    HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiHandlers)),
     AuthRoutes,
     HealthRoute,
     SeriesPageImageRoute,

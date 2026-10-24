@@ -1,6 +1,7 @@
 import type { Schema } from "effect";
 
 import { Account, accountColumns, accountTable } from "./account";
+import { ApiKey, apiKeyColumns, apiKeyTable } from "./api-key";
 import { Chapter, chapterColumns, chapterTable } from "./chapter";
 import {
   DownloadArtifact,
@@ -60,6 +61,7 @@ import {
 export * from "./user";
 export * from "./session";
 export * from "./account";
+export * from "./api-key";
 export * from "./verification";
 export * from "./source";
 export * from "./series";
@@ -77,6 +79,7 @@ export * from "./ids";
 
 export const modelTables = {
   account: { columns: accountColumns, schema: Account, table: accountTable },
+  apikey: { columns: apiKeyColumns, schema: ApiKey, table: apiKeyTable },
   chapter: { columns: chapterColumns, schema: Chapter, table: chapterTable },
   downloadArtifact: {
     columns: downloadArtifactColumns,

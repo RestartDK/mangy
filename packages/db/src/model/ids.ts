@@ -3,6 +3,9 @@ import { Schema } from "effect";
 export const AccountIdSchema = Schema.String.pipe(Schema.brand("AccountId"));
 export type AccountId = typeof AccountIdSchema.Type;
 
+export const ApiKeyIdSchema = Schema.String.pipe(Schema.brand("ApiKeyId"));
+export type ApiKeyId = typeof ApiKeyIdSchema.Type;
+
 export const ChapterIdSchema = Schema.String.pipe(Schema.brand("ChapterId"));
 export type ChapterId = typeof ChapterIdSchema.Type;
 
@@ -88,6 +91,7 @@ const decoder =
   (value: unknown): S["Type"] =>
     Schema.decodeUnknownSync(schema)(value);
 
+export const decodeApiKeyId = decoder(ApiKeyIdSchema);
 export const decodeDownloadDestinationId = decoder(DownloadDestinationIdSchema);
 export const decodeKomgaLibraryId = decoder(KomgaLibraryIdSchema);
 export const decodeSourceChapterId = decoder(SourceChapterIdSchema);

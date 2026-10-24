@@ -1,4 +1,5 @@
 export type {
+  ApiKeyId,
   DownloadDestinationId,
   DownloadJobId,
   KomgaLibraryId,
@@ -11,6 +12,7 @@ export type {
 } from "@mangy/db/model/ids";
 
 export {
+  ApiKeyIdSchema,
   decodeDownloadDestinationId,
   decodeKomgaLibraryId,
   decodeSourceChapterId,

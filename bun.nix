@@ -173,6 +173,10 @@
     url = "https://registry.npmjs.org/@babel/types/-/types-7.29.8.tgz";
     hash = "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==";
   };
+  "@better-auth/api-key@1.7.7" = fetchurl {
+    url = "https://registry.npmjs.org/@better-auth/api-key/-/api-key-1.7.7.tgz";
+    hash = "sha512-XWtZxF37A7BURHh/GvsYh2Vype1p+R1ZxvQHkRzB4tK3uniZpILe2WRIXfVj3m8NIBHdg8Ez8S8sZJY/ewTu7w==";
+  };
   "@better-auth/core@1.7.7" = fetchurl {
     url = "https://registry.npmjs.org/@better-auth/core/-/core-1.7.7.tgz";
     hash = "sha512-srgFzHEjB2WWlokFz1i4BfG41sNhsA105Pukgqu6RrEh5A+LSkzf1mCHydVipkjt9l5qswtBMi7IL6ouHbZL4Q==";

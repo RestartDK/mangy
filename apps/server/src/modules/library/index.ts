@@ -1,8 +1,6 @@
-import { Api, BadRequest } from "@mangy/contract";
+import { Api, BadRequest, CurrentUser } from "@mangy/contract";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
-
-import { currentUser } from "@/lib/auth";
 
 import { LibraryService } from "./service";
 
@@ -15,7 +13,7 @@ export const makeLibraryApiLive = (trackingPollIntervalMs: string) =>
   HttpApiBuilder.group(Api, "library", (handlers) =>
     handlers.handleAll({
       getSeriesState: Effect.fn(function* getSeriesStateHandler({ query }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.promise(
           async () =>
             await LibraryService.getSeriesState(
@@ -26,13 +24,13 @@ export const makeLibraryApiLive = (trackingPollIntervalMs: string) =>
         );
       }),
       list: Effect.fn(function* listHandler() {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.promise(
           async () => await LibraryService.list(userId)
         );
       }),
       removeSeries: Effect.fn(function* removeSeriesHandler({ query }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to remove library series"),
           try: async () =>
@@ -46,7 +44,7 @@ export const makeLibraryApiLive = (trackingPollIntervalMs: string) =>
       updateSeriesState: Effect.fn(function* updateSeriesStateHandler({
         payload,
       }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to update library state"),
           try: async () =>
