@@ -15,6 +15,12 @@ export const browserPushSettingsQuery = ApiAtoms.query("settings", "getPush", {
   reactivityKeys: [reactivityKey.browserPushSettings],
 });
 
+export const komgaLibrariesQuery = ApiAtoms.query(
+  "settings",
+  "getKomgaLibraries",
+  {}
+);
+
 export const browserPushClientState = Atom.make(
   Effect.promise(async () => await getBrowserPushClientState())
 ).pipe(Atom.withReactivity([reactivityKey.browserPushClientState]));
@@ -22,6 +28,11 @@ export const browserPushClientState = Atom.make(
 export const createDestination = ApiAtoms.mutation(
   "settings",
   "createDestination"
+);
+
+export const createKomgaDestination = ApiAtoms.mutation(
+  "settings",
+  "createKomgaDestination"
 );
 
 export const deleteDestination = ApiAtoms.mutation(
