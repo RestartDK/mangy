@@ -1,4 +1,5 @@
 export const reactivityKey = {
+  apiKeys: "api-keys",
   browserPushClientState: "browser-push-client-state",
   browserPushSettings: "browser-push-settings",
   downloads: "downloads",

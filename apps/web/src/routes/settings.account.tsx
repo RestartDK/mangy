@@ -4,6 +4,7 @@ import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
 import { settingsBootstrapQuery } from "@/atoms/settings";
+import { ApiKeysPanel } from "@/components/settings/api-keys-panel";
 import { SectionError } from "@/components/settings/section-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hasText } from "@/lib/format";
@@ -62,6 +63,8 @@ const AccountRouteComponent = () => {
           </dl>
         </section>
       )}
+
+      <ApiKeysPanel />
     </div>
   );
 };

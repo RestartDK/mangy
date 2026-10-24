@@ -1,8 +1,6 @@
-import { Api, BadRequest } from "@mangy/contract";
+import { Api, BadRequest, CurrentUser } from "@mangy/contract";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
-
-import { currentSessionUser, currentUser } from "@/lib/auth";
 
 import { SettingsService } from "./service";
 
@@ -17,7 +15,7 @@ export const SettingsApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers.handleAll({
       bootstrap: Effect.fn(function* bootstrapHandler() {
-        const { email, id, name } = yield* currentSessionUser;
+        const { email, id, name } = yield* CurrentUser;
         return yield* Effect.promise(
           async () => await SettingsService.getBootstrap(id, { email, name })
         );
@@ -25,7 +23,7 @@ export const SettingsApiLive = HttpApiBuilder.group(
       createDestination: Effect.fn(function* createDestinationHandler({
         payload,
       }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to save destination"),
           try: async () =>
@@ -34,7 +32,7 @@ export const SettingsApiLive = HttpApiBuilder.group(
       }),
       createKomgaDestination: Effect.fn(
         function* createKomgaDestinationHandler({ payload }) {
-          const userId = yield* currentUser;
+          const { id: userId } = yield* CurrentUser;
           return yield* Effect.tryPromise({
             catch: badRequest("Unable to save destination"),
             try: async () =>
@@ -45,7 +43,7 @@ export const SettingsApiLive = HttpApiBuilder.group(
       deleteDestination: Effect.fn(function* deleteDestinationHandler({
         params,
       }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to delete destination"),
           try: async () =>
@@ -56,21 +54,21 @@ export const SettingsApiLive = HttpApiBuilder.group(
         });
       }),
       getKomgaLibraries: Effect.fn(function* getKomgaLibrariesHandler() {
-        yield* currentUser;
+        yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to list Komga libraries"),
           try: async () => await SettingsService.getKomgaLibraries(),
         });
       }),
       getPush: Effect.fn(function* getPushHandler() {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.promise(
           async () => await SettingsService.getBrowserPushSettings(userId)
         );
       }),
       removePushSubscription: Effect.fn(
         function* removePushSubscriptionHandler({ payload }) {
-          const userId = yield* currentUser;
+          const { id: userId } = yield* CurrentUser;
           return yield* Effect.tryPromise({
             catch: badRequest("Unable to remove this browser subscription"),
             try: async () =>
@@ -81,7 +79,7 @@ export const SettingsApiLive = HttpApiBuilder.group(
       savePushSubscription: Effect.fn(function* savePushSubscriptionHandler({
         payload,
       }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to save this browser subscription"),
           try: async () =>
@@ -89,7 +87,7 @@ export const SettingsApiLive = HttpApiBuilder.group(
         });
       }),
       sendTestPush: Effect.fn(function* sendTestPushHandler() {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to send a browser test notification"),
           try: async () => await SettingsService.sendTestBrowserPush(userId),
@@ -98,7 +96,7 @@ export const SettingsApiLive = HttpApiBuilder.group(
       updatePushPreferences: Effect.fn(function* updatePushPreferencesHandler({
         payload,
       }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: badRequest("Unable to update browser notification settings"),
           try: async () =>

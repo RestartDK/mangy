@@ -1,8 +1,6 @@
-import { Api, RefreshFailed } from "@mangy/contract";
+import { Api, CurrentUser, RefreshFailed } from "@mangy/contract";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
-
-import { currentUser } from "@/lib/auth";
 
 import { TrackingService } from "./service";
 
@@ -12,13 +10,13 @@ export const TrackingApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers.handleAll({
       list: Effect.fn(function* listHandler() {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.promise(
           async () => await TrackingService.list(userId)
         );
       }),
       refresh: Effect.fn(function* refreshHandler({ payload }) {
-        const userId = yield* currentUser;
+        const { id: userId } = yield* CurrentUser;
         return yield* Effect.tryPromise({
           catch: (cause) =>
             new RefreshFailed({

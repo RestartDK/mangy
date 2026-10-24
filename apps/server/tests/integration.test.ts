@@ -288,6 +288,35 @@ const jsonRequest = (body: unknown, init?: RequestInit): RequestInit => ({
 const readJson = async <T>(response: Response): Promise<T> =>
   (await response.json()) as T;
 
+const withApiKey = async (secret: string, path: string, init?: RequestInit) =>
+  await app.handle(
+    new Request(`http://localhost${path}`, {
+      ...init,
+      headers: {
+        ...Object.fromEntries(new Headers(init?.headers).entries()),
+        "x-api-key": secret,
+      },
+    })
+  );
+
+interface ApiKeyBody {
+  createdAt: string;
+  id: string;
+  lastUsedAt: string | null;
+  name: string;
+  prefix: string;
+}
+
+interface CreatedApiKeyBody {
+  key: ApiKeyBody;
+  secret: string;
+}
+
+interface BootstrapBody {
+  destinations: { id: string }[];
+  profile: { email: string };
+}
+
 const readUntilChunk = async (
   reader: ReadableStreamDefaultReader<Uint8Array>,
   matcher: string,
@@ -362,6 +391,127 @@ describe("server and worker integration", () => {
       }
     );
     expect(settingsBootstrapResponse.status).toBe(200);
+  });
+
+  test("api keys authenticate as their owner, stay scoped to that user, and stop after revoke", async () => {
+    const password = "reader-password-123";
+    const ownerEmail = `api-key-owner-${crypto.randomUUID()}@example.com`;
+    const otherEmail = `api-key-other-${crypto.randomUUID()}@example.com`;
+    const owner = await createApiClient(ownerEmail, password, "Key Owner");
+    const other = await createApiClient(otherEmail, password, "Key Other");
+
+    assert.ok(owner.userId !== null && other.userId !== null);
+    cleanupState.userIds.add(owner.userId);
+    cleanupState.userIds.add(other.userId);
+    cleanupState.tempPaths.add(
+      await mkdtemp(nodePath.join(tmpdir(), "mangy-api-key-"))
+    );
+
+    const bootstrapByHeader = async (secret: string) => {
+      const response = await withApiKey(secret, "/api/settings/bootstrap", {
+        method: "GET",
+      });
+      expect(response.status).toBe(200);
+      return await readJson<BootstrapBody>(response);
+    };
+
+    const withoutHeader = await app.handle(
+      new Request("http://localhost/api/settings/bootstrap", { method: "GET" })
+    );
+    expect(withoutHeader.status).toBe(401);
+
+    const createResponse = await owner.apiFetch(
+      "/api/api-keys",
+      jsonRequest({ name: "Integration script" }, { method: "POST" })
+    );
+    expect(createResponse.status).toBe(200);
+    const created = await readJson<CreatedApiKeyBody>(createResponse);
+
+    expect(created.secret.startsWith("mangy_")).toBe(true);
+    expect(created.key.name).toBe("Integration script");
+    expect(created.key.lastUsedAt).toBeNull();
+    expect(created.key.prefix).toBe(created.secret.slice(0, 12));
+
+    const ownerBootstrap = await bootstrapByHeader(created.secret);
+    expect(ownerBootstrap.profile.email).toBe(ownerEmail);
+
+    const listedKeys = await readJson<ApiKeyBody[]>(
+      await owner.apiFetch("/api/api-keys", { method: "GET" })
+    );
+    expect(listedKeys).toHaveLength(1);
+    expect(listedKeys[0]?.id).toBe(created.key.id);
+    expect(listedKeys[0]?.lastUsedAt).toBeString();
+    expect(JSON.stringify(listedKeys)).not.toContain(created.secret);
+
+    const otherDestinationDirectory = await mkdtemp(
+      nodePath.join(tmpdir(), "mangy-api-key-other-")
+    );
+    cleanupState.tempPaths.add(otherDestinationDirectory);
+    const otherDestinationResponse = await other.apiFetch(
+      "/api/settings/destinations",
+      jsonRequest(
+        {
+          absolutePath: otherDestinationDirectory,
+          name: "Other library",
+        },
+        { method: "POST" }
+      )
+    );
+    expect(otherDestinationResponse.status).toBe(200);
+    const otherDestination = await readJson<{ id: string }>(
+      otherDestinationResponse
+    );
+
+    expect(
+      ownerBootstrap.destinations.map((destination) => destination.id)
+    ).not.toContain(otherDestination.id);
+
+    const foreignDelete = await withApiKey(
+      created.secret,
+      `/api/settings/destinations/${otherDestination.id}`,
+      { method: "DELETE" }
+    );
+    expect(foreignDelete.status).toBe(400);
+    const otherKeyResponse = await other.apiFetch(
+      "/api/api-keys",
+      jsonRequest({ name: "Other script" }, { method: "POST" })
+    );
+    expect(otherKeyResponse.status).toBe(200);
+    const otherKey = await readJson<CreatedApiKeyBody>(otherKeyResponse);
+    const otherBootstrap = await bootstrapByHeader(otherKey.secret);
+    expect(
+      otherBootstrap.destinations.map((destination) => destination.id)
+    ).toContain(otherDestination.id);
+    expect(otherBootstrap.profile.email).toBe(otherEmail);
+
+    const foreignRevoke = await withApiKey(
+      created.secret,
+      `/api/api-keys/${otherKey.key.id}`,
+      { method: "DELETE" }
+    );
+    expect(foreignRevoke.status).toBe(400);
+
+    const revokeResponse = await owner.apiFetch(
+      `/api/api-keys/${created.key.id}`,
+      { method: "DELETE" }
+    );
+    expect(revokeResponse.status).toBe(200);
+    expect(await readJson<{ id: string }>(revokeResponse)).toEqual({
+      id: created.key.id,
+    });
+
+    const afterRevoke = await withApiKey(
+      created.secret,
+      "/api/settings/bootstrap",
+      { method: "GET" }
+    );
+    expect(afterRevoke.status).toBe(401);
+
+    const unknownKeyWithSession = await owner.apiFetch(
+      "/api/settings/bootstrap",
+      { headers: { "x-api-key": "mangy_notarealkey" }, method: "GET" }
+    );
+    expect(unknownKeyWithSession.status).toBe(401);
   });
 
   test("queue controls, worker processing, tracking automation, and notification APIs work together", async () => {

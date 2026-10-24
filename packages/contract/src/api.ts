@@ -1,5 +1,7 @@
 import { HttpApi } from "effect/http-api";
 
+import { ApiKeysApi } from "./api-keys";
+import { CurrentUserMiddleware } from "./current-user-middleware";
 import { DownloadsApi } from "./downloads";
 import { LibraryApi } from "./library";
 import { LiveApi } from "./live";
@@ -17,4 +19,6 @@ export const Api = HttpApi.make("mangy-api")
   .add(SourcesApi)
   .add(SeriesApi)
   .add(SettingsApi)
-  .add(LiveApi);
+  .add(ApiKeysApi)
+  .add(LiveApi)
+  .middleware(CurrentUserMiddleware);

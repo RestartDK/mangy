@@ -1,10 +1,8 @@
-import { Api } from "@mangy/contract";
+import { Api, CurrentUser } from "@mangy/contract";
 import type { LiveEvent, LiveSnapshot } from "@mangy/contract";
 import type { UserId } from "@mangy/db/model";
 import { Duration, Effect, Schedule, Stream } from "effect";
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
-
-import { currentUser } from "@/lib/auth";
 
 import { hasSnapshotChanged, LiveService } from "./service";
 
@@ -60,7 +58,7 @@ const liveEvents = (userId: UserId, initial: LiveSnapshot) =>
 export const LiveApiLive = HttpApiBuilder.group(Api, "live", (handlers) =>
   handlers.handleAll({
     events: Effect.fn(function* eventsHandler() {
-      const userId = yield* currentUser;
+      const { id: userId } = yield* CurrentUser;
       const initialSnapshot = yield* Effect.promise(
         async () => await LiveService.loadSnapshot(userId)
       );

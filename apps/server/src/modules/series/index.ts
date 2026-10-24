@@ -1,10 +1,15 @@
-import { Api, SeriesPageNotFound, SeriesRequestFailed } from "@mangy/contract";
+import {
+  Api,
+  CurrentUser,
+  SeriesPageNotFound,
+  SeriesRequestFailed,
+} from "@mangy/contract";
 import { decodeSourceChapterId, decodeSourceId } from "@mangy/db/model";
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 
-import { currentUser, getSessionUser } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 
 import { SeriesService, SeriesServiceError } from "./service";
 
@@ -31,7 +36,7 @@ const requestUrl = (request: HttpServerRequest.HttpServerRequest) =>
 export const SeriesApiLive = HttpApiBuilder.group(Api, "series", (handlers) =>
   handlers.handleAll({
     get: Effect.fn(function* getSeriesHandler({ params, query }) {
-      yield* currentUser;
+      yield* CurrentUser;
       return yield* Effect.tryPromise({
         catch: seriesRequestFailed,
         try: async () =>
@@ -39,7 +44,7 @@ export const SeriesApiLive = HttpApiBuilder.group(Api, "series", (handlers) =>
       });
     }),
     getChapters: Effect.fn(function* getChaptersHandler({ params, query }) {
-      yield* currentUser;
+      yield* CurrentUser;
       return yield* Effect.tryPromise({
         catch: seriesRequestFailed,
         try: async () =>
@@ -47,7 +52,7 @@ export const SeriesApiLive = HttpApiBuilder.group(Api, "series", (handlers) =>
       });
     }),
     getPages: Effect.fn(function* getPagesHandler({ params, query, request }) {
-      yield* currentUser;
+      yield* CurrentUser;
       const absoluteUrl = requestUrl(request);
       return yield* Effect.tryPromise({
         catch: seriesPageFailed,
